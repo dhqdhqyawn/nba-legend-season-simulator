@@ -871,9 +871,12 @@
     .side {
       position: sticky;
       top: 16px;
+      min-width: 0;
       display: grid;
       gap: 12px;
     }
+
+    .side > * { min-width: 0; }
 
     .side-section,
     .top-lineup {
@@ -1240,6 +1243,402 @@
       font-weight: 800;
     }
 
+    body.result-modal-open {
+      overflow: hidden;
+    }
+
+    .season-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      display: grid;
+      place-items: center;
+      padding: 16px;
+      visibility: hidden;
+      opacity: 0;
+      transition: opacity .18s ease, visibility .18s ease;
+    }
+
+    .season-modal.is-open {
+      visibility: visible;
+      opacity: 1;
+    }
+
+    .season-modal-backdrop {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border: 0;
+      border-radius: 0;
+      background: rgba(13, 12, 10, .76);
+      backdrop-filter: blur(4px);
+      cursor: default;
+    }
+
+    .season-modal-dialog {
+      position: relative;
+      width: min(940px, 100%);
+      max-height: calc(100svh - 32px);
+      display: grid;
+      grid-template-rows: auto auto minmax(0, 1fr) auto;
+      overflow: hidden;
+      border: 1px solid rgba(25, 23, 20, .22);
+      border-radius: 8px;
+      background: #f8f5ef;
+      color: var(--ink);
+      box-shadow: 0 28px 80px rgba(0, 0, 0, .38);
+      transform: translateY(12px) scale(.985);
+      transition: transform .18s ease;
+    }
+
+    .season-modal.is-open .season-modal-dialog {
+      transform: translateY(0) scale(1);
+    }
+
+    .season-modal-header {
+      min-height: 68px;
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      border-bottom: 1px solid var(--line);
+      background: #fffdf8;
+    }
+
+    .season-modal-kicker {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    .season-modal-title {
+      margin: 3px 0 0;
+      font-size: 22px;
+      line-height: 1.05;
+    }
+
+    .season-modal-close {
+      width: 38px;
+      height: 38px;
+      flex: 0 0 38px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--ink);
+      font-size: 25px;
+      line-height: 1;
+    }
+
+    .season-modal-tabs {
+      padding: 8px 18px 0;
+      display: flex;
+      gap: 4px;
+      border-bottom: 1px solid var(--line);
+      background: #fffdf8;
+    }
+
+    .season-modal-tab {
+      min-height: 38px;
+      padding: 0 14px;
+      border-bottom: 3px solid transparent;
+      color: var(--muted);
+      background: transparent;
+      font-weight: 950;
+    }
+
+    .season-modal-tab.is-active {
+      border-bottom-color: var(--red);
+      color: var(--ink);
+    }
+
+    .season-modal-scroll {
+      min-height: 0;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+
+    .season-modal-panel {
+      padding: 18px;
+    }
+
+    .season-modal-panel[hidden] {
+      display: none;
+    }
+
+    .season-result-hero {
+      padding: 20px;
+      display: grid;
+      grid-template-columns: minmax(220px, .85fr) minmax(0, 1.15fr);
+      gap: 20px;
+      align-items: center;
+      border-radius: 8px;
+      background: #181714;
+      color: #fff;
+    }
+
+    .season-result-tier {
+      display: inline-flex;
+      min-height: 28px;
+      align-items: center;
+      padding: 0 9px;
+      border-radius: 999px;
+      background: var(--gold);
+      color: #17130d;
+      font-size: 12px;
+      font-weight: 950;
+    }
+
+    .season-result-record {
+      margin-top: 8px;
+      font-size: 68px;
+      line-height: .95;
+      font-weight: 1000;
+    }
+
+    .season-result-summary {
+      margin: 10px 0 0;
+      color: rgba(255,255,255,.72);
+      font-size: 13px;
+      line-height: 1.45;
+      font-weight: 800;
+    }
+
+    .season-result-lineup {
+      display: grid;
+      gap: 6px;
+    }
+
+    .season-result-player {
+      min-height: 40px;
+      padding: 7px 9px;
+      display: grid;
+      grid-template-columns: 34px minmax(0, 1fr);
+      gap: 9px;
+      align-items: center;
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 8px;
+      background: rgba(255,255,255,.06);
+    }
+
+    .season-result-player span {
+      width: 34px;
+      height: 26px;
+      display: grid;
+      place-items: center;
+      border-radius: 6px;
+      background: rgba(255,255,255,.1);
+      color: var(--gold);
+      font-size: 11px;
+      font-weight: 1000;
+    }
+
+    .season-result-player b {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 13px;
+    }
+
+    .season-result-metrics {
+      margin-top: 12px;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .season-result-metric {
+      min-height: 72px;
+      padding: 11px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .season-result-metric b {
+      display: block;
+      font-size: 25px;
+      line-height: 1;
+    }
+
+    .season-result-metric span {
+      display: block;
+      margin-top: 7px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    .season-result-section {
+      margin-top: 18px;
+      padding-top: 16px;
+      border-top: 1px solid var(--line);
+    }
+
+    .season-result-section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .season-result-section-head h3 {
+      margin: 0;
+      font-size: 16px;
+    }
+
+    .season-result-section-head span {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 850;
+      text-align: right;
+    }
+
+    .season-result-playoffs {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .season-result-round {
+      min-height: 92px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .season-result-round.win {
+      border-color: rgba(35, 122, 87, .38);
+      background: rgba(35, 122, 87, .07);
+    }
+
+    .season-result-round.loss {
+      border-color: rgba(214, 64, 50, .34);
+      background: rgba(214, 64, 50, .06);
+    }
+
+    .season-result-round b,
+    .season-result-round strong,
+    .season-result-round span {
+      display: block;
+    }
+
+    .season-result-round b { font-size: 11px; }
+    .season-result-round strong { margin-top: 7px; font-size: 19px; }
+    .season-result-round span { margin-top: 6px; color: var(--muted); font-size: 11px; line-height: 1.3; }
+
+    .season-result-reasons {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .season-result-reason {
+      padding: 10px 11px;
+      border-left: 3px solid var(--gold);
+      background: #fff;
+      color: #3c3933;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .season-player-table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .season-player-table {
+      width: 100%;
+      min-width: 680px;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    .season-player-table th,
+    .season-player-table td {
+      padding: 11px 10px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    .season-player-table tr:last-child td { border-bottom: 0; }
+    .season-player-table th { color: var(--muted); font-size: 10px; }
+    .season-player-table td:first-child { white-space: normal; }
+
+    .season-player-name b,
+    .season-player-name span { display: block; }
+    .season-player-name span { margin-top: 3px; color: var(--muted); font-size: 10px; }
+
+    .season-model-details {
+      margin-top: 14px;
+      border-top: 1px solid var(--line);
+    }
+
+    .season-model-details summary {
+      padding: 13px 0;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 950;
+    }
+
+    .season-result-detail-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 7px;
+      padding-bottom: 4px;
+    }
+
+    .season-result-detail {
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .season-result-detail b,
+    .season-result-detail span { display: block; }
+    .season-result-detail span { margin-top: 4px; color: var(--muted); font-size: 10px; font-weight: 850; }
+
+    .season-modal-footer {
+      padding: 10px 18px;
+      display: flex;
+      justify-content: flex-end;
+      border-top: 1px solid var(--line);
+      background: #fffdf8;
+    }
+
+    @media (max-width: 760px) {
+      .season-modal { padding: 0; place-items: stretch; }
+      .season-modal-dialog { width: 100%; max-height: 100svh; border: 0; border-radius: 0; }
+      .season-modal-header { min-height: 60px; padding: 11px 14px; }
+      .season-modal-title { font-size: 19px; }
+      .season-modal-tabs { padding-left: 14px; padding-right: 14px; }
+      .season-modal-panel { padding: 12px; }
+      .season-result-hero { padding: 15px; grid-template-columns: 1fr; gap: 14px; }
+      .season-result-record { font-size: 58px; }
+      .season-result-lineup { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .season-result-player:last-child { grid-column: 1 / -1; }
+      .season-result-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .season-result-playoffs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .season-result-reasons { grid-template-columns: 1fr; }
+      .season-result-detail-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .season-modal-footer .btn { flex: 1; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .season-modal,
+      .season-modal-dialog { transition: none; }
+    }
+
     .model {
       padding: 14px;
       color: var(--muted);
@@ -1436,6 +1835,64 @@
       </aside>
     </div>
   </main>
+
+  <div class="season-modal" id="seasonModal" aria-hidden="true">
+    <div class="season-modal-backdrop" id="seasonModalBackdrop" aria-hidden="true"></div>
+    <section class="season-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="seasonModalTitle">
+      <header class="season-modal-header">
+        <div>
+          <div class="season-modal-kicker" id="seasonModalKicker">82 场常规赛与季后赛</div>
+          <h2 class="season-modal-title" id="seasonModalTitle">赛季模拟结果</h2>
+        </div>
+        <button class="season-modal-close" id="seasonModalClose" type="button" aria-label="关闭赛季结果" title="关闭">&times;</button>
+      </header>
+      <div class="season-modal-tabs" role="tablist" aria-label="结果视图">
+        <button class="season-modal-tab is-active" id="seasonOverviewTab" type="button" role="tab" aria-selected="true" aria-controls="seasonOverviewPanel" data-result-tab="overview">赛季结果</button>
+        <button class="season-modal-tab" id="seasonPlayersTab" type="button" role="tab" aria-selected="false" aria-controls="seasonPlayersPanel" data-result-tab="players">球员数据</button>
+      </div>
+      <div class="season-modal-scroll">
+        <section class="season-modal-panel" id="seasonOverviewPanel" role="tabpanel" aria-labelledby="seasonOverviewTab" data-result-panel="overview">
+          <div class="season-result-hero">
+            <div>
+              <span class="season-result-tier" id="seasonResultTier">等待结果</span>
+              <div class="season-result-record" id="seasonResultRecord">-- - --</div>
+              <p class="season-result-summary" id="seasonResultSummary"></p>
+            </div>
+            <div class="season-result-lineup" id="seasonResultLineup"></div>
+          </div>
+          <div class="season-result-metrics" id="seasonResultMetrics"></div>
+          <section class="season-result-section">
+            <div class="season-result-section-head">
+              <h3>季后赛路径</h3>
+              <span id="seasonResultPlayoffMeta"></span>
+            </div>
+            <div class="season-result-playoffs" id="seasonResultPlayoffs"></div>
+          </section>
+          <section class="season-result-section">
+            <div class="season-result-section-head">
+              <h3>为什么是这个结果</h3>
+              <span>阵容结构与时代环境</span>
+            </div>
+            <div class="season-result-reasons" id="seasonResultReasons"></div>
+          </section>
+        </section>
+        <section class="season-modal-panel" id="seasonPlayersPanel" role="tabpanel" aria-labelledby="seasonPlayersTab" data-result-panel="players" hidden>
+          <div class="season-result-section-head">
+            <h3>五人本季模拟数据</h3>
+            <span>产量会按球权、阵容空间与胜场重新分配</span>
+          </div>
+          <div class="season-player-table-wrap" id="seasonResultPlayers"></div>
+          <details class="season-model-details">
+            <summary>查看完整模型维度</summary>
+            <div class="season-result-detail-grid" id="seasonResultDetails"></div>
+          </details>
+        </section>
+      </div>
+      <footer class="season-modal-footer">
+        <button class="btn secondary" id="seasonModalDone" type="button">返回阵容</button>
+      </footer>
+    </section>
+  </div>
 
   <script>
     if (location.protocol === "file:") {
@@ -1755,9 +2212,9 @@
       ["Vince Carter","2000-01 Half Man","Raptors","SG/SF","shotCreator",92,94,80,78,86,97,68,88,88,91,27.6,.551,25.0,.189,5.1,5.7,["扣篮王","锋卫摇摆"]],
       ["Tracy McGrady","2002-03 Scoring Apex","Magic","SG/SF","shotCreator",95,98,82,84,86,95,70,88,96,93,32.1,.564,30.3,.262,9.7,7.4,["得分王","魔术大核"]],
       ["Tracy McGrady","2004-05 Rockets Carry","Rockets","SG/SF","shotCreator",94,96,80,84,86,93,72,88,94,92,25.7,.526,22.9,.143,5.8,5.3,["火箭核心","持球得分","锋卫摇摆"]],
-      ["Kevin Garnett","2003-04 MVP Big Ticket","Timberwolves","PF","defAnchor",97,94,99,88,78,90,100,82,88,99,24.2,.547,29.4,.272,10.0,9.9,["MVP","DPOY级","全能内线"]],
+      ["Kevin Garnett","2003-04 MVP Big Ticket","Timberwolves","PF/C","defAnchor",97,94,99,88,78,90,100,82,88,99,24.2,.547,29.4,.272,10.0,9.9,["MVP","DPOY级","全能内线"]],
       ["Kevin Garnett","2007-08 Celtics DPOY","Celtics","PF/C","defAnchor",95,88,100,82,74,86,94,78,72,97,18.8,.588,25.3,.265,7.4,5.5,["DPOY","冠军防守","换防中轴"]],
-      ["Kevin Garnett","1999-00 Young Wolf","Timberwolves","PF","connector",93,91,94,84,76,92,95,78,84,94,22.9,.545,23.6,.172,5.7,5.4,["全能前锋","篮板支点","防守核心"]],
+      ["Kevin Garnett","1999-00 Young Wolf","Timberwolves","PF/C","connector",93,91,94,84,76,92,95,78,84,94,22.9,.545,23.6,.172,5.7,5.4,["全能前锋","篮板支点","防守核心"]],
       ["Karl-Anthony Towns","2021-22 Wolves Stretch Five","Timberwolves","C/PF","stretchBig",91,94,72,74,94,90,94,96,82,88,24.6,.642,24.1,.204,5.0,4.4,["空间五号","三分大个","篮板支点"]],
       ["Karl-Anthony Towns","2025-26 Knicks Finals Big","Knicks","C/PF","stretchBig",92,93,76,80,93,88,93,95,76,90,21.8,.620,22.2,.180,4.4,4.5,["冠军二当家","总决赛空间内线","高位策应"]],
       ["Dirk Nowitzki","2006-07 MVP","Mavericks","PF","stretchBig",95,97,80,76,96,88,85,98,88,96,24.6,.605,27.6,.278,8.3,7.4,["MVP","空间四号位"]],
@@ -1859,15 +2316,15 @@
       ["Kemba Walker","2018-19 Cardiac Kemba","Hornets","PG","shotCreator",88,91,66,82,88,86,44,90,84,83,25.6,.558,21.7,.123,3.2,3.0,["持球得分","全明星"]],
       ["DeMar DeRozan","2016-17 Raptors Scoring Wing","Raptors","SG/SF","shotCreator",90,94,68,74,66,92,58,68,86,84,27.3,.552,24.0,.166,2.4,3.4,["猛龙核心","中距离","突破造杀伤"]],
       ["DeMar DeRozan","2021-22 Clutch Bulls","Bulls","SF/SG","shotCreator",89,92,70,78,70,90,64,72,80,82,27.9,.590,23.1,.165,2.9,3.2,["中距离","关键球"]],
-      ["Donovan Mitchell","2022-23 71 Point Cavs","Cavaliers","SG","shotCreator",91,94,74,82,88,92,58,90,86,84,28.3,.614,22.9,.176,5.0,4.4,["71分","爆发"]],
+      ["Donovan Mitchell","2022-23 71 Point Cavs","Cavaliers","PG/SG","shotCreator",91,94,74,82,88,92,58,90,86,84,28.3,.614,22.9,.176,5.0,4.4,["71分","爆发"]],
       ["Shawn Marion","2005-06 Matrix Suns","Suns","SF/PF","twoWayWing",91,88,90,74,78,90,92,82,74,92,21.8,.591,23.6,.214,5.2,5.4,["骇客","太阳锋线","篮板防守"]],
       ["Michael Finley","1999-00 Mavs All-Star","Mavericks","SG/SF","shotCreator",88,90,74,76,84,86,70,84,82,84,22.6,.538,18.9,.120,3.4,3.5,["小牛全明星","锋卫摇摆","中距离"]],
       ["Steve Francis","2001-02 Franchise","Rockets","PG","slasher",88,90,70,84,78,92,72,80,84,80,21.6,.563,21.6,.159,4.4,4.2,["弗老大","弹跳控卫","火箭核心"]],
       ["Latrell Sprewell","1993-94 Warriors Two-Way","Warriors","SG/SF","twoWayWing",88,88,88,78,78,90,62,80,82,86,21.0,.548,18.2,.119,3.6,4.0,["狂人","双向锋卫","速度"]],
       ["Michael Redd","2006-07 Bucks Flamethrower","Bucks","SG","movementShooter",88,92,64,66,96,80,48,98,84,84,26.7,.585,19.3,.132,2.5,3.1,["左手射手","雄鹿火力","高产三分"]],
-      ["Devin Booker","2021-22 Suns 64 Wins","Suns","SG","shotCreator",91,94,74,78,90,88,58,92,80,88,26.8,.576,21.3,.156,3.6,3.9,["64胜","得分后卫"]],
-      ["Devin Booker","2020-21 Finals Booker","Suns","SG","shotCreator",91,94,72,78,88,88,56,90,82,88,25.6,.587,19.2,.109,2.7,3.2,["总决赛","太阳门面","中距离"]],
-      ["Devin Booker","2022-23 Playoff Inferno","Suns","SG","shotCreator",93,97,74,82,91,92,58,94,88,90,27.8,.601,21.8,.142,3.7,4.0,["季后赛爆发","45分","太阳门面"]],
+      ["Devin Booker","2021-22 Suns 64 Wins","Suns","PG/SG","shotCreator",91,94,74,78,90,88,58,92,80,88,26.8,.576,21.3,.156,3.6,3.9,["64胜","得分后卫"]],
+      ["Devin Booker","2020-21 Finals Booker","Suns","PG/SG","shotCreator",91,94,72,78,88,88,56,90,82,88,25.6,.587,19.2,.109,2.7,3.2,["总决赛","太阳门面","中距离"]],
+      ["Devin Booker","2022-23 Playoff Inferno","Suns","PG/SG","shotCreator",93,97,74,82,91,92,58,94,88,90,27.8,.601,21.8,.142,3.7,4.0,["季后赛爆发","45分","太阳门面"]],
       ["Ben Simmons","2019-20 All-NBA Stopper","76ers","PG/PF","connector",91,82,98,94,28,91,86,25,70,88,16.4,.602,20.4,.165,3.2,4.6,["一防","抢断王","投射黑洞"]],
       ["Trae Young","2021-22 Deep Range Playmaker","Hawks","PG","heliocentric",90,94,55,96,94,82,42,96,90,80,28.4,.603,25.4,.181,4.8,4.3,["超远三分","助攻"]],
       ["Ja Morant","2021-22 Flying Grizzly","Grizzlies","PG","slasher",90,92,70,84,76,98,58,78,86,78,27.4,.575,24.4,.171,3.9,3.8,["爆扣控卫","快攻"]],
@@ -2151,6 +2608,7 @@
     let ratingsRevealed = false;
     let activeSlot = 0;
     let previewCardId = null;
+    let resultModalReturnFocus = null;
 
     const el = {
       cards: document.getElementById("cards"),
@@ -2186,7 +2644,22 @@
       playoffOdds: document.getElementById("playoffOdds"),
       playoffGrid: document.getElementById("playoffGrid"),
       playoffNote: document.getElementById("playoffNote"),
-      analysis: document.getElementById("analysis")
+      analysis: document.getElementById("analysis"),
+      seasonModal: document.getElementById("seasonModal"),
+      seasonModalBackdrop: document.getElementById("seasonModalBackdrop"),
+      seasonModalClose: document.getElementById("seasonModalClose"),
+      seasonModalDone: document.getElementById("seasonModalDone"),
+      seasonModalKicker: document.getElementById("seasonModalKicker"),
+      seasonResultTier: document.getElementById("seasonResultTier"),
+      seasonResultRecord: document.getElementById("seasonResultRecord"),
+      seasonResultSummary: document.getElementById("seasonResultSummary"),
+      seasonResultLineup: document.getElementById("seasonResultLineup"),
+      seasonResultMetrics: document.getElementById("seasonResultMetrics"),
+      seasonResultPlayoffMeta: document.getElementById("seasonResultPlayoffMeta"),
+      seasonResultPlayoffs: document.getElementById("seasonResultPlayoffs"),
+      seasonResultReasons: document.getElementById("seasonResultReasons"),
+      seasonResultPlayers: document.getElementById("seasonResultPlayers"),
+      seasonResultDetails: document.getElementById("seasonResultDetails")
     };
 
     function clamp(n, min, max) { return Math.max(min, Math.min(max, n)); }
@@ -2977,7 +3450,123 @@
       `;
     }
 
-    function simulate() {
+    function teamResultSummary(r) {
+      const strength = r.wins >= 60 ? "联盟第一档" : r.wins >= 50 ? "分区前列" : "季后赛竞争区";
+      return `模拟净胜强度约等于 ${strength}，球权负载 ${r.usageLoad}。`;
+    }
+
+    function setResultModalTab(tabName) {
+      document.querySelectorAll("[data-result-tab]").forEach(button => {
+        const active = button.dataset.resultTab === tabName;
+        button.classList.toggle("is-active", active);
+        button.setAttribute("aria-selected", String(active));
+      });
+      document.querySelectorAll("[data-result-panel]").forEach(panel => {
+        panel.hidden = panel.dataset.resultPanel !== tabName;
+      });
+    }
+
+    function renderResultModal(r) {
+      const eraLabel = el.era.options[el.era.selectedIndex]?.textContent || "跨时代环境";
+      const playoff = r.playoff;
+      const rows = playerSeasonRows(r);
+      el.seasonModalKicker.textContent = `${eraLabel} · 82 场常规赛与季后赛`;
+      el.seasonResultTier.textContent = tier(r.wins);
+      el.seasonResultRecord.textContent = `${r.wins} - ${r.losses}`;
+      el.seasonResultSummary.textContent = teamResultSummary(r);
+      el.seasonResultLineup.innerHTML = selectedCards().map((card, index) => `
+        <div class="season-result-player">
+          <span>${slotCodes[index]}</span>
+          <b>${card.displayName}</b>
+        </div>
+      `).join("");
+      el.seasonResultMetrics.innerHTML = [
+        [r.offense, "进攻火力"],
+        [r.defense, "防守质量"],
+        [r.fit, "阵容兼容"],
+        [r.adv, "高阶影响"]
+      ].map(([value, label]) => `
+        <div class="season-result-metric"><b>${value}</b><span>${label}</span></div>
+      `).join("");
+      el.seasonResultPlayoffMeta.textContent = playoff
+        ? `${playoff.seed} · 夺冠概率 ${playoff.titleOdds}% · PO 强度 ${playoff.power}`
+        : "未生成季后赛路径";
+      el.seasonResultPlayoffs.innerHTML = (playoff?.rounds || []).map(round => `
+        <div class="season-result-round ${round.status}">
+          <b>${round.name}</b>
+          <strong>${round.result}</strong>
+          <span>${round.note}</span>
+        </div>
+      `).join("");
+      el.seasonResultReasons.innerHTML = buildAnalysis(r).slice(0, 6).map(reason => `
+        <div class="season-result-reason">${reason}</div>
+      `).join("");
+      el.seasonResultPlayers.innerHTML = `
+        <table class="season-player-table">
+          <thead>
+            <tr><th>球员</th><th>PTS</th><th>REB</th><th>AST</th><th>TS%</th><th>MIN</th><th>角色</th></tr>
+          </thead>
+          <tbody>
+            ${rows.map(row => `
+              <tr>
+                <td class="season-player-name"><b>${row.card.displayName}</b><span>${row.slot} · ${row.card.displayVersion}</span></td>
+                <td>${row.ppg.toFixed(1)}</td>
+                <td>${row.rpg.toFixed(1)}</td>
+                <td>${row.apg.toFixed(1)}</td>
+                <td>${row.ts}%</td>
+                <td>${row.minutes.toFixed(1)}</td>
+                <td>${row.role}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      `;
+      el.seasonResultDetails.innerHTML = detailMetricItems(r).map(([value, label]) => `
+        <div class="season-result-detail"><b>${value}</b><span>${label}</span></div>
+      `).join("");
+    }
+
+    function openResultModal(r) {
+      renderResultModal(r);
+      setResultModalTab("overview");
+      resultModalReturnFocus = document.activeElement;
+      el.seasonModal.classList.add("is-open");
+      el.seasonModal.setAttribute("aria-hidden", "false");
+      document.body.classList.add("result-modal-open");
+      el.seasonModalClose.focus();
+    }
+
+    function closeResultModal() {
+      if (!el.seasonModal.classList.contains("is-open")) return;
+      el.seasonModal.classList.remove("is-open");
+      el.seasonModal.setAttribute("aria-hidden", "true");
+      document.body.classList.remove("result-modal-open");
+      if (resultModalReturnFocus?.isConnected) resultModalReturnFocus.focus();
+    }
+
+    function handleResultModalKeydown(event) {
+      if (!el.seasonModal.classList.contains("is-open")) return;
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeResultModal();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const focusable = Array.from(el.seasonModal.querySelectorAll("button:not([disabled]), summary, a[href]"))
+        .filter(node => !node.closest("[hidden]"));
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    function simulate({ present = true } = {}) {
       if (selectedCount() !== 5) return;
       const r = calculateTeam(selectedCards());
       r.playoff = calculatePlayoffs(r, selectedCards());
@@ -2985,7 +3574,7 @@
       ratingsRevealed = true;
       el.tier.textContent = tier(r.wins);
       el.record.textContent = `${r.wins} - ${r.losses}`;
-      el.summary.textContent = `模拟净胜强度约等于 ${r.wins >= 60 ? "联盟第一档" : r.wins >= 50 ? "分区前列" : "季后赛竞争区"}，球权负载 ${r.usageLoad}。`;
+      el.summary.textContent = teamResultSummary(r);
       el.offMetric.textContent = r.offense;
       el.defMetric.textContent = r.defense;
       el.fitMetric.textContent = r.fit;
@@ -2995,6 +3584,7 @@
       renderPlayerSeason(r);
       el.analysis.innerHTML = buildAnalysis(r).map(n => `<li>${n}</li>`).join("");
       render();
+      if (present) openResultModal(r);
     }
 
     function resetResult() {
@@ -3060,7 +3650,7 @@
       if (lastResult && ratingsRevealed) {
         el.tier.textContent = tier(lastResult.wins);
         el.record.textContent = `${lastResult.wins} - ${lastResult.losses}`;
-        el.summary.textContent = `模拟净胜强度约等于 ${lastResult.wins >= 60 ? "联盟第一档" : lastResult.wins >= 50 ? "分区前列" : "季后赛竞争区"}，球权负载 ${lastResult.usageLoad}。`;
+        el.summary.textContent = teamResultSummary(lastResult);
         el.offMetric.textContent = lastResult.offense;
         el.defMetric.textContent = lastResult.defense;
         el.fitMetric.textContent = lastResult.fit;
@@ -3076,14 +3666,21 @@
 
     el.rerollBtn.addEventListener("click", openPack);
     el.openPackBtn.addEventListener("click", openPack);
-    el.clearBtn.addEventListener("click", () => { selected = Array(5).fill(null); ratingsRevealed = false; activeSlot = 0; render(); resetResult(); });
+    el.clearBtn.addEventListener("click", () => { closeResultModal(); selected = Array(5).fill(null); ratingsRevealed = false; activeSlot = 0; render(); resetResult(); });
     el.saveBtn.addEventListener("click", saveGame);
     el.loadBtn.addEventListener("click", loadGame);
-    el.simulateBtn.addEventListener("click", simulate);
-    el.simulateBtnInline.addEventListener("click", simulate);
+    el.simulateBtn.addEventListener("click", () => simulate());
+    el.simulateBtnInline.addEventListener("click", () => simulate());
+    el.seasonModalBackdrop.addEventListener("click", closeResultModal);
+    el.seasonModalClose.addEventListener("click", closeResultModal);
+    el.seasonModalDone.addEventListener("click", closeResultModal);
+    document.querySelectorAll("[data-result-tab]").forEach(button => {
+      button.addEventListener("click", () => setResultModalTab(button.dataset.resultTab));
+    });
+    document.addEventListener("keydown", handleResultModalKeydown);
     el.pool.addEventListener("change", openPack);
     el.posFilter.addEventListener("change", render);
-    el.era.addEventListener("change", () => { if (selectedCount() === 5) simulate(); });
+    el.era.addEventListener("change", () => { if (selectedCount() === 5) simulate({ present: false }); });
     el.injury.addEventListener("input", () => { el.injuryValue.textContent = el.injury.value; });
     el.chem.addEventListener("input", () => { el.chemValue.textContent = el.chem.value; });
 
