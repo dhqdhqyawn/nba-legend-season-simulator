@@ -1,0 +1,3094 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NBA 巨星常规赛战绩模拟器</title>
+  <style>
+    :root {
+      --bg: #f5f3ef;
+      --ink: #191714;
+      --muted: #6a6258;
+      --line: #d8d0c4;
+      --card: #fffaf2;
+      --card-2: #f0ece4;
+      --red: #d64032;
+      --gold: #d9a441;
+      --green: #237a57;
+      --blue: #276f9f;
+      --black: #121212;
+      --shadow: 0 18px 44px rgba(25, 23, 20, .14);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        linear-gradient(90deg, rgba(25,23,20,.035) 1px, transparent 1px) 0 0 / 36px 36px,
+        linear-gradient(rgba(25,23,20,.035) 1px, transparent 1px) 0 0 / 36px 36px,
+        var(--bg);
+    }
+
+    button, input, select {
+      font: inherit;
+    }
+
+    button {
+      border: 0;
+      cursor: pointer;
+      color: inherit;
+    }
+
+    .app {
+      width: min(1460px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 22px 0 48px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 14px 0 18px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .logo {
+      width: 48px;
+      height: 48px;
+      border-radius: 8px;
+      background:
+        linear-gradient(135deg, var(--red) 0 49%, var(--black) 50% 100%);
+      color: #fff;
+      display: grid;
+      place-items: center;
+      font-weight: 900;
+      letter-spacing: 0;
+      box-shadow: 0 9px 24px rgba(214, 64, 50, .22);
+      flex: 0 0 auto;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(24px, 3vw, 44px);
+      line-height: 1.02;
+      letter-spacing: 0;
+    }
+
+    .sub {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+
+    .btn {
+      min-height: 42px;
+      padding: 0 14px;
+      border-radius: 8px;
+      background: var(--ink);
+      color: #fff;
+      font-weight: 800;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: 0 10px 24px rgba(25, 23, 20, .12);
+    }
+
+    .btn.secondary {
+      background: #fff;
+      color: var(--ink);
+      border: 1px solid var(--line);
+      box-shadow: none;
+    }
+
+    .btn:disabled {
+      opacity: .42;
+      cursor: not-allowed;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(390px, 460px);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .panel {
+      background: rgba(255, 250, 242, .88);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(120px, 1fr));
+      gap: 12px;
+      padding: 14px;
+      margin-bottom: 16px;
+    }
+
+    .field label {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 6px;
+      font-weight: 800;
+    }
+
+    select, input[type="range"] {
+      width: 100%;
+    }
+
+    select {
+      height: 40px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      padding: 0 10px;
+      color: var(--ink);
+    }
+
+    .range-line {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      height: 40px;
+    }
+
+    .range-line span {
+      min-width: 34px;
+      text-align: right;
+      font-weight: 900;
+      color: var(--red);
+    }
+
+    .draft-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 0 0 12px;
+    }
+
+    h2 {
+      margin: 0;
+      font-size: 18px;
+      letter-spacing: 0;
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .wheel-stage {
+      display: grid;
+      grid-template-columns: 360px minmax(0, 1fr);
+      gap: 16px;
+      align-items: center;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    .pack-stage {
+      display: grid;
+      grid-template-columns: 104px minmax(0, 1fr);
+      gap: 10px;
+      align-items: center;
+      padding: 10px;
+      margin-bottom: 12px;
+    }
+
+    .pack-art {
+      min-height: 92px;
+      border-radius: 8px;
+      background:
+        linear-gradient(135deg, rgba(214, 64, 50, .96), rgba(25, 23, 20, .96)),
+        var(--ink);
+      color: #fff;
+      display: grid;
+      align-content: center;
+      padding: 10px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 18px 36px rgba(25, 23, 20, .18);
+    }
+
+    .pack-art::before {
+      content: "?";
+      position: absolute;
+      right: -12px;
+      top: -24px;
+      font-size: 92px;
+      line-height: 1;
+      font-weight: 1000;
+      color: rgba(255,255,255,.12);
+    }
+
+    .pack-title {
+      font-size: 18px;
+      line-height: 1;
+      font-weight: 1000;
+      position: relative;
+      z-index: 1;
+    }
+
+    .pack-sub {
+      margin-top: 6px;
+      color: rgba(255,255,255,.76);
+      font-size: 10px;
+      font-weight: 800;
+      position: relative;
+      z-index: 1;
+    }
+
+    .pack-panel {
+      min-width: 0;
+      display: grid;
+      align-content: center;
+    }
+
+    .pack-status {
+      min-height: 72px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: #fff;
+      padding: 10px;
+      box-shadow: 0 10px 22px rgba(25, 23, 20, .08);
+    }
+
+    .pack-kicker {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 900;
+      margin-bottom: 4px;
+    }
+
+    .pack-main {
+      font-size: 18px;
+      line-height: 1.08;
+      font-weight: 1000;
+    }
+
+    .pack-copy {
+      color: var(--muted);
+      font-weight: 800;
+      margin-top: 4px;
+      line-height: 1.4;
+      font-size: 12px;
+    }
+
+    .pack-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    .wheel-wrap {
+      position: relative;
+      width: min(100%, 340px);
+      aspect-ratio: 1;
+      margin: 0 auto;
+      display: grid;
+      place-items: center;
+    }
+
+    .pointer {
+      position: absolute;
+      top: -4px;
+      left: 50%;
+      width: 28px;
+      height: 38px;
+      transform: translateX(-50%);
+      background: var(--red);
+      clip-path: polygon(50% 100%, 0 0, 100% 0);
+      z-index: 4;
+      filter: drop-shadow(0 8px 10px rgba(25, 23, 20, .22));
+    }
+
+    .wheel {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      position: relative;
+      overflow: hidden;
+      border: 8px solid #fffaf2;
+      box-shadow: inset 0 0 0 2px rgba(25,23,20,.16), 0 18px 42px rgba(25, 23, 20, .18);
+      background: conic-gradient(
+        #d64032 0 30deg,
+        #191714 30deg 60deg,
+        #d9a441 60deg 90deg,
+        #276f9f 90deg 120deg,
+        #237a57 120deg 150deg,
+        #8a5b2c 150deg 180deg,
+        #6f45a8 180deg 210deg,
+        #c27a1b 210deg 240deg,
+        #1f766e 240deg 270deg,
+        #993844 270deg 300deg,
+        #a4562b 300deg 330deg,
+        #314f73 330deg 360deg
+      );
+      transform: rotate(var(--spin, 0deg));
+      transition: transform 2.2s cubic-bezier(.11,.82,.18,1);
+    }
+
+    .wheel::after {
+      content: "";
+      position: absolute;
+      inset: 34%;
+      border-radius: 50%;
+      background: #fffaf2;
+      box-shadow: 0 0 0 2px rgba(25,23,20,.16), 0 8px 24px rgba(25,23,20,.18);
+      z-index: 2;
+    }
+
+    .wheel-label {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 122px;
+      transform:
+        rotate(calc(var(--i) * 30deg + 15deg))
+        translateY(-137px)
+        rotate(calc(var(--i) * -30deg - 15deg));
+      transform-origin: 0 0;
+      color: #fff;
+      text-align: center;
+      font-size: 10px;
+      font-weight: 950;
+      line-height: 1.08;
+      text-shadow: 0 2px 5px rgba(0,0,0,.35);
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .wheel-center {
+      position: absolute;
+      width: 104px;
+      height: 104px;
+      border-radius: 50%;
+      background: #fffaf2;
+      z-index: 5;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      border: 1px solid rgba(25,23,20,.12);
+      box-shadow: 0 12px 28px rgba(25, 23, 20, .18);
+      font-weight: 1000;
+      font-size: 13px;
+      line-height: 1.1;
+    }
+
+    .wheel-panel {
+      min-width: 0;
+    }
+
+    .pulled-card {
+      min-height: 144px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background:
+        linear-gradient(135deg, var(--accent, var(--red)) 0 12px, transparent 12px),
+        #fff;
+      padding: 14px;
+      display: grid;
+      align-content: center;
+      box-shadow: 0 10px 22px rgba(25, 23, 20, .08);
+    }
+
+    .pulled-kicker {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 900;
+      margin-bottom: 8px;
+    }
+
+    .pulled-name {
+      font-size: 28px;
+      line-height: 1;
+      font-weight: 1000;
+    }
+
+    .pulled-version {
+      color: var(--accent, var(--red));
+      font-weight: 950;
+      margin-top: 6px;
+    }
+
+    .wheel-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .draw-meter {
+      margin-top: 12px;
+      height: 10px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: rgba(25, 23, 20, .1);
+    }
+
+    .draw-meter span {
+      display: block;
+      height: 100%;
+      width: var(--drawn);
+      background: linear-gradient(90deg, var(--red), var(--gold));
+      border-radius: inherit;
+    }
+
+    .draft-browser {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 12px;
+    }
+
+    .card-preview {
+      min-height: 250px;
+      max-height: 330px;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background:
+        linear-gradient(135deg, var(--accent, #d64032) 0 10px, transparent 10px),
+        var(--card);
+      padding: 10px;
+      box-shadow: 0 10px 22px rgba(25, 23, 20, .09);
+    }
+
+    .preview-grid {
+      display: grid;
+      grid-template-columns: 150px minmax(0, 1fr);
+      gap: 12px;
+    }
+
+    .preview-art {
+      height: 180px;
+      border-radius: 8px;
+      background:
+        radial-gradient(circle at 50% 18%, rgba(255,255,255,.54) 0 18px, transparent 19px),
+        radial-gradient(circle at 50% 56%, rgba(255,255,255,.38) 0 44px, transparent 45px),
+        linear-gradient(145deg, color-mix(in srgb, var(--accent, #d64032), #fff 18%), #1b1916);
+      display: grid;
+      place-items: end center;
+      overflow: hidden;
+      color: #fff;
+      font-size: 34px;
+      font-weight: 1000;
+    }
+
+    .preview-art img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      object-position: center bottom;
+      display: block;
+    }
+
+    .preview-title {
+      font-size: 24px;
+      line-height: 1.05;
+      font-weight: 1000;
+    }
+
+    .preview-version {
+      margin-top: 4px;
+      color: var(--accent);
+      font-size: 14px;
+      font-weight: 950;
+    }
+
+    .preview-copy {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+      font-weight: 800;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+      max-height: 450px;
+      min-height: 450px;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .player-card {
+      min-height: 128px;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid rgba(25, 23, 20, .14);
+      background: rgba(255,250,242,.92);
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 10px 22px rgba(25, 23, 20, .1);
+      transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+      display: grid;
+      grid-template-columns: 92px minmax(0, 1fr) 122px;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .player-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 16px 30px rgba(25, 23, 20, .16);
+    }
+
+    .player-card.selected {
+      border-color: var(--green);
+      outline: 3px solid rgba(35, 122, 87, .22);
+    }
+
+    .player-card.fresh {
+      outline: 3px solid rgba(217, 164, 65, .38);
+    }
+
+    .player-card.disabled {
+      opacity: 1;
+    }
+
+    .player-card.ineligible {
+      opacity: 1;
+      filter: none;
+    }
+
+    .player-card.ineligible::after {
+      display: none;
+    }
+
+    .card-shell {
+      display: contents;
+    }
+
+    .ovr {
+      width: 48px;
+      height: 34px;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      background: var(--ink);
+      color: #fff;
+      font-size: 18px;
+      font-weight: 950;
+      flex: 0 0 auto;
+    }
+
+    .portrait {
+      width: 92px;
+      height: 104px;
+      border-radius: 8px;
+      margin: 0;
+      background:
+        radial-gradient(circle at 50% 18%, rgba(255,255,255,.54) 0 18px, transparent 19px),
+        radial-gradient(circle at 50% 56%, rgba(255,255,255,.38) 0 44px, transparent 45px),
+        linear-gradient(145deg, color-mix(in srgb, var(--accent, #d64032), #fff 18%), #1b1916);
+      display: grid;
+      place-items: end center;
+      color: rgba(255,255,255,.92);
+      font-size: 22px;
+      line-height: 1;
+      font-weight: 1000;
+      text-shadow: 0 8px 18px rgba(0,0,0,.28);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .portrait span {
+      position: relative;
+      z-index: 1;
+      margin-bottom: 8px;
+    }
+
+    .portrait img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      object-position: center bottom;
+      z-index: 2;
+      filter: saturate(1.04) contrast(1.03);
+    }
+
+    .meta {
+      text-align: right;
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 800;
+    }
+
+    .meta b {
+      color: var(--ink);
+      font-size: 15px;
+      line-height: 1.05;
+    }
+
+    .name {
+      margin: 0 0 3px;
+      font-size: 18px;
+      line-height: 1.06;
+      font-weight: 950;
+      letter-spacing: 0;
+      max-width: 100%;
+    }
+
+    .version {
+      color: var(--accent, var(--red));
+      font-size: 14px;
+      font-weight: 900;
+      min-height: auto;
+      line-height: 1.18;
+    }
+
+    .card-main {
+      min-width: 0;
+    }
+
+    .card-actions {
+      width: 122px;
+      display: grid;
+      gap: 6px;
+    }
+
+    .card-subline {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin: 8px 0 0;
+    }
+
+    .mini-pill {
+      min-height: 23px;
+      padding: 4px 7px;
+      border-radius: 999px;
+      background: rgba(25, 23, 20, .08);
+      color: #302c27;
+      font-size: 11px;
+      line-height: 1.1;
+      font-weight: 900;
+    }
+
+    .card-id-line {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .flip-hint {
+      color: var(--accent, var(--red));
+    }
+
+    .pick-btn {
+      position: static;
+      min-height: 38px;
+      padding: 6px 8px;
+      border-radius: 8px;
+      background: var(--ink);
+      color: #fff;
+      font-weight: 950;
+      font-size: 13px;
+      line-height: 1.12;
+      z-index: 3;
+    }
+
+    .inspect-btn {
+      min-height: 36px;
+      padding: 6px 8px;
+      border-radius: 8px;
+      background: #fff;
+      color: var(--ink);
+      border: 1px solid var(--line);
+      font-weight: 950;
+      font-size: 13px;
+    }
+
+    .pick-btn.remove {
+      background: rgba(214, 64, 50, .12);
+      color: var(--red);
+      border: 1px solid rgba(214, 64, 50, .18);
+    }
+
+    .pick-btn:disabled {
+      opacity: .48;
+      cursor: not-allowed;
+    }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin: 2px 0 4px;
+    }
+
+    .chip {
+      padding: 4px 7px;
+      border-radius: 999px;
+      background: rgba(25, 23, 20, .08);
+      font-size: 11px;
+      font-weight: 850;
+      color: #302c27;
+    }
+
+    .bars {
+      display: grid;
+      gap: 5px;
+    }
+
+    .bar {
+      display: grid;
+      grid-template-columns: 34px 1fr 26px;
+      gap: 6px;
+      align-items: center;
+      font-size: 10px;
+      font-weight: 850;
+      color: var(--muted);
+    }
+
+    .bar-track {
+      height: 7px;
+      border-radius: 99px;
+      background: rgba(25, 23, 20, .1);
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      width: var(--w);
+      background: var(--accent, var(--red));
+      border-radius: inherit;
+    }
+
+    .adv {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      margin-top: 0;
+      position: relative;
+      z-index: 1;
+    }
+
+    .adv div {
+      background: rgba(255, 255, 255, .66);
+      border: 1px solid rgba(25, 23, 20, .08);
+      border-radius: 8px;
+      padding: 6px 4px;
+      text-align: center;
+    }
+
+    .adv b {
+      display: block;
+      font-size: 12px;
+      line-height: 1;
+    }
+
+    .adv small {
+      display: block;
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 850;
+    }
+
+    .card-section-title {
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 950;
+      line-height: 1;
+      margin-top: 2px;
+    }
+
+    .card-info-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 6px;
+    }
+
+    .info-cell {
+      min-height: 42px;
+      border: 1px solid rgba(25, 23, 20, .08);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, .56);
+      padding: 6px 7px;
+    }
+
+    .info-cell b {
+      display: block;
+      font-size: 13px;
+      line-height: 1.05;
+      color: var(--ink);
+    }
+
+    .info-cell span {
+      display: block;
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.1;
+      font-weight: 850;
+    }
+
+    .lock-note {
+      border: 1px dashed rgba(25, 23, 20, .18);
+      border-radius: 8px;
+      padding: 7px 8px;
+      color: var(--muted);
+      background: rgba(255, 255, 255, .44);
+      font-size: 11px;
+      line-height: 1.3;
+      font-weight: 850;
+    }
+
+    .side {
+      position: sticky;
+      top: 16px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .side-section,
+    .top-lineup {
+      padding: 14px;
+    }
+
+    .top-lineup {
+      margin-bottom: 16px;
+    }
+
+    .lineup-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .lineup-head .hint {
+      text-align: right;
+    }
+
+    .lineup {
+      display: grid;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .top-lineup .lineup {
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      margin-top: 0;
+    }
+
+    .lineup-actions {
+      margin-top: 10px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .top-lineup .lineup-actions {
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    .lineup-simulate {
+      width: 100%;
+      min-height: 46px;
+      border-radius: 8px;
+      background: var(--ink);
+      color: #fff;
+      font-weight: 1000;
+    }
+
+    .top-lineup .lineup-simulate {
+      width: min(100%, 260px);
+    }
+
+    .lineup-simulate:disabled {
+      opacity: .45;
+      cursor: not-allowed;
+    }
+
+    .slot {
+      min-height: 58px;
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+      padding: 8px;
+      display: grid;
+      grid-template-columns: 36px 1fr auto;
+      gap: 8px;
+      align-items: center;
+      background: rgba(255,255,255,.48);
+    }
+
+    .top-lineup .slot {
+      min-height: 78px;
+      grid-template-columns: 34px minmax(0, 1fr) 30px;
+      align-items: start;
+    }
+
+    .slot.active {
+      border-style: solid;
+      border-color: var(--green);
+      outline: 3px solid rgba(35, 122, 87, .18);
+      background: rgba(35, 122, 87, .06);
+    }
+
+    .slot-main {
+      text-align: left;
+      background: transparent;
+      padding: 0;
+      min-width: 0;
+      display: block;
+    }
+
+    .slot-num {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(25, 23, 20, .08);
+      font-weight: 950;
+    }
+
+    .slot-name {
+      font-weight: 950;
+      line-height: 1.1;
+    }
+
+    .slot-version {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 3px;
+    }
+
+    .x {
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      background: rgba(214, 64, 50, .1);
+      color: var(--red);
+      font-weight: 950;
+    }
+
+    .result {
+      padding: 16px;
+      background: #181714;
+      color: #fff;
+      border-color: #181714;
+    }
+
+    .record {
+      font-size: 58px;
+      line-height: 1;
+      font-weight: 1000;
+      letter-spacing: 0;
+      margin: 6px 0;
+    }
+
+    .tier {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 9px;
+      border-radius: 999px;
+      background: var(--gold);
+      color: #16130d;
+      font-size: 12px;
+      font-weight: 950;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .metric {
+      border: 1px solid rgba(255,255,255,.13);
+      border-radius: 8px;
+      padding: 9px;
+      background: rgba(255,255,255,.06);
+    }
+
+    .metric b {
+      display: block;
+      font-size: 22px;
+      line-height: 1;
+    }
+
+    .metric span {
+      display: block;
+      margin-top: 5px;
+      font-size: 11px;
+      color: rgba(255,255,255,.72);
+      font-weight: 850;
+    }
+
+    .detail-metrics {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 6px;
+      margin-top: 10px;
+    }
+
+    .detail-metric {
+      min-height: 52px;
+      border: 1px solid rgba(255,255,255,.11);
+      border-radius: 8px;
+      padding: 7px 8px;
+      background: rgba(255,255,255,.045);
+    }
+
+    .detail-metric b {
+      display: block;
+      font-size: 17px;
+      line-height: 1;
+    }
+
+    .detail-metric span {
+      display: block;
+      margin-top: 5px;
+      color: rgba(255,255,255,.68);
+      font-size: 10px;
+      line-height: 1.15;
+      font-weight: 850;
+    }
+
+    .player-season {
+      margin-top: 12px;
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 8px;
+      overflow: hidden;
+      background: rgba(255,255,255,.045);
+    }
+
+    .player-season-title {
+      padding: 9px 10px;
+      color: rgba(255,255,255,.92);
+      font-size: 13px;
+      font-weight: 950;
+      border-bottom: 1px solid rgba(255,255,255,.1);
+    }
+
+    .season-row {
+      display: grid;
+      grid-template-columns: minmax(110px, 1.25fr) repeat(5, minmax(42px, .45fr)) minmax(72px, .7fr);
+      gap: 8px;
+      align-items: center;
+      padding: 8px 10px;
+      border-bottom: 1px solid rgba(255,255,255,.08);
+      color: rgba(255,255,255,.84);
+      font-size: 11px;
+      font-weight: 850;
+    }
+
+    .season-row:last-child { border-bottom: 0; }
+
+    .season-row.header {
+      color: rgba(255,255,255,.58);
+      background: rgba(255,255,255,.035);
+      font-size: 10px;
+    }
+
+    .season-player b {
+      display: block;
+      color: #fff;
+      font-size: 12px;
+      line-height: 1.08;
+    }
+
+    .season-player span {
+      display: block;
+      margin-top: 3px;
+      color: rgba(255,255,255,.55);
+      font-size: 10px;
+      line-height: 1.15;
+    }
+
+    .analysis-list {
+      margin: 12px 0 0;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .analysis-list li {
+      padding: 9px 10px;
+      border-radius: 8px;
+      background: rgba(255,255,255,.08);
+      color: rgba(255,255,255,.86);
+      font-size: 13px;
+      line-height: 1.35;
+    }
+
+    .playoff {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255,255,255,.12);
+    }
+
+    .playoff-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .playoff-title {
+      font-size: 16px;
+      line-height: 1;
+      font-weight: 950;
+    }
+
+    .playoff-odds {
+      min-height: 26px;
+      padding: 5px 8px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.10);
+      color: rgba(255,255,255,.82);
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    .playoff-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .round {
+      min-height: 86px;
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 8px;
+      padding: 9px;
+      background: rgba(255,255,255,.055);
+    }
+
+    .round b {
+      display: block;
+      font-size: 12px;
+      line-height: 1.15;
+    }
+
+    .round strong {
+      display: block;
+      margin-top: 6px;
+      font-size: 19px;
+      line-height: 1;
+    }
+
+    .round span {
+      display: block;
+      margin-top: 6px;
+      color: rgba(255,255,255,.68);
+      font-size: 11px;
+      line-height: 1.25;
+      font-weight: 800;
+    }
+
+    .round.win {
+      border-color: rgba(228,175,63,.45);
+      background: rgba(228,175,63,.12);
+    }
+
+    .round.loss {
+      border-color: rgba(214,64,50,.32);
+      background: rgba(214,64,50,.10);
+    }
+
+    .playoff-note {
+      margin-top: 8px;
+      padding: 9px 10px;
+      border-radius: 8px;
+      background: rgba(255,255,255,.08);
+      color: rgba(255,255,255,.82);
+      font-size: 12px;
+      line-height: 1.4;
+      font-weight: 800;
+    }
+
+    .model {
+      padding: 14px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+      order: 3;
+    }
+
+    .model b {
+      color: var(--ink);
+    }
+
+    @media (max-width: 1180px) {
+      .layout { grid-template-columns: 1fr; }
+      .side { position: static; grid-template-columns: 1fr; }
+      .top-lineup .lineup { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+      .cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .cards { max-height: none; overflow: visible; padding-right: 0; }
+      .wheel-stage { grid-template-columns: 320px minmax(0, 1fr); }
+      .metrics { grid-template-columns: repeat(2, 1fr); }
+      .detail-metrics { grid-template-columns: repeat(3, 1fr); }
+      .playoff-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .analysis-list { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 780px) {
+      .app { width: min(100% - 20px, 1460px); padding-top: 10px; }
+      .topbar { align-items: flex-start; flex-direction: column; }
+      .actions { justify-content: flex-start; width: 100%; }
+      .btn { flex: 1 1 140px; }
+      .controls { grid-template-columns: 1fr 1fr; }
+      .cards { grid-template-columns: 1fr; }
+      .side { grid-template-columns: 1fr; }
+      .top-lineup .lineup { grid-template-columns: 1fr; }
+      .lineup-head { align-items: flex-start; flex-direction: column; }
+      .lineup-head .hint { text-align: left; }
+      .top-lineup .lineup-actions { justify-content: stretch; }
+      .top-lineup .lineup-simulate { width: 100%; }
+      .record { font-size: 46px; }
+      .playoff-grid { grid-template-columns: 1fr; }
+      .season-row { grid-template-columns: minmax(104px, 1.4fr) repeat(4, minmax(38px, .5fr)); }
+      .season-row > :nth-child(6),
+      .season-row > :nth-child(7) { display: none; }
+      .wheel-stage { grid-template-columns: 1fr; }
+      .wheel-wrap { max-width: 310px; }
+      .wheel-label { transform: rotate(calc(var(--i) * 30deg + 15deg)) translateY(-125px) rotate(calc(var(--i) * -30deg - 15deg)); }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div class="brand">
+        <div class="logo">82</div>
+        <div>
+          <h1>NBA 巨星常规赛战绩模拟器</h1>
+          <p class="sub">开卡包抽出 20 张历史时刻卡，盲选五人首发，模拟完整 82 场后揭晓真实评分和高阶数据。</p>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn secondary" id="rerollBtn">重开卡包</button>
+        <button class="btn secondary" id="clearBtn">清空阵容</button>
+        <button class="btn secondary" id="saveBtn">存档</button>
+        <button class="btn secondary" id="loadBtn">读档</button>
+        <button class="btn" id="simulateBtn" disabled>模拟赛季</button>
+      </div>
+    </header>
+
+    <section class="controls panel">
+      <div class="field">
+        <label for="eraSelect">联盟环境</label>
+        <select id="eraSelect">
+          <option value="modern">现代空间时代</option>
+          <option value="balanced">跨时代中性</option>
+          <option value="physical">90s/00s 肉搏时代</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="poolSelect">卡池偏好</label>
+        <select id="poolSelect">
+          <option value="all">全部巨星卡</option>
+          <option value="mvp">MVP / 冠军核心</option>
+          <option value="guard">后卫盛宴</option>
+          <option value="frontcourt">锋线与内线</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="positionFilter">候选卡位置筛选</label>
+        <select id="positionFilter">
+          <option value="all">全部位置</option>
+          <option value="1">只看 PG</option>
+          <option value="2">只看 SG</option>
+          <option value="3">只看 SF</option>
+          <option value="4">只看 PF</option>
+          <option value="5">只看 C</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="injuryRange">伤病/疲劳波动</label>
+        <div class="range-line">
+          <input id="injuryRange" type="range" min="0" max="12" value="5" />
+          <span id="injuryValue">5</span>
+        </div>
+      </div>
+      <div class="field">
+        <label for="chemRange">教练磨合加成</label>
+        <div class="range-line">
+          <input id="chemRange" type="range" min="-8" max="8" value="0" />
+          <span id="chemValue">0</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel top-lineup">
+      <div class="lineup-head">
+        <div>
+          <h2>你的首发五人</h2>
+          <div class="hint">先点一个坑位，再从下方候选卡选择能打该位置的球员。</div>
+        </div>
+        <div class="hint" id="selectInfo">已选 0/5</div>
+      </div>
+      <div class="lineup" id="lineup"></div>
+      <div class="lineup-actions">
+        <button class="lineup-simulate" id="simulateBtnInline" disabled>模拟整个赛季</button>
+      </div>
+    </section>
+
+    <div class="layout">
+      <section>
+        <section class="panel pack-stage">
+          <div class="pack-art">
+            <div class="pack-title">巨星<br />时刻卡包</div>
+            <div class="pack-sub">20 张候选卡 · 盲盒评分 · 赛季后揭晓</div>
+          </div>
+          <div class="pack-panel">
+            <div class="pack-status" id="packStatus">
+              <div class="pack-kicker">卡包待开启</div>
+              <div class="pack-main">先开出 20 张候选卡</div>
+              <div class="pack-copy">候选卡只展示中文名、赛季版本和身份标签，真正评分会在赛季模拟后揭晓。</div>
+            </div>
+            <div class="pack-actions">
+              <button class="btn" id="openPackBtn">开一包 20 张</button>
+              <button class="btn secondary" id="revealHintBtn" disabled>评分未揭晓</button>
+            </div>
+          </div>
+        </section>
+
+        <div class="draft-head">
+          <div>
+            <h2>卡包抽出的候选卡</h2>
+            <div class="hint" id="poolInfo"></div>
+          </div>
+          <div class="hint">当前候选卡</div>
+        </div>
+        <div class="draft-browser">
+          <div class="cards" id="cards"></div>
+          <div class="card-preview" id="cardPreview"></div>
+        </div>
+      </section>
+
+      <aside class="side">
+        <section class="panel result">
+          <span class="tier" id="tier">等待组队</span>
+          <div class="record" id="record">-- - --</div>
+          <div class="hint" id="summary" style="color:rgba(255,255,255,.72)">选五张卡后开始模拟。</div>
+          <div class="metrics">
+            <div class="metric"><b id="offMetric">--</b><span>进攻火力</span></div>
+            <div class="metric"><b id="defMetric">--</b><span>防守质量</span></div>
+            <div class="metric"><b id="fitMetric">--</b><span>阵容兼容</span></div>
+            <div class="metric"><b id="advMetric">--</b><span>高阶影响</span></div>
+          </div>
+          <ul class="analysis-list" id="analysis"></ul>
+          <div class="playoff" id="playoffPanel">
+            <div class="playoff-head">
+              <div class="playoff-title">季后赛模拟</div>
+              <div class="playoff-odds" id="playoffOdds">等待常规赛结果</div>
+            </div>
+            <div class="playoff-grid" id="playoffGrid"></div>
+            <div class="playoff-note" id="playoffNote">模拟完整赛季后，根据常规赛强度、半场硬解、护框、球权风险和时代环境生成季后赛路径。</div>
+          </div>
+          <div class="player-season" id="playerSeason"></div>
+          <div class="detail-metrics" id="detailMetrics"></div>
+        </section>
+
+        <section class="panel model">
+          <b>模型说明</b><br />
+          当前使用 derived-v1 可复算评分：由 PPG/TS%/PER/BPM/VORP/WS48、位置、archetype、荣誉与角色标签生成能力分。2KDB/MyTeam 只用于卡面与版本视觉，不参与属性评分。胜场会综合持球创造、组织、空间、禁区压力、护框、领防、换防、篮板、球权风险、时代规则适配和磨合。<br />
+          <a href="scoring-model.html" target="_blank" rel="noreferrer" style="color:#e4af3f;font-weight:900">模型说明</a>
+          <span style="color:#bdb6aa"> · </span>
+          <a href="rating-audit.html" target="_blank" rel="noreferrer" style="color:#e4af3f;font-weight:900">评分审计</a>
+          <span style="color:#bdb6aa"> · </span>
+          <a href="player-library.html" target="_blank" rel="noreferrer" style="color:#e4af3f;font-weight:900">球员库</a>
+        </section>
+      </aside>
+    </div>
+  </main>
+
+  <script>
+    if (location.protocol === "file:") {
+      document.body.insertAdjacentHTML("afterbegin", `<div style="position:sticky;top:0;z-index:20;background:#1a1511;color:#fff;padding:12px 18px;font-weight:900">公测版需要通过网站服务打开。请部署到静态托管，或本地用 python3 -m http.server 后访问。</div>`);
+    }
+
+    const palette = ["#d64032", "#276f9f", "#237a57", "#8a5b2c", "#6f45a8", "#c27a1b", "#1f766e", "#993844"];
+
+    const nameZh = {
+      "Michael Jordan": "迈克尔·乔丹",
+      "Scottie Pippen": "斯科蒂·皮蓬",
+      "Dennis Rodman": "丹尼斯·罗德曼",
+      "Hakeem Olajuwon": "哈基姆·奥拉朱旺",
+      "Shaquille O'Neal": "沙奎尔·奥尼尔",
+      "Kobe Bryant": "科比·布莱恩特",
+      "Tim Duncan": "蒂姆·邓肯",
+      "David Robinson": "大卫·罗宾逊",
+      "Karl Malone": "卡尔·马龙",
+      "John Stockton": "约翰·斯托克顿",
+      "Charles Barkley": "查尔斯·巴克利",
+      "Patrick Ewing": "帕特里克·尤因",
+      "Reggie Miller": "雷吉·米勒",
+      "Gary Payton": "加里·佩顿",
+      "Shawn Kemp": "肖恩·坎普",
+      "Allen Iverson": "阿伦·艾弗森",
+      "Vince Carter": "文斯·卡特",
+      "Tracy McGrady": "特雷西·麦克格雷迪",
+      "Andrew Wiggins": "安德鲁·威金斯",
+      "Karl-Anthony Towns": "卡尔-安东尼·唐斯",
+      "OG Anunoby": "OG·阿奴诺比",
+      "Cade Cunningham": "凯德·坎宁安",
+      "Brandon Jennings": "布兰登·詹宁斯",
+      "Kevin Garnett": "凯文·加内特",
+      "Dirk Nowitzki": "德克·诺维茨基",
+      "Steve Nash": "史蒂夫·纳什",
+      "Dwyane Wade": "德怀恩·韦德",
+      "LeBron James": "勒布朗·詹姆斯",
+      "Chris Paul": "克里斯·保罗",
+      "Carmelo Anthony": "卡梅罗·安东尼",
+      "Dwight Howard": "德怀特·霍华德",
+      "Kevin Durant": "凯文·杜兰特",
+      "Russell Westbrook": "拉塞尔·威斯布鲁克",
+      "James Harden": "詹姆斯·哈登",
+      "Stephen Curry": "斯蒂芬·库里",
+      "Klay Thompson": "克莱·汤普森",
+      "Draymond Green": "德雷蒙德·格林",
+      "Kawhi Leonard": "科怀·伦纳德",
+      "Giannis Antetokounmpo": "扬尼斯·阿德托昆博",
+      "Nikola Jokic": "尼古拉·约基奇",
+      "Joel Embiid": "乔尔·恩比德",
+      "Luka Doncic": "卢卡·东契奇",
+      "Jayson Tatum": "杰森·塔图姆",
+      "Anthony Davis": "安东尼·戴维斯",
+      "Damian Lillard": "达米安·利拉德",
+      "Jimmy Butler": "吉米·巴特勒",
+      "Shai Gilgeous-Alexander": "谢伊·吉尔杰斯-亚历山大",
+      "Kevin Love": "凯文·乐福",
+      "Blake Griffin": "布雷克·格里芬",
+      "Paul George": "保罗·乔治",
+      "Yao Ming": "姚明",
+      "Manu Ginobili": "马努·吉诺比利",
+      "Tony Parker": "托尼·帕克",
+      "Ray Allen": "雷·阿伦",
+      "Paul Pierce": "保罗·皮尔斯",
+      "Rajon Rondo": "拉简·隆多",
+      "Ben Wallace": "本·华莱士",
+      "Chauncey Billups": "昌西·比卢普斯",
+      "Pau Gasol": "保罗·加索尔",
+      "Jason Kidd": "杰森·基德",
+      "Grant Hill": "格兰特·希尔",
+      "Penny Hardaway": "安芬尼·哈达威",
+      "Alonzo Mourning": "阿朗佐·莫宁",
+      "Mutombo": "迪肯贝·穆托姆博",
+      "Dominique Wilkins": "多米尼克·威尔金斯",
+      "Clyde Drexler": "克莱德·德雷克斯勒",
+      "Isiah Thomas": "伊赛亚·托马斯",
+      "Magic Johnson": "魔术师约翰逊",
+      "Larry Bird": "拉里·伯德",
+      "Moses Malone": "摩西·马龙",
+      "Kareem Abdul-Jabbar": "卡里姆·阿卜杜尔-贾巴尔",
+      "Julius Erving": "朱利叶斯·欧文",
+      "Mark Price": "马克·普莱斯",
+      "Chris Webber": "克里斯·韦伯",
+      "Peja Stojakovic": "佩贾·斯托亚科维奇",
+      "Jermaine O'Neal": "杰梅因·奥尼尔",
+      "Amar'e Stoudemire": "阿玛雷·斯塔德迈尔",
+      "Deron Williams": "德隆·威廉姆斯",
+      "Brandon Roy": "布兰登·罗伊",
+      "LaMarcus Aldridge": "拉马库斯·阿尔德里奇",
+      "Marc Gasol": "马克·加索尔",
+      "Zach Randolph": "扎克·兰多夫",
+      "Derrick Rose": "德里克·罗斯",
+      "Kyrie Irving": "凯里·欧文",
+      "Kemba Walker": "肯巴·沃克",
+      "DeMar DeRozan": "德马尔·德罗赞",
+      "Donovan Mitchell": "多诺万·米切尔",
+      "Devin Booker": "德文·布克",
+      "Ben Simmons": "本·西蒙斯",
+      "Trae Young": "特雷·杨",
+      "Ja Morant": "贾·莫兰特",
+      "Zion Williamson": "蔡恩·威廉森",
+      "Victor Wembanyama": "维克托·文班亚马",
+      "Alperen Sengun": "阿尔佩伦·申京",
+      "Tyrese Haliburton": "泰瑞斯·哈利伯顿",
+      "Anthony Edwards": "安东尼·爱德华兹",
+      "Rudy Gobert": "鲁迪·戈贝尔",
+      "Jalen Brunson": "杰伦·布伦森",
+      "Pascal Siakam": "帕斯卡尔·西亚卡姆",
+      "Bam Adebayo": "巴姆·阿德巴约",
+      "Andre Iguodala": "安德烈·伊戈达拉",
+      "Robert Horry": "罗伯特·霍里",
+      "Shane Battier": "肖恩·巴蒂尔",
+      "Mikal Bridges": "米卡尔·布里奇斯",
+      "Andrei Kirilenko": "安德烈·基里连科",
+      "Chris Bosh": "克里斯·波什",
+      "LaMelo Ball": "拉梅洛·鲍尔",
+      "Monta Ellis": "蒙塔·埃利斯",
+      "De'Aaron Fox": "德阿龙·福克斯",
+      "Domantas Sabonis": "多曼塔斯·萨博尼斯",
+      "Arvydas Sabonis": "阿维达斯·萨博尼斯",
+      "Tyrese Maxey": "泰瑞斯·马克西",
+      "Jaren Jackson Jr.": "小贾伦·杰克逊",
+      "Lauri Markkanen": "劳里·马尔卡宁",
+      "Kristaps Porzingis": "克里斯塔普斯·波尔津吉斯",
+      "Julius Randle": "朱利叶斯·兰德尔",
+      "Chet Holmgren": "切特·霍姆格伦",
+      "Paolo Banchero": "保罗·班凯罗",
+      "Dejounte Murray": "德章泰·穆雷",
+      "Desmond Bane": "德斯蒙德·贝恩",
+      "Michael Porter Jr.": "小迈克尔·波特",
+      "Darius Garland": "达里厄斯·加兰",
+      "Evan Mobley": "埃文·莫布里",
+      "Gilbert Arenas": "吉尔伯特·阿里纳斯",
+      "Baron Davis": "拜伦·戴维斯",
+      "Joe Johnson": "乔·约翰逊",
+      "Paul Millsap": "保罗·米尔萨普",
+      "Kyle Lowry": "凯尔·洛瑞",
+      "Al Horford": "艾尔·霍福德",
+      "Rasheed Wallace": "拉希德·华莱士",
+      "Elton Brand": "埃尔顿·布兰德",
+      "Bradley Beal": "布拉德利·比尔",
+      "Zach LaVine": "扎克·拉文",
+      "Goran Dragic": "戈兰·德拉季奇",
+      "Mike Conley": "迈克·康利",
+      "Jamal Murray": "贾马尔·穆雷",
+      "Aaron Gordon": "阿龙·戈登",
+      "Jrue Holiday": "朱·霍勒迪",
+      "Brook Lopez": "布鲁克·洛佩斯",
+      "Jaylen Brown": "杰伦·布朗",
+      "Chris Mullin": "克里斯·穆林",
+      "Mitch Richmond": "米奇·里奇蒙德",
+      "Tim Hardaway": "蒂姆·哈达威",
+      "Joe Dumars": "乔·杜马斯",
+      "Richard Hamilton": "理查德·汉密尔顿",
+      "Tayshaun Prince": "泰肖恩·普林斯",
+      "Shawn Marion": "肖恩·马里昂",
+      "Michael Finley": "迈克尔·芬利",
+      "Steve Francis": "史蒂夫·弗朗西斯",
+      "Latrell Sprewell": "拉特里尔·斯普雷维尔",
+      "Ron Artest": "罗恩·阿泰斯特",
+      "Bernard King": "伯纳德·金",
+      "Alex English": "阿历克斯·英格利什",
+      "Glen Rice": "格伦·莱斯",
+      "Larry Johnson": "拉里·约翰逊",
+      "Michael Redd": "迈克尔·里德",
+      "Carlos Boozer": "卡洛斯·布泽尔"
+    };
+
+    function localizedVersion(version) {
+      return version
+        .replace("First Ring", "首冠版")
+        .replace("MVP Diesel", "巅峰鲨鱼版")
+        .replace("Finals Chef", "总决赛厨神版")
+        .replace("Nets Return", "篮网回归版")
+        .replace("Fo Fo Fo", "横扫宣言版")
+        .replace("Afro Kobe", "爆炸头科比版")
+        .replace("DPOY", "最佳防守球员")
+        .replace("Scoring King", "得分王版")
+        .replace("Champion", "冠军版")
+        .replace("Title", "冠军版")
+        .replace("Finals", "总决赛")
+        .replace("MVP", "MVP版")
+        .replace("Apex", "巅峰版")
+        .replace("Peak", "巅峰版")
+        .replace("Scoring Champ", "得分王版")
+        .replace("Assist King", "助攻王版")
+        .replace("Sixth Man", "第六人版")
+        .replace("Point Forward", "组织前锋版")
+        .replace("Two-Way", "双向版");
+    }
+
+    const playerImageIds = {
+      "Tracy McGrady": 1503,
+      "Kevin Garnett": 708,
+      "Dwyane Wade": 2548,
+      "Andrew Wiggins": 203952,
+      "Karl-Anthony Towns": 1626157,
+      "Jalen Brunson": 1628973,
+      "OG Anunoby": 1628384,
+      "Cade Cunningham": 1630595,
+      "Brandon Jennings": 201943,
+      "DeMar DeRozan": 201942,
+      "Anthony Edwards": 1630162,
+      "Damian Lillard": 203081,
+      "Kyrie Irving": 202681,
+      "Monta Ellis": 101145,
+      "Stephen Curry": 201939,
+      "LeBron James": 2544,
+      "Nikola Jokic": 203999,
+      "Jimmy Butler": 202710,
+      "Shai Gilgeous-Alexander": 1628983,
+      "Giannis Antetokounmpo": 203507,
+      "Luka Doncic": 1629029,
+      "Jayson Tatum": 1628369,
+      "Jaylen Brown": 1627759,
+      "Kawhi Leonard": 202695,
+      "Kevin Durant": 201142,
+      "James Harden": 201935,
+      "Russell Westbrook": 201566,
+      "Joel Embiid": 203954,
+      "Anthony Davis": 203076,
+      "Paul George": 202331,
+      "De'Aaron Fox": 1628368,
+      "Domantas Sabonis": 1627734,
+      "Tyrese Maxey": 1630178,
+      "Jaren Jackson Jr.": 1628991,
+      "Lauri Markkanen": 1628374,
+      "Kristaps Porzingis": 204001,
+      "Julius Randle": 203944,
+      "Chet Holmgren": 1631096,
+      "Paolo Banchero": 1631094,
+      "Dejounte Murray": 1627749,
+      "Desmond Bane": 1630217,
+      "Michael Porter Jr.": 1629008,
+      "Darius Garland": 1629636,
+      "Evan Mobley": 1630596,
+      "Zach LaVine": 203897,
+      "Klay Thompson": 202691,
+      "Draymond Green": 203110,
+      "Chris Paul": 101108,
+      "Kobe Bryant": 977,
+      "Michael Jordan": 893,
+      "Shaquille O'Neal": 406,
+      "Tim Duncan": 1495,
+      "Dirk Nowitzki": 1717,
+      "Steve Nash": 959,
+      "Vince Carter": 1713,
+      "Allen Iverson": 947,
+      "Yao Ming": 2397,
+      "Devin Booker": 1626164,
+      "Tayshaun Prince": 2419,
+      "Ben Simmons": 1627732
+    };
+
+    function headshotUrl(name) {
+      return playerImageIds[name] ? `https://cdn.nba.com/headshots/nba/latest/1040x760/${playerImageIds[name]}.png` : "";
+    }
+
+    let cardArtFiles = {};
+
+    function cardArtKeys(card) {
+      return [
+        `${card.name}|${card.team}|${card.version}`,
+        `${card.name}|${card.version}`,
+        `${card.name}|${card.team}`,
+        card.name
+      ];
+    }
+
+    function cardImage(card) {
+      for (const key of cardArtKeys(card)) {
+        if (cardArtFiles[key]) return cardArtFiles[key];
+      }
+      return card.image;
+    }
+
+    async function loadCardArtManifest() {
+      try {
+        const res = await fetch("assets/card-art.json");
+        if (!res.ok) return;
+        const data = await res.json();
+        cardArtFiles = Object.fromEntries(Object.entries(data.cards || {}).map(([key, meta]) => [key, meta.file]));
+        renderCards();
+      } catch {}
+    }
+
+    const rawCards = [
+      ["Michael Jordan","1987-88 DPOY Scoring King","Bulls","SG","twoWayWing",98,99,98,88,86,97,78,94,96,99,31.7,.603,31.7,.308,13.0,12.5,["MVP","DPOY","得分王"]],
+      ["Michael Jordan","1990-91 First Ring","Bulls","SG","twoWayWing",99,99,96,89,88,98,77,93,97,99,31.5,.605,32.0,.321,12.0,10.8,["MVP","冠军核心","Finals MVP"]],
+      ["Michael Jordan","1995-96 72 Win Revenge","Bulls","SG","twoWayWing",98,98,97,86,90,95,76,92,95,99,30.4,.582,29.4,.317,9.8,8.6,["MVP","72胜","冠军核心"]],
+      ["Scottie Pippen","1993-94 Point Forward","Bulls","SF","connector",94,88,97,92,83,88,86,83,86,94,22.0,.544,23.2,.194,7.7,7.8,["一阵","组织前锋","防守"]],
+      ["Dennis Rodman","1991-92 Rebound Apex","Pistons","PF","defAnchor",91,66,97,72,46,69,99,40,48,89,9.8,.572,17.8,.168,2.7,3.8,["篮板王","DPOY级","蓝领神卡"]],
+      ["Hakeem Olajuwon","1993-94 MVP Dream","Rockets","C","defAnchor",97,96,99,78,68,94,95,74,84,98,27.3,.565,25.3,.210,7.0,7.3,["MVP","DPOY","冠军核心"]],
+      ["Hakeem Olajuwon","1994-95 Playoff Dream","Rockets","C","defAnchor",96,95,98,77,70,94,94,75,84,98,27.8,.563,26.0,.177,6.8,6.0,["Finals MVP","脚步大师","护框"]],
+      ["Shaquille O'Neal","1994-95 Magic Finals Run","Magic","C","interiorHub",94,96,84,70,44,99,95,30,95,94,29.3,.602,28.6,.230,7.0,6.2,["年轻鲨鱼","总决赛"]],
+      ["Shaquille O'Neal","1999-00 MVP Diesel","Lakers","C","interiorHub",98,99,87,74,42,100,96,25,99,99,29.7,.578,30.6,.283,9.3,9.0,["MVP","冠军核心","禁区统治"]],
+      ["Shaquille O'Neal","2001-02 Threepeat","Lakers","C","interiorHub",96,98,84,72,40,99,94,24,97,98,27.2,.590,29.7,.262,7.2,6.0,["三连冠","Finals MVP"]],
+      ["Kobe Bryant","2000-01 Afro Kobe","Lakers","SG","shotCreator",94,96,91,84,82,96,73,86,88,94,28.5,.552,24.5,.196,5.3,5.8,["冠军二当家","爆发"]],
+      ["Kobe Bryant","2005-06 81 Point Season","Lakers","SG","shotCreator",97,100,86,82,85,98,70,88,99,96,35.4,.559,28.0,.224,6.4,6.5,["得分王","81分","高使用率"]],
+      ["Kobe Bryant","2007-08 MVP","Lakers","SG","shotCreator",97,98,90,86,87,95,73,90,93,97,28.3,.576,24.2,.208,5.8,6.3,["MVP","总决赛","一防"]],
+      ["Kobe Bryant","2009-10 Fifth Ring","Lakers","SG","shotCreator",94,96,88,84,85,92,71,87,91,93,27.0,.545,21.9,.160,4.7,4.3,["冠军核心","关键球"]],
+      ["Tim Duncan","2002-03 MVP Champion","Spurs","PF/C","defAnchor",97,95,99,80,73,91,98,78,86,99,23.3,.564,26.9,.248,7.6,7.8,["MVP","冠军核心","护框"]],
+      ["Tim Duncan","2006-07 Title Anchor","Spurs","PF/C","defAnchor",94,91,98,78,70,89,96,72,80,96,20.0,.579,26.1,.230,6.2,6.0,["冠军核心","防守中轴"]],
+      ["David Robinson","1994-95 MVP Admiral","Spurs","C","defAnchor",96,97,99,76,70,95,96,72,90,97,27.6,.602,29.1,.273,10.7,8.7,["MVP","盖帽","海军上将"]],
+      ["Karl Malone","1996-97 MVP Mailman","Jazz","PF","interiorHub",95,97,85,78,70,96,91,75,88,96,27.4,.600,28.9,.268,8.0,7.8,["MVP","挡拆终结"]],
+      ["John Stockton","1989-90 Assist Machine","Jazz","PG","floorGeneral",94,90,87,99,84,80,58,86,75,97,17.2,.607,23.9,.214,8.1,6.8,["助攻王","抢断王","控场"]],
+      ["Charles Barkley","1992-93 MVP Suns","Suns","PF","interiorHub",96,97,82,84,75,96,96,78,91,95,25.6,.596,25.9,.242,8.0,7.1,["MVP","篮板怪","转换"]],
+      ["Patrick Ewing","1989-90 Peak Knicks","Knicks","C","defAnchor",93,92,94,66,58,90,92,62,84,92,28.6,.599,25.8,.200,4.8,5.4,["纽约核心","护框"]],
+      ["Reggie Miller","1993-94 Miller Time","Pacers","SG","movementShooter",91,92,77,78,99,78,52,99,72,92,19.9,.636,21.4,.194,4.0,4.8,["无球射手","关键球"]],
+      ["Chris Mullin","1990-91 Run TMC Shooter","Warriors","SF/SG","movementShooter",91,94,76,82,96,86,70,98,82,90,25.7,.604,23.9,.190,4.8,5.0,["Run TMC","左手射手","全明星"]],
+      ["Mitch Richmond","1996-97 Rock Scorer","Kings","SG","shotCreator",90,93,76,74,88,86,62,90,84,86,25.9,.558,19.8,.140,3.2,3.6,["强壮分卫","国王核心","全明星"]],
+      ["Tim Hardaway","1996-97 Heat Crossover","Heat","PG","floorGeneral",90,90,78,94,88,82,48,90,80,88,20.3,.556,21.5,.174,4.6,4.7,["杀手变向","热火核心","组织"]],
+      ["Joe Dumars","1988-89 Finals MVP Guard","Pistons","SG/PG","pointStopper",90,87,94,84,84,82,50,86,66,92,17.2,.571,17.8,.170,3.6,3.8,["Finals MVP","后场领防","坏孩子"]],
+      ["Gary Payton","1995-96 Glove DPOY","Sonics","PG","pointStopper",93,88,98,91,80,82,63,82,78,95,19.3,.538,21.6,.182,5.8,6.3,["DPOY","控卫防守","总决赛"]],
+      ["Shawn Kemp","1995-96 Reign Man","Sonics","PF","verticalBig",91,90,84,70,50,95,91,54,82,89,19.6,.631,22.6,.205,3.9,4.2,["暴扣","总决赛"]],
+      ["Allen Iverson","2000-01 MVP Answer","76ers","PG/SG","shotCreator",95,98,78,82,80,94,55,82,98,93,31.1,.518,24.0,.190,4.8,4.5,["MVP","得分王","孤胆英雄"]],
+      ["Vince Carter","2000-01 Half Man","Raptors","SG/SF","shotCreator",92,94,80,78,86,97,68,88,88,91,27.6,.551,25.0,.189,5.1,5.7,["扣篮王","锋卫摇摆"]],
+      ["Tracy McGrady","2002-03 Scoring Apex","Magic","SG/SF","shotCreator",95,98,82,84,86,95,70,88,96,93,32.1,.564,30.3,.262,9.7,7.4,["得分王","魔术大核"]],
+      ["Tracy McGrady","2004-05 Rockets Carry","Rockets","SG/SF","shotCreator",94,96,80,84,86,93,72,88,94,92,25.7,.526,22.9,.143,5.8,5.3,["火箭核心","持球得分","锋卫摇摆"]],
+      ["Kevin Garnett","2003-04 MVP Big Ticket","Timberwolves","PF","defAnchor",97,94,99,88,78,90,100,82,88,99,24.2,.547,29.4,.272,10.0,9.9,["MVP","DPOY级","全能内线"]],
+      ["Kevin Garnett","2007-08 Celtics DPOY","Celtics","PF/C","defAnchor",95,88,100,82,74,86,94,78,72,97,18.8,.588,25.3,.265,7.4,5.5,["DPOY","冠军防守","换防中轴"]],
+      ["Kevin Garnett","1999-00 Young Wolf","Timberwolves","PF","connector",93,91,94,84,76,92,95,78,84,94,22.9,.545,23.6,.172,5.7,5.4,["全能前锋","篮板支点","防守核心"]],
+      ["Karl-Anthony Towns","2021-22 Wolves Stretch Five","Timberwolves","C/PF","stretchBig",91,94,72,74,94,90,94,96,82,88,24.6,.642,24.1,.204,5.0,4.4,["空间五号","三分大个","篮板支点"]],
+      ["Karl-Anthony Towns","2025-26 Knicks Finals Big","Knicks","C/PF","stretchBig",92,93,76,80,93,88,93,95,76,90,21.8,.620,22.2,.180,4.4,4.5,["冠军二当家","总决赛空间内线","高位策应"]],
+      ["Dirk Nowitzki","2006-07 MVP","Mavericks","PF","stretchBig",95,97,80,76,96,88,85,98,88,96,24.6,.605,27.6,.278,8.3,7.4,["MVP","空间四号位"]],
+      ["Dirk Nowitzki","2010-11 Title Run","Mavericks","PF","stretchBig",94,96,78,75,95,87,82,98,84,94,23.0,.612,23.4,.213,4.5,4.6,["冠军核心","金鸡独立"]],
+      ["Steve Nash","2005-06 MVP Engine","Suns","PG","floorGeneral",94,94,70,100,98,78,50,99,82,92,18.8,.632,23.3,.212,5.0,4.9,["MVP","助攻王","7秒进攻"]],
+      ["Dwyane Wade","2008-09 Scoring Wade","Heat","SG","slasher",96,98,91,88,76,98,70,78,96,94,30.2,.574,30.4,.232,10.6,9.6,["得分王","盖帽后卫"]],
+      ["Dwyane Wade","2005-06 Finals Flash","Heat","SG","slasher",95,97,88,86,74,97,68,76,91,95,27.2,.577,27.6,.240,7.5,6.8,["Finals MVP","突破"]],
+      ["LeBron James","2008-09 Cavs MVP","Cavaliers","SF","heliocentric",98,99,94,94,82,99,83,84,96,99,28.4,.591,31.7,.318,13.2,11.8,["MVP","66胜","持球大核"]],
+      ["LeBron James","2012-13 Heat Apex","Heat","SF/PF","heliocentric",99,99,97,96,88,99,87,90,93,100,26.8,.640,31.6,.322,11.7,9.8,["MVP","冠军核心","攻防巅峰"]],
+      ["LeBron James","2015-16 Cleveland Block","Cavaliers","SF/PF","heliocentric",98,98,94,95,80,98,88,82,94,99,25.3,.588,27.5,.242,9.6,8.4,["Finals MVP","3-1逆转"]],
+      ["LeBron James","2019-20 Lakers Point Forward","Lakers","PG/SF","heliocentric",96,96,90,98,82,94,86,84,88,97,25.3,.577,25.5,.204,6.7,6.1,["助攻王","冠军核心"]],
+      ["Chris Paul","2007-08 Hornets Maestro","Hornets","PG","floorGeneral",96,94,92,100,86,84,58,88,82,96,21.1,.576,28.3,.284,10.4,8.6,["MVP第二","助攻抢断王"]],
+      ["Chris Paul","2020-21 Suns Revival","Suns","PG","floorGeneral",91,88,86,96,87,76,54,90,70,90,16.4,.599,21.4,.201,3.6,3.8,["老炮","总决赛"]],
+      ["Carmelo Anthony","2008-09 Nuggets WCF Melo","Nuggets","SF/PF","shotCreator",93,95,76,74,80,94,78,82,90,89,22.8,.532,19.7,.120,3.1,3.2,["西决甜瓜","强侧单挑","掘金核心"]],
+      ["Carmelo Anthony","2012-13 Scoring Melo","Knicks","SF/PF","shotCreator",92,96,74,72,84,94,76,86,94,90,28.7,.560,24.8,.184,4.7,3.8,["得分王","三威胁"]],
+      ["Dwight Howard","2010-11 DPOY Superman","Magic","C","defAnchor",94,90,100,62,28,94,99,20,86,95,22.9,.616,26.1,.235,5.4,5.9,["DPOY","篮板王","护框"]],
+      ["Kevin Durant","2013-14 MVP Slim Reaper","Thunder","SF","shotCreator",98,100,85,86,96,96,78,98,94,97,32.0,.635,29.8,.295,9.6,8.5,["MVP","得分王"]],
+      ["Kevin Durant","2016-17 Warriors Reaper","Warriors","SF/PF","shotCreator",97,98,90,85,97,95,82,98,85,96,25.1,.651,27.6,.278,5.8,5.6,["Finals MVP","超级空间"]],
+      ["Kevin Durant","2020-21 Nets Return","Nets","SF/PF","shotCreator",95,98,84,83,96,93,78,98,86,91,26.9,.666,26.4,.215,4.0,3.5,["大伤归来","季后赛神级"]],
+      ["Russell Westbrook","2016-17 Triple Double MVP","Thunder","PG","heliocentric",96,97,78,94,72,96,92,74,100,94,31.6,.554,30.6,.224,12.4,9.3,["MVP","三双王","高使用率"]],
+      ["Russell Westbrook","2020-21 Wizards Triple Push","Wizards","PG","heliocentric",88,86,70,93,66,88,88,68,86,82,22.2,.509,19.5,.075,3.7,2.0,["三双","快节奏"]],
+      ["James Harden","2011-12 Thunder Sixth Man","Thunder","SG","connector",90,91,74,82,89,86,58,91,72,88,16.8,.660,21.1,.230,3.5,3.4,["最佳第六人","高效"]],
+      ["James Harden","2016-17 Assist King","Rockets","PG/SG","heliocentric",96,98,76,99,94,90,72,96,96,94,29.1,.613,27.3,.245,9.0,8.0,["助攻王","MVP第二"]],
+      ["James Harden","2017-18 MVP Rockets","Rockets","SG/PG","heliocentric",97,99,78,96,95,91,70,96,98,95,30.4,.619,29.8,.289,8.3,7.7,["MVP","得分王","单打"]],
+      ["James Harden","2023-24 Clippers Table Setter","Clippers","PG","floorGeneral",87,86,70,93,88,76,62,91,68,80,16.6,.612,18.6,.129,3.1,2.8,["老年组织","空间"]],
+      ["Stephen Curry","2015-16 Unanimous MVP","Warriors","PG","movementShooter",98,100,82,94,100,92,62,100,92,96,30.1,.669,31.5,.318,9.8,9.5,["全票MVP","三分革命","73胜"]],
+      ["Stephen Curry","2020-21 Scoring Champ","Warriors","PG","movementShooter",96,99,78,90,100,90,60,100,94,92,32.0,.655,26.3,.201,5.8,5.3,["得分王","重力"]],
+      ["Stephen Curry","2021-22 Finals Chef","Warriors","PG","movementShooter",95,97,80,89,99,88,62,100,84,94,25.5,.601,21.4,.173,4.8,4.4,["Finals MVP","冠军核心"]],
+      ["Klay Thompson","2015-16 Splash Wing","Warriors","SG","movementShooter",90,91,84,72,98,82,58,99,70,90,22.1,.597,18.6,.144,1.8,2.7,["3&D","无球"]],
+      ["Draymond Green","2016-17 DPOY Connector","Warriors","PF/C","connector",91,78,99,90,76,78,88,82,60,92,10.2,.522,16.5,.146,5.4,5.0,["DPOY","组织内线","换防"]],
+      ["Kawhi Leonard","2016-17 Two-Way Peak","Spurs","SF","twoWayWing",96,96,99,80,90,92,76,92,86,94,25.5,.610,27.6,.264,7.1,6.7,["DPOY级","MVP第三"]],
+      ["Kawhi Leonard","2018-19 Raptors Klaw","Raptors","SF","twoWayWing",96,97,96,78,88,93,78,90,90,92,26.6,.606,25.8,.224,5.0,5.7,["Finals MVP","季后赛"]],
+      ["OG Anunoby","2022-23 Raptors Stopper","Raptors","SF/PF","pointStopper",86,78,94,68,82,78,64,84,45,86,16.8,.586,13.2,.104,1.8,1.9,["锋线领防","底角空间","换防"]],
+      ["Giannis Antetokounmpo","2018-19 MVP Freak","Bucks","PF","slasher",97,97,96,86,68,99,96,72,90,97,27.7,.644,30.9,.292,10.8,7.4,["MVP","转换怪物"]],
+      ["Giannis Antetokounmpo","2020-21 Finals 50","Bucks","PF/C","slasher",98,98,97,84,66,100,97,70,91,98,28.1,.633,29.2,.244,8.8,7.5,["Finals MVP","50分封神"]],
+      ["Nikola Jokic","2020-21 MVP Joker","Nuggets","C","pointCenter",96,97,78,99,88,91,94,90,86,96,26.4,.647,31.3,.301,8.6,8.8,["MVP","组织中锋"]],
+      ["Nikola Jokic","2022-23 Champion Joker","Nuggets","C","pointCenter",98,99,82,100,90,93,96,92,84,99,24.5,.701,31.5,.308,8.8,8.7,["Finals MVP","冠军核心"]],
+      ["Nikola Jokic","2023-24 Third MVP","Nuggets","C","pointCenter",98,99,83,100,90,94,97,92,86,99,26.4,.650,31.0,.299,10.6,9.2,["MVP","中锋大脑"]],
+      ["Joel Embiid","2022-23 MVP Process","76ers","C","interiorHub",97,99,90,78,82,97,93,84,94,90,33.1,.655,31.4,.259,7.3,6.4,["MVP","得分王"]],
+      ["Luka Doncic","2019-20 Bubble Luka","Mavericks","PG/SF","heliocentric",94,96,76,96,86,93,87,88,92,88,28.8,.585,27.6,.207,5.4,5.8,["持球大核","季后赛绝杀"]],
+      ["Luka Doncic","2023-24 Scoring Maestro","Mavericks","PG","heliocentric",97,99,76,98,90,94,88,92,98,91,33.9,.617,28.1,.220,8.0,7.3,["得分王","总决赛"]],
+      ["Jayson Tatum","2023-24 Champion Wing","Celtics","SF/PF","twoWayWing",94,94,88,84,88,90,86,91,84,93,26.9,.604,22.3,.189,5.1,5.4,["冠军核心","双向锋线"]],
+      ["Anthony Davis","2017-18 Pelicans Monster","Pelicans","PF/C","defAnchor",95,96,97,72,75,96,94,78,88,89,28.1,.612,28.9,.241,5.2,5.3,["一防","空接护框"]],
+      ["Anthony Davis","2019-20 Lakers Bubble","Lakers","PF/C","defAnchor",95,95,98,74,78,95,94,80,84,91,26.1,.610,27.4,.250,5.9,5.5,["冠军二当家","护框"]],
+      ["Damian Lillard","2019-20 Bubble Dame","Blazers","PG","movementShooter",94,97,70,90,98,87,55,99,91,88,30.0,.627,26.9,.225,5.5,5.2,["超远三分","园区爆发"]],
+      ["Jimmy Butler","2019-20 Bubble Heat","Heat","SF","twoWayWing",92,90,94,86,72,88,82,76,75,92,19.9,.585,23.6,.221,4.5,4.7,["硬汉","总决赛","季后赛主攻","造犯规","强硬解"]],
+      ["Shai Gilgeous-Alexander","2023-24 MVP Runner-Up","Thunder","SG/PG","slasher",96,98,91,86,79,96,70,80,92,92,30.1,.636,29.3,.275,7.1,6.8,["MVP第二","中距离"]],
+      ["Kevin Love","2013-14 Outlet King","Timberwolves","PF/C","stretchBig",90,92,70,78,89,86,96,92,86,86,26.1,.591,26.9,.245,6.6,5.3,["篮板","长传","空间"]],
+      ["Blake Griffin","2013-14 Lob City Point PF","Clippers","PF","verticalBig",91,93,74,82,69,96,86,72,86,88,24.1,.583,23.9,.205,5.4,4.7,["空接之城","组织四号"]],
+      ["Paul George","2013-14 Pacers Two-Way Star","Pacers","SF/SG","twoWayWing",91,89,94,78,86,88,80,88,82,87,21.7,.555,20.1,.167,4.7,4.5,["步行者门面","双向锋线","东决"]],
+      ["Paul George","2018-19 OKC Peak","Thunder","SF","twoWayWing",94,96,95,80,91,90,82,93,88,89,28.0,.583,23.3,.201,5.5,5.3,["MVP第三","抢断王"]],
+      ["Paul George","2020-21 Clippers WCF Carry","Clippers","SF/SG","twoWayWing",92,93,88,82,88,90,82,90,86,88,23.3,.598,20.5,.154,4.6,4.3,["西决单核","季后赛硬撑","双向侧翼"]],
+      ["Yao Ming","2006-07 Peak Yao","Rockets","C","interiorHub",91,92,82,66,78,92,88,80,84,82,25.0,.601,26.5,.230,3.9,3.2,["低位","巨人中投"]],
+      ["Manu Ginobili","2007-08 Sixth Man Star","Spurs","SG","connector",90,91,82,86,88,88,58,90,76,86,19.5,.612,24.3,.232,5.0,4.5,["最佳第六人","妖刀"]],
+      ["Tony Parker","2012-13 Finals Engine","Spurs","PG","slasher",90,91,74,90,78,90,48,80,78,88,20.3,.588,23.0,.206,4.7,4.1,["突破控卫","总决赛"]],
+      ["Ray Allen","2005-06 Sonics Sniper","SuperSonics","SG","movementShooter",91,94,74,78,99,84,58,100,82,89,25.1,.587,21.4,.162,3.4,4.3,["三分大师","无球"]],
+      ["Paul Pierce","2007-08 Truth Title","Celtics","SF","shotCreator",90,90,82,78,86,86,72,88,76,90,19.6,.599,19.6,.207,3.9,3.5,["Finals MVP","强硬"]],
+      ["Rajon Rondo","2011-12 Playoff Conductor","Celtics","PG","floorGeneral",87,78,86,96,54,80,68,55,66,84,11.9,.483,17.2,.135,3.1,3.4,["助攻","防守控卫"]],
+      ["Ben Wallace","2003-04 DPOY Wall","Pistons","C","defAnchor",88,58,100,62,25,70,99,20,42,90,9.5,.441,17.3,.190,4.3,4.9,["DPOY","冠军防守"]],
+      ["Chauncey Billups","2005-06 Mr Big Shot","Pistons","PG","floorGeneral",89,88,84,88,90,78,54,92,68,91,18.5,.602,23.4,.254,5.4,4.8,["控场","关键球"]],
+      ["Richard Hamilton","2005-06 Rip Midrange","Pistons","SG","movementShooter",87,88,82,76,86,78,48,88,66,86,20.1,.548,16.8,.131,2.2,2.8,["无球中投","活塞进攻","面具侠"]],
+      ["Tayshaun Prince","2003-04 Pistons Wing Stopper","Pistons","SF","pointStopper",84,72,94,70,76,76,64,78,42,86,10.3,.520,12.8,.116,1.9,2.2,["长臂锋线","冠军拼图","追帽"]],
+      ["Pau Gasol","2009-10 Lakers Skill Big","Lakers","PF/C","connector",90,88,84,82,76,86,91,78,70,90,18.3,.593,22.9,.220,4.2,4.5,["冠军拼图","策应"]],
+      ["Jason Kidd","2002-03 Nets Maestro","Nets","PG","floorGeneral",92,84,90,97,78,80,78,80,74,93,18.7,.526,22.2,.175,6.8,6.4,["总决赛","大三双"]],
+      ["Grant Hill","1996-97 Point Forward","Pistons","SF","connector",92,91,82,91,72,92,82,74,84,87,21.4,.556,25.5,.223,7.9,7.0,["全能前锋","组织"]],
+      ["Penny Hardaway","1995-96 Magic Penny","Magic","PG/SG","floorGeneral",92,92,80,90,82,91,64,84,82,84,21.7,.605,24.6,.229,6.9,5.8,["魔术控锋","总决赛班底"]],
+      ["Alonzo Mourning","1998-99 DPOY Heat","Heat","C","defAnchor",91,88,99,60,45,88,92,35,78,86,20.1,.563,24.6,.216,4.7,4.3,["DPOY","盖帽王"]],
+      ["Mutombo","1994-95 Nuggets Wall","Nuggets","C","defAnchor",88,62,100,52,20,74,98,18,48,87,11.5,.588,18.2,.173,3.1,3.8,["DPOY","盖帽"]],
+      ["Mutombo","2000-01 Sixers Finals Wall","76ers","C","defAnchor",90,66,100,54,20,76,99,18,50,90,11.7,.547,17.3,.168,3.6,4.1,["DPOY","总决赛护框","篮板王"]],
+      ["Dominique Wilkins","1985-86 Human Highlight","Hawks","SF","slasher",92,96,72,70,70,98,74,72,91,90,30.3,.537,22.6,.181,3.8,4.4,["扣篮","得分王"]],
+      ["Bernard King","1984-85 Scoring King","Knicks","SF","shotCreator",92,98,70,68,72,92,66,74,96,88,32.9,.585,25.2,.180,3.7,4.6,["得分王","中距离杀手","纽约火力"]],
+      ["Alex English","1985-86 Denver Flow Scorer","Nuggets","SF","shotCreator",90,94,68,74,74,88,72,76,88,90,29.8,.589,21.7,.160,3.4,4.0,["高产得分","掘金跑轰","中距离"]],
+      ["Clyde Drexler","1991-92 Glide MVP2","Trail Blazers","SG","slasher",94,94,86,86,78,94,82,80,84,93,25.0,.560,23.6,.223,7.4,6.8,["MVP第二","总决赛"]],
+      ["Isiah Thomas","1989-90 Bad Boys Finals","Pistons","PG","floorGeneral",91,88,82,94,74,84,54,76,76,92,18.4,.501,19.7,.149,3.8,4.6,["Finals MVP","坏孩子"]],
+      ["Magic Johnson","1986-87 MVP Showtime","Lakers","PG","floorGeneral",98,96,84,100,82,92,82,84,84,98,23.9,.602,27.0,.263,8.9,8.1,["MVP","Showtime","组织大师"]],
+      ["Larry Bird","1985-86 MVP Champion","Celtics","SF/PF","connector",98,97,88,94,96,88,92,98,86,98,25.8,.580,25.6,.244,8.7,7.9,["MVP","冠军核心","全能"]],
+      ["Moses Malone","1982-83 Fo Fo Fo","76ers","C","interiorHub",96,94,86,62,30,95,100,20,90,97,24.5,.578,25.1,.248,6.0,5.6,["MVP","Finals MVP","篮板王"]],
+      ["Kareem Abdul-Jabbar","1984-85 Finals Captain","Lakers","C","interiorHub",94,92,88,72,45,90,86,40,78,93,22.0,.628,22.9,.196,4.5,4.2,["Finals MVP","天勾"]],
+      ["Julius Erving","1982-83 Champion Doc","76ers","SF","slasher",93,91,86,82,65,93,78,68,76,94,21.4,.580,22.2,.201,4.5,4.7,["冠军核心","飞人前辈"]],
+      ["Mark Price","1992-93 Elite Shooter PG","Cavaliers","PG","floorGeneral",88,88,72,92,96,74,42,98,68,87,18.2,.623,21.9,.205,3.6,3.9,["180俱乐部","控卫射手"]],
+      ["Chris Webber","2000-01 Kings Hub","Kings","PF/C","pointCenter",91,90,78,86,72,88,92,74,82,86,27.1,.516,24.7,.159,5.5,5.0,["国王普林斯顿","策应"]],
+      ["Peja Stojakovic","2003-04 Kings Sniper","Kings","SF","movementShooter",89,91,70,70,98,76,62,100,74,86,24.2,.624,21.8,.198,4.0,3.8,["三分","无球"]],
+      ["Glen Rice","1996-97 Hornets Flame","Hornets","SF","movementShooter",89,93,68,66,97,78,64,99,82,86,26.8,.605,20.2,.157,3.0,3.7,["全明星MVP","三分锋线","高效得分"]],
+      ["Larry Johnson","1992-93 Grandmama","Hornets","PF/SF","interiorHub",89,90,76,72,66,90,88,70,80,86,22.1,.551,20.0,.157,3.8,4.1,["大妈","强壮前锋","黄蜂门面"]],
+      ["Jermaine O'Neal","2003-04 Pacers Anchor","Pacers","PF/C","defAnchor",90,88,92,66,58,88,91,60,78,83,20.1,.494,20.4,.146,3.8,3.9,["内线核心","防守"]],
+      ["Ron Artest","2003-04 DPOY Menace","Pacers","SF/SG","pointStopper",89,82,99,72,76,82,70,78,62,86,18.3,.511,17.4,.120,3.8,4.3,["DPOY","外线恶汉","领防"]],
+      ["Amar'e Stoudemire","2004-05 Suns Finisher","Suns","PF/C","verticalBig",91,94,72,62,60,98,84,64,84,86,26.0,.617,26.6,.243,4.8,4.9,["挡拆终结","太阳"]],
+      ["Deron Williams","2007-08 Jazz Engine","Jazz","PG","floorGeneral",89,89,75,93,86,82,48,88,74,86,18.8,.595,20.8,.177,3.9,4.0,["挡拆控卫","助攻"]],
+      ["Carlos Boozer","2007-08 Jazz Pick-Pop Bruiser","Jazz","PF","interiorHub",88,90,70,68,76,86,94,78,78,86,21.1,.581,21.6,.180,3.7,3.8,["爵士挡拆","低位中投","篮板"]],
+      ["Brandon Roy","2008-09 Smooth Star","Trail Blazers","SG","shotCreator",90,91,78,84,84,88,62,86,78,80,22.6,.573,24.0,.223,5.1,4.5,["黄曼巴","关键球"]],
+      ["LaMarcus Aldridge","2014-15 Midpost Star","Trail Blazers","PF/C","interiorHub",89,91,76,66,78,88,90,80,82,86,23.4,.528,22.8,.165,3.7,3.6,["中距离","低位"]],
+      ["Arvydas Sabonis","1997-98 Blazers Genius Big","Trail Blazers","C","pointCenter",87,82,82,88,78,80,92,82,56,88,16.0,.576,21.1,.200,5.4,4.8,["老萨","策应中锋","低位智慧"]],
+      ["Marc Gasol","2012-13 DPOY Hub","Grizzlies","C","connector",90,82,98,84,74,82,88,76,62,90,14.1,.559,19.5,.197,4.5,4.6,["DPOY","高位策应"]],
+      ["Zach Randolph","2010-11 Grit Grind","Grizzlies","PF","interiorHub",88,88,72,62,54,88,96,58,80,84,20.1,.552,22.6,.185,3.6,3.3,["低位","篮板"]],
+      ["Derrick Rose","2010-11 Youngest MVP","Bulls","PG","slasher",94,95,78,88,75,98,52,78,90,82,25.0,.550,23.5,.208,6.8,6.0,["MVP","爆裂突破"]],
+      ["Kyrie Irving","2016-17 Finals Shot Maker","Cavaliers","PG","shotCreator",91,94,68,86,90,92,46,92,82,82,25.2,.580,23.0,.170,3.4,3.1,["单打","总决赛"]],
+      ["Kyrie Irving","2020-21 Nets 50-40-90","Nets","PG","shotCreator",92,96,68,86,94,91,50,96,80,80,26.9,.614,24.4,.189,3.7,3.2,["180俱乐部","控运终结"]],
+      ["James Harden","2020-21 Nets Point God","Nets","PG/SG","floorGeneral",93,94,72,98,90,86,70,92,78,88,24.6,.619,24.5,.188,6.3,5.4,["篮网组织核","带伤季后赛","三巨头"]],
+      ["Kemba Walker","2018-19 Cardiac Kemba","Hornets","PG","shotCreator",88,91,66,82,88,86,44,90,84,83,25.6,.558,21.7,.123,3.2,3.0,["持球得分","全明星"]],
+      ["DeMar DeRozan","2016-17 Raptors Scoring Wing","Raptors","SG/SF","shotCreator",90,94,68,74,66,92,58,68,86,84,27.3,.552,24.0,.166,2.4,3.4,["猛龙核心","中距离","突破造杀伤"]],
+      ["DeMar DeRozan","2021-22 Clutch Bulls","Bulls","SF/SG","shotCreator",89,92,70,78,70,90,64,72,80,82,27.9,.590,23.1,.165,2.9,3.2,["中距离","关键球"]],
+      ["Donovan Mitchell","2022-23 71 Point Cavs","Cavaliers","SG","shotCreator",91,94,74,82,88,92,58,90,86,84,28.3,.614,22.9,.176,5.0,4.4,["71分","爆发"]],
+      ["Shawn Marion","2005-06 Matrix Suns","Suns","SF/PF","twoWayWing",91,88,90,74,78,90,92,82,74,92,21.8,.591,23.6,.214,5.2,5.4,["骇客","太阳锋线","篮板防守"]],
+      ["Michael Finley","1999-00 Mavs All-Star","Mavericks","SG/SF","shotCreator",88,90,74,76,84,86,70,84,82,84,22.6,.538,18.9,.120,3.4,3.5,["小牛全明星","锋卫摇摆","中距离"]],
+      ["Steve Francis","2001-02 Franchise","Rockets","PG","slasher",88,90,70,84,78,92,72,80,84,80,21.6,.563,21.6,.159,4.4,4.2,["弗老大","弹跳控卫","火箭核心"]],
+      ["Latrell Sprewell","1993-94 Warriors Two-Way","Warriors","SG/SF","twoWayWing",88,88,88,78,78,90,62,80,82,86,21.0,.548,18.2,.119,3.6,4.0,["狂人","双向锋卫","速度"]],
+      ["Michael Redd","2006-07 Bucks Flamethrower","Bucks","SG","movementShooter",88,92,64,66,96,80,48,98,84,84,26.7,.585,19.3,.132,2.5,3.1,["左手射手","雄鹿火力","高产三分"]],
+      ["Devin Booker","2021-22 Suns 64 Wins","Suns","SG","shotCreator",91,94,74,78,90,88,58,92,80,88,26.8,.576,21.3,.156,3.6,3.9,["64胜","得分后卫"]],
+      ["Devin Booker","2020-21 Finals Booker","Suns","SG","shotCreator",91,94,72,78,88,88,56,90,82,88,25.6,.587,19.2,.109,2.7,3.2,["总决赛","太阳门面","中距离"]],
+      ["Devin Booker","2022-23 Playoff Inferno","Suns","SG","shotCreator",93,97,74,82,91,92,58,94,88,90,27.8,.601,21.8,.142,3.7,4.0,["季后赛爆发","45分","太阳门面"]],
+      ["Ben Simmons","2019-20 All-NBA Stopper","76ers","PG/PF","connector",91,82,98,94,28,91,86,25,70,88,16.4,.602,20.4,.165,3.2,4.6,["一防","抢断王","投射黑洞"]],
+      ["Trae Young","2021-22 Deep Range Playmaker","Hawks","PG","heliocentric",90,94,55,96,94,82,42,96,90,80,28.4,.603,25.4,.181,4.8,4.3,["超远三分","助攻"]],
+      ["Ja Morant","2021-22 Flying Grizzly","Grizzlies","PG","slasher",90,92,70,84,76,98,58,78,86,78,27.4,.575,24.4,.171,3.9,3.8,["爆扣控卫","快攻"]],
+      ["Zion Williamson","2020-21 Paint Force","Pelicans","PF","slasher",89,93,62,74,42,99,78,45,88,72,27.0,.649,27.1,.205,4.3,3.6,["禁区效率","怪力"]],
+      ["Victor Wembanyama","2023-24 Rookie Alien","Spurs","C/PF","defAnchor",89,86,97,76,78,90,90,80,82,78,21.4,.565,23.1,.085,5.2,3.8,["新秀","盖帽王","未来"]],
+      ["Alperen Sengun","2023-24 Baby Joker","Rockets","C","pointCenter",87,88,72,84,68,88,88,70,80,76,21.1,.585,22.0,.140,3.3,3.2,["策应中锋","低位"]],
+      ["Tyrese Haliburton","2023-24 Assist Engine","Pacers","PG","floorGeneral",89,91,66,98,92,78,46,94,72,82,20.1,.605,23.6,.174,6.0,5.1,["助攻","快节奏"]],
+      ["Anthony Edwards","2023-24 Wolves Face","Timberwolves","SG","twoWayWing",91,92,86,80,84,94,68,86,84,86,25.9,.575,19.7,.130,3.7,4.1,["核心锋卫","攻防爆发"]],
+      ["Rudy Gobert","2020-21 DPOY Stifle","Jazz","C","defAnchor",90,70,100,56,20,82,99,15,50,88,14.3,.683,23.5,.248,4.2,4.5,["DPOY","护框","篮板"]],
+      ["Jalen Brunson","2023-24 Knicks Engine","Knicks","PG","shotCreator",90,93,70,88,86,86,48,88,86,86,28.7,.592,23.4,.198,4.9,4.2,["小个大核","季后赛"]],
+      ["Jalen Brunson","2024-25 Playoff Captain","Knicks","PG","heliocentric",93,96,72,91,88,88,50,90,94,91,29.8,.584,24.8,.176,5.2,5.0,["季后赛主攻","纽约队魂","关键球"]],
+      ["Cade Cunningham","2023-24 Pistons Engine","Pistons","PG","heliocentric",88,90,70,92,84,86,66,86,88,82,22.7,.546,16.9,.060,1.6,2.4,["持球核心","高位组织","突破分球"]],
+      ["De'Aaron Fox","2022-23 Clutch Beam","Kings","PG","slasher",89,91,72,86,82,94,50,84,86,84,25.0,.599,21.8,.146,3.2,3.8,["关键先生","速度控卫","国王复兴"]],
+      ["Domantas Sabonis","2022-23 Kings Hub","Kings","C/PF","pointCenter",90,88,76,92,70,86,98,76,72,88,19.1,.668,23.5,.221,6.1,5.5,["小萨","手递手轴心","篮板王级"]],
+      ["Tyrese Maxey","2023-24 Sixers Burst","76ers","PG/SG","shotCreator",88,92,66,86,90,90,44,92,84,80,25.9,.573,20.2,.134,3.4,3.6,["最快进步","速度后卫","三分"]],
+      ["Jaren Jackson Jr.","2022-23 DPOY Block Party","Grizzlies","PF/C","defAnchor",89,82,99,60,78,86,80,84,62,84,18.6,.613,21.6,.164,4.6,3.8,["DPOY","盖帽王","空间护框"]],
+      ["Lauri Markkanen","2022-23 Utah All-Star","Jazz","SF/PF","stretchBig",88,91,70,66,94,90,84,96,78,82,25.6,.640,22.1,.190,4.9,4.1,["最快进步","七尺射手","高效终结"]],
+      ["Kristaps Porzingis","2017-18 Knicks Unicorn","Knicks","PF/C","stretchBig",89,91,80,60,88,88,76,92,78,84,22.7,.539,20.4,.119,1.8,2.5,["尼克斯独角兽","空间护框","高点干拔"]],
+      ["Kristaps Porzingis","2023-24 Celtics Unicorn","Celtics","PF/C","stretchBig",88,86,88,62,90,86,78,94,62,84,20.1,.647,23.2,.197,4.2,3.7,["独角兽","护框空间","冠军拼图"]],
+      ["Julius Randle","2020-21 Point Bully","Knicks","PF","interiorHub",88,90,72,84,82,88,88,84,84,80,24.1,.567,19.7,.140,3.7,3.6,["最快进步","持球四号","力量"]],
+      ["Chet Holmgren","2023-24 Rookie Rim Spacer","Thunder","C/PF","stretchBig",87,84,94,72,86,86,82,90,66,80,16.5,.632,20.4,.164,4.2,3.6,["新秀","护框空间","雷霆拼图"]],
+      ["Paolo Banchero","2023-24 Magic Creator","Magic","PF/SF","shotCreator",88,90,76,82,78,90,78,80,86,80,22.6,.546,17.3,.079,1.6,2.7,["魔术核心","锋线持球","季后赛"]],
+      ["Dejounte Murray","2021-22 Spurs Triple Guard","Spurs","PG/SG","twoWayWing",88,86,88,90,78,84,78,80,78,82,21.1,.533,22.3,.130,5.4,5.4,["全明星","长臂控卫","防守篮板"]],
+      ["Desmond Bane","2023-24 Grizzlies Shooter","Grizzlies","SG","movementShooter",86,88,76,78,93,82,56,94,76,78,23.7,.583,18.4,.094,2.6,2.7,["强壮射手","副攻","空间"]],
+      ["Michael Porter Jr.","2022-23 Nuggets Sniper Wing","Nuggets","SF/PF","movementShooter",85,84,72,62,94,82,76,96,62,82,17.4,.620,14.6,.109,1.2,2.0,["冠军侧翼","高点投射","篮板"]],
+      ["Darius Garland","2021-22 Cavs Maestro","Cavaliers","PG","floorGeneral",87,88,66,92,90,82,42,92,78,78,21.7,.576,19.1,.118,2.4,3.1,["全明星控卫","挡拆","抛投"]],
+      ["Evan Mobley","2022-23 Cavs Switch Big","Cavaliers","PF/C","defAnchor",87,78,94,74,66,84,86,70,56,84,16.2,.591,17.8,.149,3.5,3.6,["换防内线","护框","年轻核心"]],
+      ["Pascal Siakam","2018-19 Title MIP","Raptors","PF","connector",88,86,84,78,74,88,82,76,68,88,16.9,.628,18.7,.177,3.4,3.5,["最快进步","冠军拼图"]],
+      ["Bam Adebayo","2019-20 Bubble Anchor","Heat","C/PF","connector",88,82,94,84,62,84,88,66,62,86,15.9,.598,20.3,.168,3.4,3.7,["换防中锋","策应"]],
+      ["Andre Iguodala","2014-15 Finals Stopper","Warriors","SF","connector",86,76,94,80,74,78,68,78,48,88,7.8,.540,11.7,.131,2.0,2.5,["Finals MVP","防守奇兵"]],
+      ["Robert Horry","2001-02 Big Shot Role","Lakers","PF","connector",82,72,82,70,82,72,70,86,42,84,6.8,.552,12.1,.137,1.5,1.8,["大心脏","空间拼图"]],
+      ["Shane Battier","2008-09 No-Stats Star","Rockets","SF","pointStopper",84,70,94,68,78,70,62,82,38,86,7.3,.574,9.6,.100,1.8,2.2,["无数据球星","防守"]],
+      ["Mikal Bridges","2021-22 Iron Wing","Suns","SF","pointStopper",86,78,92,74,82,80,62,84,52,92,14.2,.627,14.4,.170,3.4,3.5,["铁人","3&D"]],
+      ["Andrew Wiggins","2021-22 Warriors Finals Wing","Warriors","SF/SG","twoWayWing",87,82,89,70,84,86,70,86,58,85,17.2,.560,15.0,.105,0.7,1.4,["冠军侧翼","领防锋线","篮板冲击"]],
+      ["Andrei Kirilenko","2003-04 AK47","Jazz","SF/PF","connector",90,84,98,80,70,84,82,72,66,84,16.5,.559,22.6,.182,7.5,6.5,["盖帽前锋","全能防守"]],
+      ["Chris Bosh","2009-10 Raptors Star","Raptors","PF/C","stretchBig",91,92,76,70,78,88,92,80,82,85,24.0,.592,25.0,.182,4.0,4.0,["空间内线","龙王"]],
+      ["Chris Bosh","2012-13 Heat Spacing Big","Heat","C/PF","stretchBig",88,86,82,70,82,84,78,86,62,88,16.6,.592,20.0,.175,2.5,3.0,["冠军拼图","小球中锋"]],
+      ["LaMelo Ball","2021-22 Flair PG","Hornets","PG","floorGeneral",86,86,64,90,86,82,62,88,78,72,20.1,.554,18.7,.111,3.3,3.1,["花式传球","年轻"]],
+      ["Monta Ellis","2007-08 We Believe Speed","Warriors","SG","slasher",86,88,66,72,66,92,50,68,78,76,20.2,.580,18.4,.140,2.2,2.7,["速度","乱战"]],
+      ["Brandon Jennings","2009-10 55 Point Rookie","Bucks","PG","shotCreator",84,86,62,82,84,82,42,86,78,76,15.5,.475,14.5,.062,0.0,1.2,["新秀爆发","55分之夜","速度控卫"]],
+      ["Gilbert Arenas","2005-06 Agent Zero","Wizards","PG/SG","shotCreator",91,95,68,82,88,90,54,90,88,80,29.3,.581,23.8,.168,4.3,4.6,["零号特工","超远"]],
+      ["Baron Davis","2006-07 We Believe Baron","Warriors","PG","slasher",88,88,80,88,78,88,58,80,82,78,20.1,.524,19.3,.111,3.9,4.2,["黑八","力量控卫"]],
+      ["Joe Johnson","2006-07 Iso Joe","Hawks","SG/SF","shotCreator",87,90,70,78,84,84,58,86,78,86,25.0,.558,19.5,.129,3.5,3.4,["单打乔","全明星"]],
+      ["Paul Millsap","2015-16 Hawks Glue","Hawks","PF","connector",87,82,88,78,76,82,82,78,58,84,17.1,.556,21.3,.177,4.9,4.6,["万金油","防守"]],
+      ["Kyle Lowry","2015-16 Raptors Bulldog","Raptors","PG","floorGeneral",89,88,86,86,88,78,58,90,68,90,21.2,.578,22.2,.196,6.5,5.8,["强硬控卫","造犯规"]],
+      ["Al Horford","2014-15 Hawks Hub","Hawks","C/PF","connector",87,82,86,80,78,80,78,82,56,88,15.2,.563,19.3,.175,4.1,4.0,["高位策应","换防"]],
+      ["Rasheed Wallace","2003-04 Pistons Stretch Wall","Pistons","PF/C","stretchBig",87,82,90,68,82,82,78,86,58,86,13.7,.525,16.1,.132,3.0,3.3,["空间防守","冠军拼图"]],
+      ["Elton Brand","2005-06 Clippers Anchor","Clippers","PF/C","interiorHub",90,90,86,66,60,90,90,62,78,84,24.7,.591,26.5,.229,5.4,4.8,["低位","护框"]],
+      ["Bradley Beal","2020-21 Scoring Duel","Wizards","SG","shotCreator",90,94,62,76,84,88,54,86,92,78,31.3,.593,22.7,.125,3.3,3.0,["得分王竞争","持球"]],
+      ["Zach LaVine","2020-21 Efficient Bounce","Bulls","SG","shotCreator",88,92,62,74,90,94,54,92,82,76,27.4,.634,21.5,.138,3.0,3.1,["扣篮射手","高效"]],
+      ["Goran Dragic","2013-14 Most Improved","Suns","PG","slasher",87,89,68,84,86,86,48,88,72,82,20.3,.604,21.4,.186,3.7,3.6,["最快进步","左手"]],
+      ["Mike Conley","2016-17 Grit Grind Guard","Grizzlies","PG","floorGeneral",88,88,80,88,86,78,46,88,64,86,20.5,.604,23.2,.209,4.3,4.1,["稳健控卫","防守"]],
+      ["Jamal Murray","2022-23 Bubble Echo","Nuggets","PG/SG","shotCreator",89,91,70,84,88,86,54,90,76,82,20.0,.571,17.9,.117,2.8,3.2,["冠军二当家","挡拆"]],
+      ["Aaron Gordon","2022-23 Dunker Connector","Nuggets","PF","connector",86,80,86,76,66,90,78,70,48,86,16.3,.617,17.2,.163,2.7,3.0,["冠军拼图","空切"]],
+      ["Jrue Holiday","2020-21 Title Stopper","Bucks","PG/SG","pointStopper",88,84,96,86,78,82,58,80,62,88,17.7,.592,19.6,.116,3.8,4.2,["防守后卫","冠军拼图"]],
+      ["Brook Lopez","2022-23 Splash Mountain DPOY2","Bucks","C","stretchBig",86,78,94,60,86,76,78,90,48,84,15.9,.630,16.7,.155,3.0,3.4,["护框","空间五号"]],
+      ["Jaylen Brown","2023-24 Finals MVP","Celtics","SG/SF","twoWayWing",91,90,88,76,82,92,72,84,78,88,23.0,.580,17.1,.125,2.7,3.6,["Finals MVP","双向侧翼"]]
+    ];
+
+    const archetypeUsage = {
+      heliocentric: 1.18,
+      shotCreator: 1.02,
+      floorGeneral: .84,
+      movementShooter: .82,
+      twoWayWing: .88,
+      connector: .62,
+      defAnchor: .58,
+      interiorHub: .88,
+      stretchBig: .72,
+      verticalBig: .64,
+      pointStopper: .55,
+      slasher: .92,
+      pointCenter: .92
+    };
+
+    const slotLabels = ["PG 控卫", "SG 分卫", "SF 小前", "PF 大前", "C 中锋"];
+    const slotCodes = ["PG", "SG", "SF", "PF", "C"];
+    const posMap = { PG: 1, SG: 2, SF: 3, PF: 4, C: 5 };
+    const pointSwingNames = new Set([
+      "LeBron James",
+      "Giannis Antetokounmpo",
+      "Draymond Green",
+      "Nikola Jokic",
+      "Luka Doncic",
+      "James Harden",
+      "Russell Westbrook",
+      "Magic Johnson",
+      "Scottie Pippen",
+      "Grant Hill",
+      "Penny Hardaway"
+    ]);
+
+    function baseSlots(pos) {
+      return [...new Set(pos.split("/").map(p => posMap[p]).filter(Boolean))];
+    }
+
+    function expandedSlots(card) {
+      const slots = new Set(baseSlots(card.pos));
+      const base = baseSlots(card.pos);
+      if (pointSwingNames.has(card.name) || (card.pass >= 92 && ["heliocentric", "floorGeneral", "pointCenter"].includes(card.archetype))) slots.add(1);
+      if (base.includes(2) && card.pass >= 84 && card.usage >= 78) slots.add(1);
+      if (card.archetype === "twoWayWing" || card.archetype === "connector") {
+        if (base.includes(2) || base.includes(3)) { slots.add(2); slots.add(3); }
+        if (base.includes(3) && card.reb >= 78) { slots.add(3); slots.add(4); }
+        if (base.includes(4) && !base.includes(5)) slots.add(4);
+      }
+      if (card.name === "Draymond Green") slots.add(3);
+      if (card.archetype === "stretchBig" || card.archetype === "defAnchor" || card.archetype === "interiorHub" || card.archetype === "pointCenter") {
+        if (slots.has(4) || slots.has(5)) { slots.add(4); slots.add(5); }
+      }
+      return [...slots].sort((a, b) => a - b);
+    }
+
+    function slotText(slots) {
+      return slots.map(n => slotCodes[n - 1]).join(" / ");
+    }
+
+    function statScale(value, low, high) {
+      return clamp(40 + 60 * ((value - low) / (high - low)), 40, 100);
+    }
+
+    function tagMatch(card, pattern) {
+      return pattern.test(card.tags.join(" "));
+    }
+
+    function eraYear(card) {
+      return Number(card.version.slice(0, 4)) || 2000;
+    }
+
+    function buildBaseCard(r, i) {
+      return {
+        id: i,
+        name: r[0], version: r[1], team: r[2], pos: r[3], archetype: r[4],
+        displayName: nameZh[r[0]] || r[0],
+        displayVersion: localizedVersion(r[1]),
+        manual: {
+          ovr: r[5], off: r[6], def: r[7], pass: r[8], shoot: r[9], finish: r[10],
+          reb: r[11], space: r[12], usage: r[13], impact: r[14]
+        },
+        ppg: r[15], ts: r[16], per: r[17], ws48: r[18], bpm: r[19], vorp: r[20],
+        tags: r[21],
+        image: headshotUrl(r[0]),
+        color: palette[i % palette.length]
+      };
+    }
+
+    function deriveRatings(card) {
+      const ppg = statScale(card.ppg, 7, 34);
+      const ts = statScale(card.ts, .48, .67);
+      const per = statScale(card.per, 10, 32);
+      const ws = statScale(card.ws48, .06, .31);
+      const bpm = statScale(card.bpm, -1, 13);
+      const vorp = statScale(card.vorp, 0, 10);
+      const guard = hasPos(card, "PG") || hasPos(card, "SG");
+      const wing = hasPos(card, "SG") || hasPos(card, "SF");
+      const big = hasPos(card, "PF") || hasPos(card, "C");
+
+      const awardBonus =
+        (tagMatch(card, /MVP|Finals MVP|冠军核心/) ? 5 : 0) +
+        (tagMatch(card, /DPOY|一防|防守/) ? 3 : 0) +
+        (tagMatch(card, /得分王|助攻王|篮板王/) ? 2 : 0);
+      const shootBonus =
+        (["movementShooter", "stretchBig", "floorGeneral"].includes(card.archetype) ? 8 : 0) +
+        (tagMatch(card, /三分|射手|空间|180|超远|无球|Logo/) ? 8 : 0) +
+        (eraYear(card) < 1990 && tagMatch(card, /低位|篮板王|护框/) ? -8 : 0);
+      const passBonus =
+        ({ floorGeneral: 18, heliocentric: 15, pointCenter: 18, connector: 8, pointStopper: 2 }[card.archetype] || 0) +
+        (tagMatch(card, /助攻|组织|控场|策应|Showtime|大三双|传球/) ? 9 : 0);
+      const finishBonus =
+        ({ slasher: 14, interiorHub: 12, verticalBig: 13, pointCenter: 7, heliocentric: 8 }[card.archetype] || 0) +
+        (tagMatch(card, /扣篮|突破|低位|空接|禁区|终结|天勾/) ? 8 : 0);
+      const reboundBonus =
+        (hasPos(card, "C") ? 16 : hasPos(card, "PF") ? 11 : hasPos(card, "SF") ? 5 : 0) +
+        (tagMatch(card, /篮板王|篮板|护框|盖帽|禁区/) ? 14 : 0);
+      const defenseBonus =
+        ({ defAnchor: 23, pointStopper: 21, twoWayWing: 15, connector: 10, stretchBig: 6, interiorHub: 6 }[card.archetype] || 0) +
+        (tagMatch(card, /DPOY|一防|防守|护框|盖帽|抢断|领防|冠军防守|铁人/) ? 16 : 0);
+      const roleFitBonus =
+        (["connector", "pointStopper", "stretchBig", "movementShooter", "defAnchor"].includes(card.archetype) ? 7 : 0) +
+        (tagMatch(card, /冠军拼图|无数据球星|空间五号|护框空间|防守|DPOY|底角空间|换防|冠军/) ? 7 : 0);
+      const modernRoleSpacing =
+        (["pointStopper", "connector"].includes(card.archetype) && tagMatch(card, /无数据球星|底角空间|冠军拼图|防守/) ? 8 : 0) +
+        (card.archetype === "stretchBig" ? 10 : 0) +
+        (tagMatch(card, /空间五号|护框空间|三分大个/) ? 8 : 0);
+      const primaryScoringRespect =
+        ((guard || wing) && card.ppg >= 24 && card.ts >= .56 ? 7 : 0) +
+        ((guard || wing) && card.ppg >= 28 ? 4 : 0) +
+        (tagMatch(card, /MVP|Finals MVP|得分王|季后赛|总决赛|单打|大核|季后赛主攻|强硬解|造犯规/) ? 5 : 0);
+      const onBallPunish =
+        (["heliocentric", "floorGeneral", "slasher", "twoWayWing"].includes(card.archetype) ? 5 : 0) +
+        (card.ppg >= 25 && (card.bpm >= 5 || card.per >= 24) ? 4 : 0) +
+        (tagMatch(card, /季后赛主攻|强硬解|造犯规/) ? 5 : 0);
+      const offBallRespect =
+        (["movementShooter", "twoWayWing", "connector"].includes(card.archetype) ? 4 : 0) +
+        (card.ts >= .59 && (guard || wing) ? 3 : 0) +
+        (tagMatch(card, /无球|180|三分|射手|Logo|冠军|无数据球星|冠军拼图|空间五号|底角空间/) ? 4 : 0);
+
+      const usageWeight = (archetypeUsage[card.archetype] || .8);
+      const usage = clamp(Math.round(ppg * .44 + per * .20 + bpm * .16 + usageWeight * 13 + (tagMatch(card, /得分王|MVP|持球|单打|大核/) ? 6 : 0)), 38, 100);
+      const shoot = clamp(Math.round(ts * .32 + ppg * .15 + bpm * .10 + 24 + shootBonus + modernRoleSpacing * .35 + offBallRespect * .35 + (guard || wing ? 4 : -2)), 25, 100);
+      const respectFloor = (guard || wing)
+        ? 74 + primaryScoringRespect + onBallPunish * .75 + offBallRespect * .55
+        : 20;
+      const space = clamp(Math.round(Math.max(
+        shoot * .58 + 13 + shootBonus * .55 + modernRoleSpacing * .85 + primaryScoringRespect * .75 + onBallPunish * .70 + offBallRespect * .95 + (guard || wing ? 5 : big ? -2 : 0),
+        respectFloor
+      )), 20, 100);
+      const pass = clamp(Math.round(bpm * .28 + vorp * .18 + per * .14 + 18 + passBonus + (guard ? 10 : hasPos(card, "C") && card.archetype === "pointCenter" ? 13 : 2)), 40, 100);
+      const finish = clamp(Math.round(ppg * .30 + ts * .23 + per * .18 + 16 + finishBonus + (big ? 6 : 1)), 45, 100);
+      const reb = clamp(Math.round(per * .18 + ws * .16 + bpm * .10 + 28 + reboundBonus + (card.archetype === "pointCenter" ? 7 : 0)), 20, 100);
+      const def = clamp(Math.round(bpm * .22 + ws * .20 + 34 + defenseBonus + (big ? 8 : wing ? 5 : 1) + (tagMatch(card, /冠军/) ? 2 : 0)), 40, 100);
+      const off = clamp(Math.round(ppg * .32 + ts * .18 + per * .18 + bpm * .14 + usage * .10 + shoot * .08), 45, 100);
+      const impact = clamp(Math.round(bpm * .26 + vorp * .18 + ws * .17 + per * .13 + 4 + awardBonus + roleFitBonus + (tagMatch(card, /季后赛|总决赛|冠军/) ? 3 : 0)), 50, 100);
+      const ovr = clamp(Math.round(impact * .30 + off * .23 + def * .20 + Math.max(pass, shoot, finish) * .15 + reb * .06 + usage * .06), 70, 99);
+      const raw = { ovr, off, def, pass, shoot, finish, reb, space, usage, impact };
+      const calibrated = Object.fromEntries(Object.entries(raw).map(([key, value]) => [
+        key,
+        clamp(Math.round(value * .35 + card.manual[key] * .65), key === "ovr" ? 70 : 20, 100)
+      ]));
+      const adjusted = { ...calibrated };
+      if (card.archetype === "twoWayWing" && card.ppg >= 19 && card.per >= 20) {
+        adjusted.usage = Math.max(adjusted.usage, 82);
+        adjusted.impact = Math.max(adjusted.impact, 86);
+      }
+      if (tagMatch(card, /季后赛主攻|强硬解|造犯规/)) {
+        adjusted.usage = Math.max(adjusted.usage, 86);
+        adjusted.off = Math.max(adjusted.off, 88);
+        adjusted.impact = Math.max(adjusted.impact, 90);
+        adjusted.finish = Math.max(adjusted.finish, 86);
+      }
+      if (card.archetype === "connector" && card.ppg >= 15 && card.ts >= .57 && Math.max(adjusted.finish, card.manual.finish) >= 80) {
+        adjusted.usage = Math.max(adjusted.usage, 76);
+        adjusted.off = Math.max(adjusted.off, 82);
+        adjusted.impact = Math.max(adjusted.impact, 84);
+      }
+      if (card.archetype === "pointStopper" && tagMatch(card, /无数据球星|防守|冠军拼图/)) {
+        adjusted.space = Math.max(adjusted.space, 84);
+        adjusted.impact = Math.max(adjusted.impact, 82);
+      }
+      if (card.archetype === "stretchBig" && Math.max(adjusted.def, card.manual.def) >= 88 && (Math.max(adjusted.shoot, card.manual.shoot) >= 82 || tagMatch(card, /空间五号|护框空间/))) {
+        adjusted.space = Math.max(adjusted.space, 88);
+        adjusted.impact = Math.max(adjusted.impact, 82);
+      }
+      if (tagMatch(card, /MVP第二|MVP Runner-Up|MVP第三/)) {
+        adjusted.usage = Math.max(adjusted.usage, 90);
+        adjusted.off = Math.max(adjusted.off, 94);
+        adjusted.impact = Math.max(adjusted.impact, 93);
+      }
+      if (tagMatch(card, /MVP/) && !tagMatch(card, /DPOY|最佳防守球员/)) {
+        adjusted.impact = Math.max(adjusted.impact, 94);
+        adjusted.ovr = Math.max(adjusted.ovr, 92);
+      }
+      if (tagMatch(card, /冠军核心|Finals MVP/)) {
+        adjusted.usage = Math.max(adjusted.usage, 84);
+        adjusted.impact = Math.max(adjusted.impact, 92);
+        adjusted.ovr = Math.max(adjusted.ovr, 90);
+      }
+      if (tagMatch(card, /季后赛爆发|太阳门面|总决赛/) && card.ppg >= 24) {
+        adjusted.usage = Math.max(adjusted.usage, 86);
+        adjusted.off = Math.max(adjusted.off, 91);
+        adjusted.impact = Math.max(adjusted.impact, 88);
+      }
+      if (card.ppg >= 25 && card.ts >= .57 && Math.max(adjusted.off, card.manual.off) >= 90) {
+        adjusted.impact = Math.max(adjusted.impact, 88);
+      }
+      adjusted.ovr = Math.max(adjusted.ovr, clamp(Math.round(
+        adjusted.impact * .30 + adjusted.off * .23 + adjusted.def * .20 + Math.max(adjusted.pass, adjusted.shoot, adjusted.finish) * .15 + adjusted.reb * .06 + adjusted.usage * .06
+      ), 70, 99));
+
+      return { ...adjusted, ratingSource: "derived-v1-calibrated" };
+    }
+
+    const cards = rawCards.map((r, i) => {
+      const base = buildBaseCard(r, i);
+      return { ...base, ...deriveRatings(base) };
+    }).map(card => ({ ...card, slots: expandedSlots(card) }));
+
+    let draft = [];
+    let selected = Array(5).fill(null);
+    let lastResult = null;
+    let ratingsRevealed = false;
+    let activeSlot = 0;
+    let previewCardId = null;
+
+    const el = {
+      cards: document.getElementById("cards"),
+      cardPreview: document.getElementById("cardPreview"),
+      packStatus: document.getElementById("packStatus"),
+      openPackBtn: document.getElementById("openPackBtn"),
+      revealHintBtn: document.getElementById("revealHintBtn"),
+      lineup: document.getElementById("lineup"),
+      selectInfo: document.getElementById("selectInfo"),
+      poolInfo: document.getElementById("poolInfo"),
+      simulateBtn: document.getElementById("simulateBtn"),
+      simulateBtnInline: document.getElementById("simulateBtnInline"),
+      rerollBtn: document.getElementById("rerollBtn"),
+      clearBtn: document.getElementById("clearBtn"),
+      saveBtn: document.getElementById("saveBtn"),
+      loadBtn: document.getElementById("loadBtn"),
+      era: document.getElementById("eraSelect"),
+      pool: document.getElementById("poolSelect"),
+      posFilter: document.getElementById("positionFilter"),
+      injury: document.getElementById("injuryRange"),
+      injuryValue: document.getElementById("injuryValue"),
+      chem: document.getElementById("chemRange"),
+      chemValue: document.getElementById("chemValue"),
+      tier: document.getElementById("tier"),
+      record: document.getElementById("record"),
+      summary: document.getElementById("summary"),
+      offMetric: document.getElementById("offMetric"),
+      defMetric: document.getElementById("defMetric"),
+      fitMetric: document.getElementById("fitMetric"),
+      advMetric: document.getElementById("advMetric"),
+      detailMetrics: document.getElementById("detailMetrics"),
+      playerSeason: document.getElementById("playerSeason"),
+      playoffOdds: document.getElementById("playoffOdds"),
+      playoffGrid: document.getElementById("playoffGrid"),
+      playoffNote: document.getElementById("playoffNote"),
+      analysis: document.getElementById("analysis")
+    };
+
+    function clamp(n, min, max) { return Math.max(min, Math.min(max, n)); }
+    function avg(arr, key) { return arr.reduce((s, c) => s + c[key], 0) / arr.length; }
+    function sum(arr, key) { return arr.reduce((s, c) => s + c[key], 0); }
+    function hasPos(card, pos) { return card.pos.includes(pos); }
+    function hashString(str) {
+      let h = 2166136261;
+      for (let i = 0; i < str.length; i++) {
+        h ^= str.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+      }
+      return h >>> 0;
+    }
+    function seededNoise(seedText) {
+      const x = Math.sin(hashString(seedText)) * 10000;
+      return x - Math.floor(x);
+    }
+
+    function filteredPool() {
+      const mode = el.pool.value;
+      if (mode === "mvp") return cards.filter(c => c.tags.some(t => /MVP|冠军核心|Finals/.test(t)) || c.ovr >= 95);
+      if (mode === "guard") return cards.filter(c => hasPos(c, "PG") || hasPos(c, "SG"));
+      if (mode === "frontcourt") return cards.filter(c => hasPos(c, "SF") || hasPos(c, "PF") || hasPos(c, "C"));
+      return cards;
+    }
+
+    function selectedCards() {
+      return selected
+        .map((card, i) => card ? { ...card, lineupSlot: i + 1 } : null)
+        .filter(Boolean);
+    }
+
+    function selectedCount() {
+      return selectedCards().length;
+    }
+
+    function canPlay(card, slotIndex = activeSlot) {
+      return card.slots.includes(slotIndex + 1);
+    }
+
+    function filteredDraft() {
+      const pos = el.posFilter.value;
+      if (pos === "all") return draft;
+      return draft.filter(c => c.slots.includes(Number(pos)));
+    }
+
+    function shuffle(list) {
+      const a = [...list];
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    function openPack() {
+      selected = Array(5).fill(null);
+      lastResult = null;
+      ratingsRevealed = false;
+      draft = shuffle(filteredPool()).slice(0, 20);
+      previewCardId = draft[0]?.id ?? null;
+      activeSlot = 0;
+      render();
+      resetResult();
+    }
+
+    function renderPack() {
+      const pickedNames = selectedCards().map(c => c.displayName).join("、");
+      el.packStatus.innerHTML = ratingsRevealed ? `
+        <div class="pack-kicker">赛季已模拟，盲盒评分已揭晓</div>
+        <div class="pack-main">${selectedCount() ? pickedNames : "等待选择首发"}</div>
+        <div class="pack-copy">现在候选区里被选中的五张卡会显示真实 OVR、属性和高阶数据。</div>
+      ` : `
+        <div class="pack-kicker">${draft.length ? `已开出 ${draft.length} 张候选卡` : "卡包待开启"}</div>
+        <div class="pack-main">${draft.length ? "盲盒阶段：只看名字和版本选五人" : "先开出 20 张候选卡"}</div>
+        <div class="pack-copy">评分、属性条和高阶数据全部上锁；模拟完整赛季后，只揭晓你选中的五张卡。</div>
+      `;
+      el.revealHintBtn.textContent = ratingsRevealed ? "评分已揭晓" : "评分未揭晓";
+      el.revealHintBtn.disabled = true;
+    }
+
+    function cardHtml(c) {
+      const isSelected = selected.some(p => p && p.id === c.id);
+      const showRatings = ratingsRevealed && isSelected;
+      const ineligible = !canPlay(c);
+      const disabled = !isSelected && ((selectedCount() >= 5) || ineligible);
+      const pickLabel = isSelected ? "移出阵容" : ineligible ? `不能打 ${slotCodes[activeSlot]}` : `选入 ${slotCodes[activeSlot]}`;
+      const visibleTags = c.tags.slice(0, 4).map(t => `<span class="chip">${t}</span>`).join("");
+      return `
+        <article class="player-card ${isSelected ? "selected" : ""} ${showRatings ? "fresh" : ""} ${disabled ? "disabled" : ""} ${ineligible ? "ineligible" : ""}" style="--accent:${c.color}" data-id="${c.id}">
+          <div class="portrait">${cardImage(c) ? `<img src="${cardImage(c)}" alt="${c.displayName}" loading="lazy" onerror="this.remove()">` : ""}<span>${c.displayName.slice(0, 2)}</span></div>
+          <div class="card-main">
+              <div class="name">${c.displayName}</div>
+              <div class="version">${c.displayVersion}</div>
+              <div class="card-subline">
+                <span class="mini-pill">${slotText(c.slots)}</span>
+                <span class="mini-pill">${archetypeLabel(c.archetype)}</span>
+                <span class="mini-pill">${c.team}</span>
+              </div>
+              <div class="chips">${visibleTags}</div>
+              <div class="card-id-line">
+                <span>${showRatings ? `OVR ${c.ovr} · ${c.ppg.toFixed(1)} PPG` : "评分锁定"}</span>
+              </div>
+          </div>
+          <div class="card-actions">
+            <button class="inspect-btn" data-preview-id="${c.id}">${previewCardId === c.id ? "正在看" : "查看"}</button>
+            <button class="pick-btn ${isSelected ? "remove" : ""}" data-pick-id="${c.id}" ${disabled ? "disabled" : ""}>${pickLabel}</button>
+          </div>
+        </article>`;
+    }
+
+    function bar(label, value) {
+      return `<div class="bar"><span>${label}</span><div class="bar-track"><div class="bar-fill" style="--w:${value}%"></div></div><span>${value}</span></div>`;
+    }
+
+    function lockedBar(label) {
+      return `<div class="bar"><span>${label}</span><div class="bar-track"><div class="bar-fill" style="--w:38%; opacity:.32"></div></div><span>?</span></div>`;
+    }
+
+    function infoCell(value, label) {
+      return `<div class="info-cell"><b>${value}</b><span>${label}</span></div>`;
+    }
+
+    function archetypeLabel(type) {
+      const labels = {
+        heliocentric: "持球大核",
+        shotCreator: "硬解得分手",
+        floorGeneral: "组织核心",
+        movementShooter: "无球射手",
+        twoWayWing: "双向锋线",
+        connector: "连接拼图",
+        defAnchor: "防守中轴",
+        interiorHub: "内线轴心",
+        stretchBig: "空间内线",
+        verticalBig: "吃饼护框",
+        pointStopper: "领防锁",
+        slasher: "突破杀伤",
+        pointCenter: "组织中锋"
+      };
+      return labels[type] || type;
+    }
+
+    function renderCards() {
+      el.cards.innerHTML = filteredDraft().map(cardHtml).join("");
+      el.cards.querySelectorAll("[data-preview-id]").forEach(btn => {
+        btn.addEventListener("click", event => {
+          event.stopPropagation();
+          previewCardId = Number(btn.dataset.previewId);
+          renderPreview();
+          renderCards();
+        });
+      });
+      el.cards.querySelectorAll(".pick-btn").forEach(btn => {
+        btn.addEventListener("click", event => {
+          event.stopPropagation();
+          toggleCard(Number(btn.dataset.pickId));
+        });
+      });
+    }
+
+    function toggleCard(id) {
+      const card = cards.find(c => c.id === id);
+      if (!card) return;
+      const existingIndex = selected.findIndex(c => c && c.id === id);
+      if (existingIndex < 0 && !canPlay(card)) return;
+      if (existingIndex === activeSlot) selected[activeSlot] = null;
+      else {
+        if (existingIndex >= 0) selected[existingIndex] = null;
+        selected[activeSlot] = card;
+        previewCardId = card.id;
+        const nextEmpty = selected.findIndex((c, i) => !c && i !== activeSlot);
+        if (nextEmpty >= 0) activeSlot = nextEmpty;
+      }
+      lastResult = null;
+      ratingsRevealed = false;
+      render();
+      resetResult();
+    }
+
+    function removeCard(id) {
+      const idx = selected.findIndex(c => c && c.id === id);
+      if (idx >= 0) {
+        selected[idx] = null;
+        activeSlot = idx;
+      }
+      ratingsRevealed = false;
+      render();
+      resetResult();
+    }
+
+    function renderLineup() {
+      const rows = [];
+      for (let i = 0; i < 5; i++) {
+        const c = selected[i];
+        rows.push(`
+          <div class="slot ${activeSlot === i ? "active" : ""}">
+            <div class="slot-num">${i + 1}</div>
+            <button class="slot-main" data-slot="${i}">
+              <div class="slot-name">${c ? c.displayName : slotLabels[i]}</div>
+              <div class="slot-version">${c ? c.displayVersion : `点击激活，再选择能打 ${slotCodes[i]} 的卡`}</div>
+            </button>
+            ${c ? `<button class="x" data-remove="${c.id}">×</button>` : ""}
+          </div>
+        `);
+      }
+      el.lineup.innerHTML = rows.join("");
+      el.lineup.querySelectorAll("[data-slot]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          activeSlot = Number(btn.dataset.slot);
+          render();
+        });
+      });
+      el.lineup.querySelectorAll("[data-remove]").forEach(btn => {
+        btn.addEventListener("click", () => removeCard(Number(btn.dataset.remove)));
+      });
+    }
+
+    function render() {
+      renderPack();
+      renderPreview();
+      renderCards();
+      renderLineup();
+      el.selectInfo.textContent = `已选 ${selectedCount()}/5 · 当前 ${slotLabels[activeSlot]}`;
+      el.simulateBtn.disabled = selectedCount() !== 5;
+      el.simulateBtnInline.disabled = selectedCount() !== 5;
+      el.poolInfo.textContent = draft.length ? `本轮已抽 ${draft.length} 张，当前显示 ${filteredDraft().length} 张；先点右侧坑位，再选卡` : "先开卡包，再从候选卡里选五人";
+    }
+
+    function renderPreview() {
+      const c = cards.find(card => card.id === previewCardId) || filteredDraft()[0] || draft[0];
+      if (!c) {
+        el.cardPreview.innerHTML = `<div class="preview-title">先开一包候选卡</div><div class="preview-copy">这里会显示当前查看球员的卡面和详细信息。</div>`;
+        return;
+      }
+      previewCardId = c.id;
+      const isSelected = selected.some(p => p && p.id === c.id);
+      const showRatings = ratingsRevealed && isSelected;
+      el.cardPreview.style.setProperty("--accent", c.color);
+      el.cardPreview.innerHTML = `
+        <div class="preview-grid">
+          <div class="preview-art">${cardImage(c) ? `<img src="${cardImage(c)}" alt="${c.displayName}" loading="lazy" onerror="this.remove()">` : `<span>${c.displayName.slice(0, 2)}</span>`}</div>
+          <div>
+            <div class="card-top">
+              <div class="ovr">${showRatings ? c.ovr : "?"}</div>
+              <div class="meta"><b>${c.team}</b><br>${slotText(c.slots)}</div>
+            </div>
+            <div class="preview-title">${c.displayName}</div>
+            <div class="preview-version">${c.displayVersion}</div>
+            <div class="card-subline">
+              <span class="mini-pill">${slotText(c.slots)}</span>
+              <span class="mini-pill">${archetypeLabel(c.archetype)}</span>
+              <span class="mini-pill">${c.team}</span>
+            </div>
+            <div class="chips">${c.tags.slice(0, 4).map(t => `<span class="chip">${t}</span>`).join("")}</div>
+            <div class="lock-note">${showRatings ? "评分已揭晓：完整属性和高阶数据已解锁。" : "盲盒阶段：只展示身份信息，真实评分和数据模拟后解锁。"}</div>
+          </div>
+        </div>
+        <div class="card-section-title">基础属性</div>
+        <div class="bars">
+          ${showRatings ? bar("进攻", c.off) : lockedBar("进攻")}
+          ${showRatings ? bar("防守", c.def) : lockedBar("防守")}
+          ${showRatings ? bar("组织", c.pass) : lockedBar("组织")}
+          ${showRatings ? bar("投射", c.shoot) : lockedBar("投射")}
+          ${showRatings ? bar("终结", c.finish) : lockedBar("终结")}
+          ${showRatings ? bar("篮板", c.reb) : lockedBar("篮板")}
+          ${showRatings ? bar("空间", c.space) : lockedBar("空间")}
+          ${showRatings ? bar("球权", c.usage) : lockedBar("球权")}
+        </div>
+        <div class="card-section-title">赛季数据</div>
+        <div class="card-info-grid">
+          ${infoCell(showRatings ? c.ppg.toFixed(1) : "??", "PTS")}
+          ${infoCell(showRatings ? `${Math.round(c.ts * 100)}%` : "??", "TS%")}
+          ${infoCell(showRatings ? c.ws48.toFixed(3) : "??", "WS/48")}
+          ${infoCell(showRatings ? c.vorp.toFixed(1) : "??", "VORP")}
+        </div>
+        <div class="card-section-title">高阶与模型身份</div>
+        <div class="adv">
+          <div><b>${showRatings ? c.per.toFixed(1) : "??"}</b><small>PER</small></div>
+          <div><b>${showRatings ? c.bpm.toFixed(1) : "??"}</b><small>BPM</small></div>
+          <div><b>${archetypeLabel(c.archetype)}</b><small>类型</small></div>
+        </div>
+      `;
+    }
+
+    function roleCount(list, predicate) {
+      return list.filter(predicate).length;
+    }
+
+    function eraProofScorer(c) {
+      return c.impact >= 96 && c.usage >= 88 && c.finish >= 92 && c.space >= 86;
+    }
+
+    function historicPointBig(c) {
+      return c.slots.includes(5) && c.impact >= 97 && c.pass >= 94 && c.reb >= 90;
+    }
+
+    function playsSlot(c, slot) {
+      return c.lineupSlot === slot || c.slots.includes(slot);
+    }
+
+    function interiorGravity(c) {
+      return playsSlot(c, 5) && c.finish >= 95 && c.usage >= 88 && c.reb >= 90;
+    }
+
+    function eliteInteriorGravity(c) {
+      return interiorGravity(c) && c.impact >= 94 && (c.tags.some(t => /MVP|Finals MVP|冠军核心|禁区统治|天勾/.test(t)) || c.per >= 28);
+    }
+
+    function bigInteriorPresence(c) {
+      return (playsSlot(c, 4) || playsSlot(c, 5)) && (
+        c.def >= 88 ||
+        c.reb >= 88 ||
+        (c.finish >= 90 && c.reb >= 84) ||
+        c.tags.some(t => /护框|盖帽|篮板王|禁区统治|低位|巨人|天勾|DPOY/.test(t))
+      );
+    }
+
+    function helpRimProtector(c) {
+      return playsSlot(c, 4) && c.def >= 90 && (c.reb >= 78 || c.tags.some(t => /DPOY|防守|护框|盖帽/.test(t)));
+    }
+
+    function physicalTransferable(c) {
+      return eraProofScorer(c) ||
+        historicPointBig(c) ||
+        eliteInteriorGravity(c) ||
+        (c.def >= 88 && c.reb >= 70 && c.finish >= 78) ||
+        ((playsSlot(c, 4) || playsSlot(c, 5)) && c.reb >= 84 && c.finish >= 86);
+    }
+
+    function physicalEraAdjustment(list) {
+      let penalty = 0;
+      const smallLeadGuards = roleCount(list, c => c.slots.includes(1) && c.reb < 65 && c.def < 84);
+      const fragilePerimeter = roleCount(list, c => (c.slots.includes(1) || c.slots.includes(2)) && c.def < 78 && c.reb < 62);
+      const modernSpacingDependence = roleCount(list, c => c.space >= 94 && c.finish < 92 && !eraProofScorer(c));
+      const futureCards = roleCount(list, c => Number(c.version.slice(0, 4)) >= 2016 && !physicalTransferable(c));
+      const nonPhysicalStars = roleCount(list, c => c.def < 82 && c.reb < 70 && c.finish < 90);
+      const modernLeadCreators = roleCount(list, c => Number(c.version.slice(0, 4)) >= 2015 && c.usage >= 84 && (c.slots.includes(1) || c.slots.includes(2)) && !physicalTransferable(c));
+      const handcheckTargets = roleCount(list, c => (c.slots.includes(1) || c.slots.includes(2)) && c.usage >= 84 && c.finish < 95 && !physicalTransferable(c));
+      const modernPointBigs = roleCount(list, c => Number(c.version.slice(0, 4)) >= 2016 && c.slots.includes(5) && c.pass >= 90 && !physicalTransferable(c));
+      const truePowerInterior = roleCount(list, c => (c.slots.includes(4) || c.slots.includes(5)) && c.reb >= 92 && c.finish >= 90);
+      const bruisers = roleCount(list, c => c.def >= 90 && c.reb >= 85);
+      const classicEraCards = roleCount(list, c => Number(c.version.slice(0, 4)) <= 2005);
+      const eraProofStars = roleCount(list, eraProofScorer);
+      const historicBigs = roleCount(list, historicPointBig);
+
+      penalty += smallLeadGuards * 4.2;
+      penalty += fragilePerimeter * 3.8;
+      penalty += modernSpacingDependence * 2.4;
+      penalty += Math.max(0, futureCards - 1) * 3.2;
+      penalty += nonPhysicalStars * 2.2;
+      penalty += modernLeadCreators * 3.4;
+      penalty += handcheckTargets * 2.4;
+      penalty += modernPointBigs * 2.4;
+      penalty += Math.max(0, roleCount(list, c => c.space >= 90 && !eraProofScorer(c)) - 2) * 1.8;
+      penalty -= Math.min(8.5, truePowerInterior * 2.7 + bruisers * 1.5 + classicEraCards * .9 + eraProofStars * 1.4 + historicBigs * 2.2);
+      return clamp(penalty, 0, 22);
+    }
+
+    function calculateTeam(list) {
+      const interiorGravityCount = roleCount(list, interiorGravity);
+      const eliteInteriorGravityCount = roleCount(list, eliteInteriorGravity);
+      const shotCreation = avg(list, "usage") * .45 + avg(list, "finish") * .23 + avg(list, "shoot") * .20 + avg(list, "pass") * .12;
+      const playmaking = avg(list, "pass") * .78 + avg(list, "usage") * .10 + roleCount(list, c => c.pass >= 92) * 3.2 + roleCount(list, c => c.archetype === "pointCenter") * 2.2;
+      const respectedSpacers = roleCount(list, c => c.space >= 84 || (c.shoot >= 84 && c.usage >= 82));
+      const eliteSpacers = roleCount(list, c => c.space >= 90);
+      const highLevelCreators = roleCount(list, c =>
+        c.usage >= 82 &&
+        c.finish >= 84 &&
+        (c.shoot >= 80 || c.space >= 84 || c.pass >= 84 || c.off >= 90) &&
+        c.impact >= 86
+      );
+      const stretchRimFive = list.some(c => playsSlot(c, 5) && c.def >= 88 && (c.space >= 86 || c.shoot >= 84));
+      const multiCreatorFiveOut = highLevelCreators >= 3 && stretchRimFive && respectedSpacers >= 3;
+      const modernRolePlayers = roleCount(list, c =>
+        ["connector", "pointStopper", "stretchBig", "defAnchor"].includes(c.archetype) &&
+        c.def >= 82 &&
+        (c.space >= 78 || c.shoot >= 78 || playsSlot(c, 5))
+      );
+      const creatorSpacingBonus = multiCreatorFiveOut ? 7.2 : 0;
+      const lowSpaceTax = roleCount(list, c => c.space < 60 && !eliteInteriorGravity(c));
+      const spacing = avg(list, "space") * .54 + avg(list, "shoot") * .24 + respectedSpacers * 1.4 + eliteSpacers * 1.8 + modernRolePlayers * 1.1 + eliteInteriorGravityCount * 1.6 - lowSpaceTax * 3.2;
+      const rimPressure = avg(list, "finish") * .60 + avg(list, "usage") * .23 + roleCount(list, c => c.finish >= 94) * 3.1 + roleCount(list, c => c.reb >= 92 && c.finish >= 88) * 1.5 + interiorGravityCount * 2.4 + eliteInteriorGravityCount * 2.2;
+      const modernOffense = shotCreation * .29 + playmaking * .22 + spacing * .23 + rimPressure * .19 + avg(list, "off") * .05 + creatorSpacingBonus + eliteInteriorGravityCount * 1.2;
+      const physicalOffense = shotCreation * .31 + rimPressure * .25 + playmaking * .17 + avg(list, "finish") * .14 + spacing * .08 + avg(list, "off") * .05;
+      const balancedOffense = modernOffense * .55 + physicalOffense * .45;
+
+      const rimProtection = avg(list, "def") * .60 + avg(list, "reb") * .36 + roleCount(list, c => playsSlot(c, 5) && c.def >= 80) * 3.8 + roleCount(list, helpRimProtector) * 3.2 + roleCount(list, c => /护框|盖帽|DPOY|篮板王|巨人/.test(c.tags.join(""))) * 1.8;
+      const guardStopper = roleCount(list, c => (playsSlot(c, 1) || playsSlot(c, 2)) && c.def >= 88);
+      const wingStopper = roleCount(list, c => (playsSlot(c, 2) || playsSlot(c, 3)) && c.def >= 88);
+      const pointOfAttack = avg(list, "def") * .78 + guardStopper * 2.8 + wingStopper * 3.0 + roleCount(list, c => c.archetype === "pointStopper" || c.archetype === "twoWayWing") * 2.5;
+      const switchability = avg(list, "def") * .64 + roleCount(list, c => c.slots.length >= 3) * 2.4 + roleCount(list, c => ["twoWayWing", "connector", "defAnchor"].includes(c.archetype)) * 2.0 + roleCount(list, c => (playsSlot(c, 3) || playsSlot(c, 4)) && c.def >= 88) * 2.6;
+      const defensiveRebound = avg(list, "reb") * .92 + roleCount(list, c => c.reb >= 90) * 3.0 + roleCount(list, c => (playsSlot(c, 4) || playsSlot(c, 5)) && c.reb >= 84) * 2.2 + roleCount(list, c => playsSlot(c, 5) && c.reb >= 88) * 1.4;
+      const slowBigRisk = roleCount(list, c => (playsSlot(c, 4) || playsSlot(c, 5)) && c.def >= 78 && c.space >= 86 && c.slots.length <= 2 && c.archetype !== "pointCenter");
+      const pnrCoverage = avg(list, "def") * .48 + pointOfAttack * .22 + switchability * .22 + roleCount(list, c => c.def >= 88 && c.slots.length >= 3) * 2.4 - slowBigRisk * 5.2;
+      const targetabilityRisk = roleCount(list, c => c.def < 76 && c.usage >= 80) * 4.2 + slowBigRisk * 2.3 - guardStopper * 1.4 - wingStopper * .9;
+      const modernDefense = rimProtection * .26 + pointOfAttack * .20 + switchability * .20 + pnrCoverage * .18 + defensiveRebound * .11 + avg(list, "def") * .05 - Math.max(0, targetabilityRisk) * .22;
+      const physicalDefense = rimProtection * .36 + defensiveRebound * .25 + pointOfAttack * .17 + avg(list, "def") * .12 + switchability * .10;
+      const balancedDefense = modernDefense * .52 + physicalDefense * .48;
+      const advImpact = avg(list, "impact") * .38 + avg(list, "per") * 1.15 + avg(list, "bpm") * 2.1 + avg(list, "vorp") * 1.2 + avg(list, "ws48") * 42;
+
+      const creators = roleCount(list, c => c.usage >= 88);
+      const engines = roleCount(list, c => c.archetype === "heliocentric");
+      const connectors = roleCount(list, c => ["connector", "pointStopper", "movementShooter", "stretchBig", "defAnchor"].includes(c.archetype));
+      const secondaryCreators = roleCount(list, c =>
+        (c.pass >= 84 && c.usage >= 74 && c.usage < 90) ||
+        (c.usage >= 76 && c.finish >= 80 && c.def >= 78 && c.usage < 90) ||
+        (["twoWayWing", "connector", "slasher"].includes(c.archetype) && c.usage >= 74 && c.finish >= 78)
+      );
+      const lebronFriendlyRoles = roleCount(list, c =>
+        c.name !== "LeBron James" &&
+        c.def >= 82 &&
+        (c.space >= 82 || c.shoot >= 80 || c.finish >= 80) &&
+        (c.usage <= 84 || ["connector", "pointStopper", "stretchBig", "defAnchor"].includes(c.archetype))
+      );
+      const hasLeBronEngine = list.some(c => c.name === "LeBron James" && c.pass >= 92 && c.usage >= 90);
+      const heliocentricEngine = list.some(c => c.pass >= 92 && c.usage >= 90 && ["heliocentric", "floorGeneral", "pointCenter"].includes(c.archetype));
+      const highLevelSecondary = roleCount(list, c =>
+        c.archetype !== "heliocentric" &&
+        c.usage >= 82 &&
+        c.finish >= 80 &&
+        c.impact >= 84
+      );
+      const spaceDefenseSizePieces = roleCount(list, c =>
+        c.usage <= 86 &&
+        c.def >= 82 &&
+        (c.space >= 82 || c.shoot >= 80) &&
+        (playsSlot(c, 2) || playsSlot(c, 3) || playsSlot(c, 4) || playsSlot(c, 5))
+      );
+      const fiveOutHelioTemplate = heliocentricEngine && highLevelSecondary >= 1 && spaceDefenseSizePieces >= 3;
+      const helioTemplateBonus = fiveOutHelioTemplate ? 3.6 : 0;
+      const guards = roleCount(list, c => playsSlot(c, 1));
+      const wings = roleCount(list, c => playsSlot(c, 2) || playsSlot(c, 3));
+      const bigs = roleCount(list, c => playsSlot(c, 4) || playsSlot(c, 5));
+      const shooting = respectedSpacers;
+      const rim = roleCount(list, c => playsSlot(c, 5) && bigInteriorPresence(c)) + roleCount(list, helpRimProtector);
+      const traditionalRim = roleCount(list, c => playsSlot(c, 5) && c.finish >= 88 && c.reb >= 84 && (c.def >= 80 || c.tags.some(t => /低位|巨人|禁区|天勾|篮板/.test(t))));
+      const eraProofStars = roleCount(list, eraProofScorer);
+      const historicBigs = roleCount(list, historicPointBig);
+      const powerInterior = roleCount(list, c => (playsSlot(c, 4) || playsSlot(c, 5)) && c.reb >= 84 && c.finish >= 88);
+      const lineupSize = avg(list, "reb") + roleCount(list, c => playsSlot(c, 4) || playsSlot(c, 5)) * 2 + roleCount(list, c => playsSlot(c, 3)) * 1.2;
+      const usageLoad = list.reduce((s, c) => s + (archetypeUsage[c.archetype] || .8), 0);
+      const hierarchyRelief = roleCount(list, c => c.pass >= 90) * 1.3 + connectors * .9 + respectedSpacers * .45 + eliteInteriorGravityCount * 1.0;
+      const pureOnBallOverlap = Math.max(0, roleCount(list, c => c.usage >= 88 && c.pass < 84 && c.space < 84) - 1);
+      const turnoverRisk = Math.max(0, usageLoad - 4.18) * 5.4 + Math.max(0, creators - 2) * 2.2 + pureOnBallOverlap * 2.4 - secondaryCreators * 1.2 - hierarchyRelief;
+      const durabilityFloor = avg(list, "impact") * .20 + avg(list, "ws48") * 70 + roleCount(list, c => c.ovr >= 94) * 1.2 - Number(el.injury.value) * .35;
+
+      let fit = 72;
+      fit += shooting * 4.1;
+      fit += connectors * 3.2;
+      fit += secondaryCreators * 1.8;
+      if (hasLeBronEngine) fit += Math.min(8, lebronFriendlyRoles * 1.7);
+      if (fiveOutHelioTemplate) fit += 7.5;
+      if (multiCreatorFiveOut) fit += 8.5;
+      fit += guards >= 1 ? 5 : -5;
+      fit += wings >= 2 ? 4 : 0;
+      fit += bigs >= 1 ? 4 : -6;
+      fit += rim >= 1 ? 5 : -4;
+      fit += traditionalRim >= 1 ? 2.5 : 0;
+      fit -= Math.max(0, creators - 2) * 5.8;
+      fit -= Math.max(0, engines - 1) * 7.4;
+      fit -= Math.max(0, usageLoad - 4.25) * 6.8;
+      fit -= Math.max(0, turnoverRisk) * .45;
+      fit = clamp(fit, 42, 99);
+
+      let eraBonus = 0;
+      let eraPenalty = 0;
+      let eraStyle = "balanced";
+      let offense = balancedOffense;
+      let defense = balancedDefense;
+      let effectiveFit = fit;
+      if (el.era.value === "modern") {
+        eraStyle = "space";
+        offense = modernOffense;
+        defense = modernDefense;
+        eraBonus = (spacing - 84) * .08 + (switchability - 82) * .04 + (playmaking - 82) * .035 + shooting * 1.0 + modernRolePlayers * .85 + helioTemplateBonus + eliteInteriorGravityCount * 1.4 - roleCount(list, c => c.space < 55 && !eliteInteriorGravity(c)) * 1.6 - Math.max(0, traditionalRim - 1) * 1.1;
+        effectiveFit = clamp(fit + shooting * .7 + Math.max(0, switchability - 86) * .05, 42, 99);
+      }
+      if (el.era.value === "physical") {
+        eraStyle = "physical";
+        offense = physicalOffense;
+        defense = physicalDefense;
+        eraBonus = (rimPressure - 84) * .07 + (defensiveRebound - 82) * .055 + (rimProtection - 82) * .045 + lineupSize * .025 + traditionalRim * 2.3 + powerInterior * 1.2 + eraProofStars * 1.1 + historicBigs * 1.8 - roleCount(list, c => c.def < 70) * 2.7;
+        eraPenalty = physicalEraAdjustment(list);
+        effectiveFit = clamp(fit + traditionalRim * 2.0 + powerInterior * 1.4 + eraProofStars * .8 + historicBigs * 1.4 - eraPenalty * .45, 42, 99);
+      }
+      if (el.era.value === "balanced") {
+        eraStyle = "balanced";
+        offense = balancedOffense;
+        defense = balancedDefense;
+        eraBonus = (avg(list, "impact") - 88) * .10 + Math.min(4, (spacing + rimProtection + playmaking - 250) * .025) + eraProofStars * .5 + historicBigs * .6;
+      }
+
+      const injuryVol = Number(el.injury.value);
+      const coachChem = Number(el.chem.value);
+      const lineupSeed = list.map(c => c.id).sort((a, b) => a - b).join("-");
+      const seasonNoise = seededNoise(`${lineupSeed}|${injuryVol}|${coachChem}`);
+      const randomSwing = (seasonNoise - .5) * (5 + injuryVol * .65);
+      const talent = (avg(list, "ovr") - 84) * 1.8;
+      const possessionEdge = (defensiveRebound - 78) * .055 + (pointOfAttack - 78) * .035 - Math.max(0, turnoverRisk) * .12;
+      const neutralOffense = balancedOffense;
+      const neutralDefense = balancedDefense;
+      const eraOffenseDelta = offense - neutralOffense;
+      const eraDefenseDelta = defense - neutralDefense;
+      const styleAdjustment = clamp(eraBonus - eraPenalty + eraOffenseDelta * .14 + eraDefenseDelta * .12, -3.8, 3.8);
+      const structureEdge = multiCreatorFiveOut ? 5.2 : fiveOutHelioTemplate ? 4.0 : 0;
+      const net = (neutralOffense - 84) * .30 + (neutralDefense - 82) * .28 + (effectiveFit - 70) * .17 + (advImpact - 86) * .18 + talent + styleAdjustment + structureEdge + coachChem + randomSwing + possessionEdge + durabilityFloor * .035;
+      let wins = clamp(Math.round(41 + net), 18, 78);
+      if (el.era.value === "physical" && eraPenalty >= 12) wins = Math.min(wins, 66);
+      if (el.era.value === "physical" && eraPenalty >= 18) wins = Math.min(wins, 60);
+      const losses = 82 - wins;
+
+      return {
+        wins, losses,
+        offense: clamp(Math.round(offense), 40, 110),
+        defense: clamp(Math.round(defense), 40, 110),
+        fit: Math.round(effectiveFit),
+        adv: clamp(Math.round(advImpact), 40, 120),
+        creators, engines, connectors, secondaryCreators, guards, wings, bigs, shooting, rim, traditionalRim,
+        interiorGravity: interiorGravityCount,
+        eliteInteriorGravity: eliteInteriorGravityCount,
+        lebronFriendlyRoles: hasLeBronEngine ? lebronFriendlyRoles : 0,
+        fiveOutHelioTemplate: fiveOutHelioTemplate ? 1 : 0,
+        multiCreatorFiveOut: multiCreatorFiveOut ? 1 : 0,
+        eraProofStars, historicBigs, powerInterior, eraStyle,
+        shotCreation: Math.round(shotCreation),
+        playmaking: Math.round(playmaking),
+        spacing: Math.round(spacing),
+        rimPressure: Math.round(rimPressure),
+        rimProtection: Math.round(rimProtection),
+        pointOfAttack: Math.round(pointOfAttack),
+        switchability: Math.round(switchability),
+        pnrCoverage: Math.round(pnrCoverage),
+        targetabilityRisk: Math.round(clamp(targetabilityRisk, 0, 30)),
+        defensiveRebound: Math.round(defensiveRebound),
+        turnoverRisk: Math.round(clamp(turnoverRisk, 0, 30)),
+        eraPenalty: Math.round(eraPenalty),
+        styleAdjustment: Number(styleAdjustment.toFixed(2)),
+        structureEdge: Number(structureEdge.toFixed(2)),
+        era: el.era.value,
+        seasonVariance: Number(randomSwing.toFixed(2)),
+        usageLoad: usageLoad.toFixed(2),
+        top: [...list].sort((a, b) => b.impact - a.impact)[0]
+      };
+    }
+
+    function tier(wins) {
+      if (wins >= 70) return "历史级怪物队";
+      if (wins >= 64) return "争冠超级强队";
+      if (wins >= 56) return "总冠军热门";
+      if (wins >= 48) return "稳进季后赛";
+      if (wins >= 40) return "附加赛/边缘队";
+      return "天赋很高但结构危险";
+    }
+
+    function playoffSeed(wins) {
+      if (wins >= 62) return "联盟前二种子";
+      if (wins >= 56) return "分区前二种子";
+      if (wins >= 50) return "主场优势种子";
+      if (wins >= 45) return "季后赛下半区";
+      if (wins >= 40) return "附加赛球队";
+      return "乐透区/附加赛外";
+    }
+
+    function calculatePlayoffs(r, list) {
+      const closers = roleCount(list, c => c.usage >= 88 && c.impact >= 92);
+      const playoffResilience = r.shotCreation * .18 + r.rimProtection * .16 + r.defensiveRebound * .12 + r.pointOfAttack * .10 + r.adv * .20 + r.fit * .14 + r.playmaking * .10 + r.rimPressure * .10;
+      const riskTax = r.turnoverRisk * .42 + Math.max(0, Number(r.usageLoad) - 4.25) * 2.2;
+      const eraEdge = r.era === "physical"
+        ? r.traditionalRim * 1.2 + r.eraProofStars * .9 + r.historicBigs * 1.1 + (r.eliteInteriorGravity || 0) * .8 - r.eraPenalty * .28
+        : r.shooting * .75 + Math.max(0, r.spacing - 88) * .06 + (r.eliteInteriorGravity || 0) * .7;
+      const power = playoffResilience + (r.wins - 50) * .42 + closers * 1.15 + eraEdge - riskTax;
+      const titleOdds = clamp(Math.round((power - 79) * 3.2 + (r.wins - 48) * 1.4), 1, 86);
+      if (r.wins < 40) {
+        return {
+          seed: playoffSeed(r.wins),
+          power: Math.round(power),
+          titleOdds: 0,
+          rounds: [{ name: "常规赛结束", result: "未进季后赛", status: "loss", note: "胜场不足，模拟器判定为附加赛外或乐透区。" }],
+          note: "天赋可能很高，但常规赛结构没有撑进季后赛。"
+        };
+      }
+
+      const isPlayIn = r.wins < 45;
+      const roundPlan = isPlayIn
+        ? [
+            ["附加赛", 82],
+            ["首轮", 88],
+            ["分区半决赛", 91],
+            ["分区决赛", 94],
+            ["总决赛", 96]
+          ]
+        : r.wins >= 60
+          ? [["首轮", 83], ["分区半决赛", 88], ["分区决赛", 92], ["总决赛", 95]]
+          : r.wins >= 52
+            ? [["首轮", 86], ["分区半决赛", 90], ["分区决赛", 93], ["总决赛", 96]]
+            : [["首轮", 89], ["分区半决赛", 92], ["分区决赛", 95], ["总决赛", 97]];
+
+      const rounds = [];
+      let alive = true;
+      roundPlan.forEach(([name, opponent], index) => {
+        if (!alive) return;
+        const noise = (seededNoise(`${r.wins}|${r.era}|${r.usageLoad}|${name}|${r.seasonVariance}`) - .5) * (name === "附加赛" ? 5.5 : 4.2);
+        const margin = power - opponent + noise;
+        const win = margin >= 0;
+        const games = name === "附加赛"
+          ? (win ? "胜出" : "出局")
+          : margin >= 8 ? "4-0"
+            : margin >= 4 ? "4-1"
+              : margin >= 0 ? "4-2"
+                : margin > -3 ? "3-4"
+                  : margin > -7 ? "2-4"
+                    : "1-4";
+        rounds.push({
+          name,
+          result: games,
+          status: win ? "win" : "loss",
+          note: win ? `系列赛强度 +${Math.max(0, Math.round(margin))}` : `对手强度压过 ${Math.abs(Math.round(margin))}`
+        });
+        alive = win;
+      });
+
+      const champion = alive && rounds.some(round => round.name === "总决赛" && round.status === "win");
+      const exitRound = champion ? "总冠军" : (rounds[rounds.length - 1]?.name || "季后赛");
+      const note = champion
+        ? "这队不只是常规赛强，半场硬解、护框和球权层级足够撑过四轮。"
+        : `${exitRound}止步：季后赛模型会放大半场硬解、护框、防守篮板和球权风险。`;
+      return { seed: playoffSeed(r.wins), power: Math.round(power), titleOdds, rounds, note };
+    }
+
+    function buildAnalysis(r) {
+      const notes = [];
+      notes.push(`主要赢法：${r.top.displayName}「${r.top.displayVersion}」是这套阵容的第一张王牌。`);
+      if (r.era === "physical" && r.eraPenalty >= 10) {
+        notes.push(`这个时代更看重身体对抗、篮板和禁区防守；这套阵容有些打法不太适应，所以被压了 ${r.eraPenalty} 分。`);
+      } else if (r.era === "physical") {
+        notes.push("在 90s/00s 环境里，半场单挑、内线对抗、防守篮板和护框会更重要。");
+      } else if (r.era === "modern" && r.shooting >= 3) {
+        notes.push("在现代空间环境里，这队有足够投射点，突破和挡拆会更舒服。");
+      } else if (r.era === "modern") {
+        notes.push("在现代空间环境里，外线威胁不够会让突破路线变窄，挡拆也更容易被收缩。");
+      } else if (r.shooting >= 3) {
+        notes.push("跨时代环境下，空间优势还在，但不会像现代规则里那样被完全放大。");
+      } else notes.push("跨时代环境下，这队更依赖球星天赋、防守质量和谁来主攻。");
+      if (r.eraProofStars >= 1) notes.push(`有 ${r.eraProofStars} 个跨时代球星：这类人靠身材、技术和硬解能力，换到别的年代也不容易掉档。`);
+      if (r.historicBigs >= 1) notes.push(`有 ${r.historicBigs} 个会传球的历史级内线：不只是站篮下，也能在半场进攻里当轴心。`);
+      if ((r.eliteInteriorGravity || 0) >= 1) notes.push(`有 ${r.eliteInteriorGravity} 个低位大杀器：哪怕不投三分，也能靠篮下威胁制造犯规和外线空位。`);
+      if ((r.fiveOutHelioTemplate || 0) >= 1) notes.push("这是很舒服的五外大核阵容：主攻手身边有副攻、空间、防守和体型。");
+      if ((r.multiCreatorFiveOut || 0) >= 1) notes.push("这队不是单核硬打：多人能持球处理，拉开之后进攻上限很高。");
+      if (r.shotCreation >= 90 && r.playmaking >= 88) notes.push("半场进攻很稳：既有人能自己打，也有人能把队友带起来。");
+      else if (r.shotCreation >= 90) notes.push("硬解能力很强，但被包夹后需要其他人及时接上处理球。");
+      else if (r.playmaking >= 90) notes.push("组织很好，但第一得分爆点没那么夸张，需要靠连续配合创造机会。");
+      if (r.spacing >= 92) notes.push("空间很好：弱侧不敢乱收缩，突破和挡拆都会更好打。");
+      if (r.turnoverRisk >= 12) notes.push("隐患：能持球的人太多，可能出现停球、失误和回合分配不清。");
+      if (r.traditionalRim >= 1) notes.push("禁区有人兜底：护框和篮板不会轻易崩。");
+      else if (r.rim >= 1) notes.push("有可靠护框点，常规赛防守下限比较稳。");
+      else notes.push("隐患：缺少真正护框点，外线一旦被过，篮下容易连续丢分。");
+      if (r.pointOfAttack >= 88 && r.switchability >= 88) notes.push("外线防守质量不错，遇到挡拆和换防不容易被一路点名。");
+      else if (r.pointOfAttack < 76) notes.push("隐患：第一道防线偏弱，遇到顶级后卫时需要更多协防。");
+      if (r.pnrCoverage < 72) notes.push("隐患：防挡拆一般。护框强不代表能一直防住外线持球人和中锋挡拆。");
+      if (r.targetabilityRisk >= 8) notes.push("隐患：场上有容易被针对的防守点，强队会反复找这个位置打。");
+      if (r.defensiveRebound < 76) notes.push("隐患：防守篮板不稳，容易送给对手二次进攻。");
+      if (r.engines > 1 || r.creators > 3) notes.push("球权需要磨合：球星很多，但每个人都想处理球时，效率不一定简单相加。");
+      else notes.push("分工比较清楚：主攻手、二当家和拼图各自位置明确。");
+      if (r.fit >= 88) notes.push("整体搭配很好，球员能力之间能互相放大。");
+      if (r.fit < 68) notes.push("纸面很强，但搭配有问题：可能缺无球、缺防守，或空间不够干净。");
+      return notes;
+    }
+
+    function detailMetricItems(r) {
+      if (!r) return [
+        ["--", "持球创造"], ["--", "组织处理"], ["--", "投射空间"],
+        ["--", "禁区压力"], ["--", "护框质量"], ["--", "领防资源"],
+        ["--", "挡拆覆盖"], ["--", "换防弹性"], ["--", "点名风险"],
+        ["--", "防守篮板"], ["--", "球权风险"],
+        ["--", "时代修正"], ["--", "赛季波动"], ["--", "二创资源"],
+        ["--", "球权负载"], ["--", "传统内线"], ["--", "低位重力"],
+        ["--", "投射点"], ["--", "时代保护"], ["--", "历史中锋"]
+      ];
+      const eraSwing = r.era === "physical"
+        ? `${r.styleAdjustment > 0 ? "+" : ""}${r.styleAdjustment}`
+        : r.era === "modern"
+          ? `${r.styleAdjustment > 0 ? "+" : ""}${r.styleAdjustment}`
+          : `${Math.round((r.adv - 86) * .12)}`;
+      const seasonVariance = typeof r.seasonVariance === "number"
+        ? (r.seasonVariance > 0 ? `+${r.seasonVariance}` : r.seasonVariance)
+        : "--";
+      return [
+        [r.shotCreation, "持球创造"],
+        [r.playmaking, "组织处理"],
+        [r.spacing, "投射空间"],
+        [r.rimPressure, "禁区压力"],
+        [r.rimProtection, "护框质量"],
+        [r.pointOfAttack, "领防资源"],
+        [r.pnrCoverage, "挡拆覆盖"],
+        [r.switchability, "换防弹性"],
+        [r.targetabilityRisk, "点名风险"],
+        [r.defensiveRebound, "防守篮板"],
+        [r.turnoverRisk, "球权风险"],
+        [eraSwing, "时代修正"],
+        [seasonVariance, "赛季波动"],
+        [r.secondaryCreators, "二创资源"],
+        [r.usageLoad, "球权负载"],
+        [r.traditionalRim, "传统内线"],
+        [r.eliteInteriorGravity || 0, "低位重力"],
+        [r.shooting, "投射点"],
+        [r.eraProofStars, "时代保护"],
+        [r.historicBigs, "历史中锋"]
+      ];
+    }
+
+    function renderDetailMetrics(r = null) {
+      el.detailMetrics.innerHTML = detailMetricItems(r).map(([value, label]) =>
+        `<div class="detail-metric"><b>${value}</b><span>${label}</span></div>`
+      ).join("");
+    }
+
+    function renderPlayoffs(playoff = null) {
+      if (!playoff) {
+        el.playoffOdds.textContent = "等待常规赛结果";
+        el.playoffGrid.innerHTML = [
+          ["附加赛/首轮", "--", "常规赛后生成"],
+          ["分区半决赛", "--", "等待路径"],
+          ["分区决赛", "--", "等待路径"],
+          ["总决赛", "--", "等待路径"]
+        ].map(([name, result, note]) => `<div class="round"><b>${name}</b><strong>${result}</strong><span>${note}</span></div>`).join("");
+        el.playoffNote.textContent = "模拟完整赛季后，根据常规赛强度、半场硬解、护框、球权风险和时代环境生成季后赛路径。";
+        return;
+      }
+      el.playoffOdds.textContent = `${playoff.seed} · 夺冠概率 ${playoff.titleOdds}% · PO强度 ${playoff.power}`;
+      el.playoffGrid.innerHTML = playoff.rounds.map(round => `
+        <div class="round ${round.status}">
+          <b>${round.name}</b>
+          <strong>${round.result}</strong>
+          <span>${round.note}</span>
+        </div>
+      `).join("");
+      el.playoffNote.textContent = playoff.note;
+    }
+
+    function playerSeasonRows(result) {
+      const list = selectedCards();
+      const totalUsage = Math.max(1, sum(list, "usage"));
+      const pace = result.era === "modern" ? 1.03 : result.era === "physical" ? .94 : .99;
+      const winLift = (result.wins - 41) * .035;
+      return list.map((c, i) => {
+        const usageShare = c.usage / totalUsage;
+        const minutes = clamp(30 + (c.impact - 84) * .16 + usageShare * 13 - i * .12, 27, 38);
+        const ppg = clamp(c.ppg * (.74 + usageShare * 1.08) * pace + winLift, 6, 36);
+        const rpg = clamp((c.reb - 42) * .105 + (c.slots.includes(5) ? 2.2 : c.slots.includes(4) ? 1.1 : 0) + minutes * .055, 2, 15);
+        const apg = clamp((c.pass - 48) * .115 + (c.slots.includes(1) ? 2.1 : 0) + (c.archetype === "pointCenter" ? 2.2 : 0), 1, 12);
+        const ts = clamp(Math.round((c.ts * 100) + (result.spacing - 84) * .08 + (result.fit - 78) * .04), 48, 70);
+        const role = c.usage >= 92 ? "主攻" : c.pass >= 92 ? "发动机" : c.def >= 94 ? "防守轴" : c.space >= 92 ? "空间点" : c.reb >= 92 ? "篮板点" : "轮转核心";
+        return { card: c, ppg, rpg, apg, ts, minutes, role, slot: slotCodes[i] };
+      });
+    }
+
+    function renderPlayerSeason(result = null) {
+      if (!result || !ratingsRevealed || selectedCount() !== 5) {
+        el.playerSeason.innerHTML = `
+          <div class="player-season-title">选择球员的本季模拟数据</div>
+          <div class="season-row">
+            <div class="season-player"><b>等待模拟</b><span>选五人后生成每个人的赛季数据</span></div>
+            <span>--</span><span>--</span><span>--</span><span>--</span><span>--</span><span>--</span>
+          </div>
+        `;
+        return;
+      }
+      el.playerSeason.innerHTML = `
+        <div class="player-season-title">选择球员的本季模拟数据</div>
+        <div class="season-row header">
+          <span>球员</span><span>PTS</span><span>REB</span><span>AST</span><span>TS%</span><span>MIN</span><span>角色</span>
+        </div>
+        ${playerSeasonRows(result).map(row => `
+          <div class="season-row">
+            <div class="season-player">
+              <b>${row.card.displayName}</b>
+              <span>${row.slot} · ${row.card.displayVersion}</span>
+            </div>
+            <span>${row.ppg.toFixed(1)}</span>
+            <span>${row.rpg.toFixed(1)}</span>
+            <span>${row.apg.toFixed(1)}</span>
+            <span>${row.ts}%</span>
+            <span>${row.minutes.toFixed(1)}</span>
+            <span>${row.role}</span>
+          </div>
+        `).join("")}
+      `;
+    }
+
+    function simulate() {
+      if (selectedCount() !== 5) return;
+      const r = calculateTeam(selectedCards());
+      r.playoff = calculatePlayoffs(r, selectedCards());
+      lastResult = r;
+      ratingsRevealed = true;
+      el.tier.textContent = tier(r.wins);
+      el.record.textContent = `${r.wins} - ${r.losses}`;
+      el.summary.textContent = `模拟净胜强度约等于 ${r.wins >= 60 ? "联盟第一档" : r.wins >= 50 ? "分区前列" : "季后赛竞争区"}，球权负载 ${r.usageLoad}。`;
+      el.offMetric.textContent = r.offense;
+      el.defMetric.textContent = r.defense;
+      el.fitMetric.textContent = r.fit;
+      el.advMetric.textContent = r.adv;
+      renderDetailMetrics(r);
+      renderPlayoffs(r.playoff);
+      renderPlayerSeason(r);
+      el.analysis.innerHTML = buildAnalysis(r).map(n => `<li>${n}</li>`).join("");
+      render();
+    }
+
+    function resetResult() {
+      if (selectedCount() === 5 && lastResult) return;
+      el.tier.textContent = selectedCount() === 5 ? "准备模拟" : "等待组队";
+      el.record.textContent = "-- - --";
+      el.summary.textContent = selectedCount() === 5 ? "阵容已满，点击模拟赛季。" : "选五张卡后开始模拟。";
+      el.offMetric.textContent = "--";
+      el.defMetric.textContent = "--";
+      el.fitMetric.textContent = "--";
+      el.advMetric.textContent = "--";
+      renderDetailMetrics();
+      renderPlayoffs();
+      renderPlayerSeason();
+      el.analysis.innerHTML = "";
+    }
+
+    function saveGame() {
+      const data = {
+        draftIds: draft.map(c => c.id),
+        selectedIds: selected.map(c => c ? c.id : null),
+        activeSlot,
+        previewCardId,
+        ratingsRevealed,
+        settings: {
+          era: el.era.value,
+          pool: el.pool.value,
+          posFilter: el.posFilter.value,
+          injury: el.injury.value,
+          chem: el.chem.value
+        },
+        result: lastResult
+      };
+      localStorage.setItem("nbaMomentPackSave", JSON.stringify(data));
+      el.poolInfo.textContent = "已存档到本机浏览器";
+    }
+
+    function loadGame() {
+      const raw = localStorage.getItem("nbaMomentPackSave");
+      if (!raw) {
+        el.poolInfo.textContent = "还没有存档";
+        return;
+      }
+      const data = JSON.parse(raw);
+      el.era.value = data.settings?.era || "modern";
+      el.pool.value = data.settings?.pool || "all";
+      el.posFilter.value = data.settings?.posFilter || "all";
+      el.injury.value = data.settings?.injury || "5";
+      el.chem.value = data.settings?.chem || "0";
+      el.injuryValue.textContent = el.injury.value;
+      el.chemValue.textContent = el.chem.value;
+      draft = (data.draftIds || []).map(id => cards.find(c => c.id === id)).filter(Boolean);
+      selected = (data.selectedIds || []).slice(0, 5).map(id => id == null ? null : cards.find(c => c.id === id) || null);
+      while (selected.length < 5) selected.push(null);
+      activeSlot = clamp(Number(data.activeSlot || 0), 0, 4);
+      previewCardId = data.previewCardId ?? draft[0]?.id ?? null;
+      ratingsRevealed = !!data.ratingsRevealed;
+      lastResult = data.result || null;
+      if (lastResult && ratingsRevealed && !lastResult.playoff && selectedCount() === 5) {
+        lastResult.playoff = calculatePlayoffs(lastResult, selectedCards());
+      }
+      render();
+      if (lastResult && ratingsRevealed) {
+        el.tier.textContent = tier(lastResult.wins);
+        el.record.textContent = `${lastResult.wins} - ${lastResult.losses}`;
+        el.summary.textContent = `模拟净胜强度约等于 ${lastResult.wins >= 60 ? "联盟第一档" : lastResult.wins >= 50 ? "分区前列" : "季后赛竞争区"}，球权负载 ${lastResult.usageLoad}。`;
+        el.offMetric.textContent = lastResult.offense;
+        el.defMetric.textContent = lastResult.defense;
+        el.fitMetric.textContent = lastResult.fit;
+        el.advMetric.textContent = lastResult.adv;
+        renderDetailMetrics(lastResult);
+        renderPlayoffs(lastResult.playoff);
+        renderPlayerSeason(lastResult);
+        el.analysis.innerHTML = buildAnalysis(lastResult).map(n => `<li>${n}</li>`).join("");
+      } else {
+        resetResult();
+      }
+    }
+
+    el.rerollBtn.addEventListener("click", openPack);
+    el.openPackBtn.addEventListener("click", openPack);
+    el.clearBtn.addEventListener("click", () => { selected = Array(5).fill(null); ratingsRevealed = false; activeSlot = 0; render(); resetResult(); });
+    el.saveBtn.addEventListener("click", saveGame);
+    el.loadBtn.addEventListener("click", loadGame);
+    el.simulateBtn.addEventListener("click", simulate);
+    el.simulateBtnInline.addEventListener("click", simulate);
+    el.pool.addEventListener("change", openPack);
+    el.posFilter.addEventListener("change", render);
+    el.era.addEventListener("change", () => { if (selectedCount() === 5) simulate(); });
+    el.injury.addEventListener("input", () => { el.injuryValue.textContent = el.injury.value; });
+    el.chem.addEventListener("input", () => { el.chemValue.textContent = el.chem.value; });
+
+    openPack();
+    loadCardArtManifest();
+  </script>
+</body>
+</html>

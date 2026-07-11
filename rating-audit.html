@@ -1,0 +1,649 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NBA 时刻卡评分审计</title>
+  <style>
+    :root {
+      --bg: #f5f3ef;
+      --ink: #191714;
+      --muted: #6a6258;
+      --line: #d8d0c4;
+      --card: #fffaf2;
+      --dark: #171511;
+      --red: #b64242;
+      --green: #237a57;
+      --gold: #d9a441;
+      --blue: #286c9e;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", sans-serif;
+      color: var(--ink);
+      background:
+        linear-gradient(90deg, rgba(25,23,20,.035) 1px, transparent 1px) 0 0 / 36px 36px,
+        linear-gradient(rgba(25,23,20,.035) 1px, transparent 1px) 0 0 / 36px 36px,
+        var(--bg);
+    }
+
+    .app {
+      width: min(1500px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 28px 0 48px;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: end;
+      gap: 18px;
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(30px, 5vw, 58px);
+      line-height: .98;
+      letter-spacing: 0;
+    }
+
+    .sub {
+      margin: 9px 0 0;
+      max-width: 900px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.6;
+      font-weight: 700;
+    }
+
+    .links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    .links a,
+    button {
+      height: 40px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 0 12px;
+      background: var(--dark);
+      color: #fff;
+      text-decoration: none;
+      font: inherit;
+      font-weight: 950;
+      cursor: pointer;
+    }
+
+    .filters,
+    .summary,
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255,250,242,.92);
+      box-shadow: 0 12px 26px rgba(25,23,20,.07);
+    }
+
+    .filters {
+      display: grid;
+      grid-template-columns: minmax(230px, 1fr) repeat(4, minmax(140px, 180px));
+      gap: 10px;
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+
+    input,
+    select {
+      width: 100%;
+      height: 40px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      padding: 0 11px;
+      color: var(--ink);
+      font: inherit;
+      font-weight: 750;
+    }
+
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+
+    .tile {
+      min-height: 74px;
+      border: 1px solid rgba(25,23,20,.12);
+      border-radius: 8px;
+      padding: 10px;
+      background: #fffaf2;
+    }
+
+    .tile b {
+      display: block;
+      font-size: 28px;
+      line-height: 1;
+    }
+
+    .tile span {
+      display: block;
+      margin-top: 7px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.3;
+      font-weight: 850;
+    }
+
+    .panel {
+      overflow: hidden;
+    }
+
+    .table-wrap {
+      overflow: auto;
+      max-height: calc(100vh - 280px);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 1180px;
+      font-size: 13px;
+    }
+
+    th,
+    td {
+      padding: 9px 10px;
+      border-bottom: 1px solid rgba(25,23,20,.1);
+      text-align: left;
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: #ebe3d8;
+      color: #514940;
+      font-size: 12px;
+    }
+
+    td {
+      background: rgba(255,250,242,.82);
+      font-weight: 800;
+    }
+
+    .player {
+      min-width: 230px;
+      white-space: normal;
+    }
+
+    .player b {
+      display: block;
+      font-size: 15px;
+      color: var(--ink);
+    }
+
+    .player span {
+      display: block;
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.25;
+    }
+
+    .num {
+      font-variant-numeric: tabular-nums;
+      text-align: right;
+    }
+
+    .diff {
+      min-width: 48px;
+      border-radius: 999px;
+      display: inline-flex;
+      justify-content: center;
+      padding: 4px 8px;
+      font-weight: 1000;
+      color: #fff;
+    }
+
+    .up { background: var(--green); }
+    .down { background: var(--red); }
+    .flat { background: #777067; }
+
+    .reason {
+      min-width: 230px;
+      white-space: normal;
+      color: var(--muted);
+      line-height: 1.45;
+      font-weight: 750;
+    }
+
+    .flag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      border-radius: 999px;
+      padding: 0 8px;
+      background: #ece6dc;
+      color: #332e28;
+      font-size: 12px;
+      font-weight: 950;
+      margin: 2px 4px 2px 0;
+    }
+
+    .bar {
+      width: 86px;
+      height: 6px;
+      border-radius: 999px;
+      background: #e3dbd0;
+      overflow: hidden;
+      display: inline-block;
+      vertical-align: middle;
+      margin-left: 6px;
+    }
+
+    .bar i {
+      display: block;
+      height: 100%;
+      width: var(--w);
+      background: var(--blue);
+    }
+
+    @media (max-width: 920px) {
+      header { align-items: flex-start; flex-direction: column; }
+      .links { justify-content: flex-start; }
+      .filters { grid-template-columns: 1fr 1fr; }
+      .summary { grid-template-columns: 1fr 1fr; }
+    }
+
+    @media (max-width: 560px) {
+      .app { width: min(100% - 20px, 1500px); padding-top: 18px; }
+      .filters { grid-template-columns: 1fr; }
+      .summary { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header>
+      <div>
+        <h1>评分审计</h1>
+        <p class="sub">对比旧人工分 manual 与当前 derived-v1 公式分。这个页面用来找高估、低估和字段异常，不参与抽卡玩法。</p>
+      </div>
+      <nav class="links">
+        <a href="index.html">模拟器</a>
+        <a href="player-library.html">球员库</a>
+        <a href="scoring-model.html">模型说明</a>
+      </nav>
+    </header>
+
+    <section class="filters">
+      <input id="q" placeholder="搜索球员、版本、球队、标签">
+      <select id="field">
+        <option value="maxAbs">最大字段差异</option>
+        <option value="ovr">OVR</option>
+        <option value="off">进攻</option>
+        <option value="def">防守</option>
+        <option value="pass">组织</option>
+        <option value="shoot">投射</option>
+        <option value="finish">终结</option>
+        <option value="reb">篮板</option>
+        <option value="space">空间</option>
+        <option value="usage">球权</option>
+        <option value="impact">影响力</option>
+      </select>
+      <select id="direction">
+        <option value="abs">按绝对差异</option>
+        <option value="up">只看公式拉高</option>
+        <option value="down">只看公式拉低</option>
+      </select>
+      <select id="threshold">
+        <option value="0">全部差异</option>
+        <option value="5">差异 5+</option>
+        <option value="8">差异 8+</option>
+        <option value="12">差异 12+</option>
+        <option value="16">差异 16+</option>
+      </select>
+      <select id="pos">
+        <option value="all">全部位置</option>
+        <option value="PG">PG</option>
+        <option value="SG">SG</option>
+        <option value="SF">SF</option>
+        <option value="PF">PF</option>
+        <option value="C">C</option>
+      </select>
+    </section>
+
+    <section class="summary" id="summary"></section>
+
+    <section class="panel">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>球员</th>
+              <th>球队</th>
+              <th>位置</th>
+              <th>OVR</th>
+              <th>进攻</th>
+              <th>防守</th>
+              <th>组织</th>
+              <th>投射</th>
+              <th>终结</th>
+              <th>篮板</th>
+              <th>空间</th>
+              <th>球权</th>
+              <th>影响力</th>
+              <th>最大异常</th>
+              <th>可能原因</th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    if (location.protocol === "file:") {
+      document.body.insertAdjacentHTML("afterbegin", `<div style="position:sticky;top:0;z-index:20;background:#1a1511;color:#fff;padding:12px 18px;font-weight:900">公测版需要通过网站服务打开。请部署到静态托管，或本地用 python3 -m http.server 后访问。</div>`);
+    }
+
+    const palette = ["#d64032", "#276f9f", "#237a57", "#8a5b2c", "#6f45a8", "#c27a1b", "#1f766e", "#993844"];
+    const fields = ["ovr", "off", "def", "pass", "shoot", "finish", "reb", "space", "usage", "impact"];
+    const labels = { ovr: "OVR", off: "进攻", def: "防守", pass: "组织", shoot: "投射", finish: "终结", reb: "篮板", space: "空间", usage: "球权", impact: "影响力" };
+    const archetypeUsage = {
+      heliocentric: 1.18, shotCreator: 1.02, floorGeneral: .84, movementShooter: .82, twoWayWing: .88,
+      connector: .62, defAnchor: .58, interiorHub: .88, stretchBig: .72, verticalBig: .64,
+      pointStopper: .55, slasher: .92, pointCenter: .92
+    };
+    let cards = [];
+
+    function extractConst(source, name, endMarker) {
+      const start = source.indexOf(`const ${name} = `);
+      if (start < 0) throw new Error(`找不到 ${name}`);
+      const valueStart = start + `const ${name} = `.length;
+      const end = source.indexOf(endMarker, valueStart);
+      return source.slice(valueStart, end);
+    }
+
+    function localizedVersion(version) {
+      return version
+        .replace("MVP Diesel", "巅峰鲨鱼版")
+        .replace("First Ring", "首冠版")
+        .replace("Finals Chef", "总决赛厨神版")
+        .replace("Nets Return", "篮网回归版")
+        .replace("Fo Fo Fo", "横扫宣言版")
+        .replace("Afro Kobe", "爆炸头科比版")
+        .replace("DPOY", "最佳防守球员")
+        .replace("Scoring King", "得分王版")
+        .replace("Champion", "冠军版")
+        .replace("Title", "冠军版")
+        .replace("Finals", "总决赛")
+        .replace("MVP", "MVP版")
+        .replace("Apex", "巅峰版")
+        .replace("Peak", "巅峰版")
+        .replace("Scoring Champ", "得分王版")
+        .replace("Assist King", "助攻王版")
+        .replace("Sixth Man", "第六人版")
+        .replace("Point Forward", "组织前锋版")
+        .replace("Two-Way", "双向版");
+    }
+
+    function clamp(n, min, max) { return Math.max(min, Math.min(max, n)); }
+    function hasPos(card, pos) { return card.pos.includes(pos); }
+    function statScale(value, low, high) { return clamp(40 + 60 * ((value - low) / (high - low)), 40, 100); }
+    function tagMatch(card, pattern) { return pattern.test(card.tags.join(" ")); }
+    function eraYear(card) { return Number(card.version.slice(0, 4)) || 2000; }
+
+    function buildBaseCard(r, i, nameZh) {
+      return {
+        id: i,
+        name: r[0], version: r[1], team: r[2], pos: r[3], archetype: r[4],
+        displayName: nameZh[r[0]] || r[0],
+        displayVersion: localizedVersion(r[1]),
+        manual: {
+          ovr: r[5], off: r[6], def: r[7], pass: r[8], shoot: r[9], finish: r[10],
+          reb: r[11], space: r[12], usage: r[13], impact: r[14]
+        },
+        ppg: r[15], ts: r[16], per: r[17], ws48: r[18], bpm: r[19], vorp: r[20],
+        tags: r[21],
+        color: palette[i % palette.length]
+      };
+    }
+
+    function deriveRatings(card) {
+      const ppg = statScale(card.ppg, 7, 34);
+      const ts = statScale(card.ts, .48, .67);
+      const per = statScale(card.per, 10, 32);
+      const ws = statScale(card.ws48, .06, .31);
+      const bpm = statScale(card.bpm, -1, 13);
+      const vorp = statScale(card.vorp, 0, 10);
+      const guard = hasPos(card, "PG") || hasPos(card, "SG");
+      const wing = hasPos(card, "SG") || hasPos(card, "SF");
+      const big = hasPos(card, "PF") || hasPos(card, "C");
+      const awardBonus = (tagMatch(card, /MVP|Finals MVP|冠军核心/) ? 5 : 0) + (tagMatch(card, /DPOY|一防|防守/) ? 3 : 0) + (tagMatch(card, /得分王|助攻王|篮板王/) ? 2 : 0);
+      const shootBonus = (["movementShooter", "stretchBig", "floorGeneral"].includes(card.archetype) ? 8 : 0) + (tagMatch(card, /三分|射手|空间|180|超远|无球|Logo/) ? 8 : 0) + (eraYear(card) < 1990 && tagMatch(card, /低位|篮板王|护框/) ? -8 : 0);
+      const passBonus = ({ floorGeneral: 18, heliocentric: 15, pointCenter: 18, connector: 8, pointStopper: 2 }[card.archetype] || 0) + (tagMatch(card, /助攻|组织|控场|策应|Showtime|大三双|传球/) ? 9 : 0);
+      const finishBonus = ({ slasher: 14, interiorHub: 12, verticalBig: 13, pointCenter: 7, heliocentric: 8 }[card.archetype] || 0) + (tagMatch(card, /扣篮|突破|低位|空接|禁区|终结|天勾/) ? 8 : 0);
+      const reboundBonus = (hasPos(card, "C") ? 16 : hasPos(card, "PF") ? 11 : hasPos(card, "SF") ? 5 : 0) + (tagMatch(card, /篮板王|篮板|护框|盖帽|禁区/) ? 14 : 0);
+      const defenseBonus = ({ defAnchor: 23, pointStopper: 21, twoWayWing: 15, connector: 10, stretchBig: 6, interiorHub: 6 }[card.archetype] || 0) + (tagMatch(card, /DPOY|一防|防守|护框|盖帽|抢断|领防|冠军防守|铁人/) ? 16 : 0);
+      const roleFitBonus =
+        (["connector", "pointStopper", "stretchBig", "movementShooter", "defAnchor"].includes(card.archetype) ? 7 : 0) +
+        (tagMatch(card, /冠军拼图|无数据球星|空间五号|护框空间|防守|DPOY|底角空间|换防|冠军/) ? 7 : 0);
+      const modernRoleSpacing =
+        (["pointStopper", "connector"].includes(card.archetype) && tagMatch(card, /无数据球星|底角空间|冠军拼图|防守/) ? 8 : 0) +
+        (card.archetype === "stretchBig" ? 10 : 0) +
+        (tagMatch(card, /空间五号|护框空间|三分大个/) ? 8 : 0);
+      const primaryScoringRespect =
+        ((guard || wing) && card.ppg >= 24 && card.ts >= .56 ? 7 : 0) +
+        ((guard || wing) && card.ppg >= 28 ? 4 : 0) +
+        (tagMatch(card, /MVP|Finals MVP|得分王|季后赛|总决赛|单打|大核/) ? 5 : 0);
+      const onBallPunish =
+        (["heliocentric", "floorGeneral", "slasher", "twoWayWing"].includes(card.archetype) ? 5 : 0) +
+        (card.ppg >= 25 && (card.bpm >= 5 || card.per >= 24) ? 4 : 0);
+      const offBallRespect =
+        (["movementShooter", "twoWayWing", "connector"].includes(card.archetype) ? 4 : 0) +
+        (card.ts >= .59 && (guard || wing) ? 3 : 0) +
+        (tagMatch(card, /无球|180|三分|射手|Logo|冠军|无数据球星|冠军拼图|空间五号|底角空间/) ? 4 : 0);
+      const usageWeight = (archetypeUsage[card.archetype] || .8);
+      const usage = clamp(Math.round(ppg * .44 + per * .20 + bpm * .16 + usageWeight * 13 + (tagMatch(card, /得分王|MVP|持球|单打|大核/) ? 6 : 0)), 38, 100);
+      const shoot = clamp(Math.round(ts * .32 + ppg * .15 + bpm * .10 + 24 + shootBonus + modernRoleSpacing * .35 + offBallRespect * .35 + (guard || wing ? 4 : -2)), 25, 100);
+      const respectFloor = (guard || wing)
+        ? 74 + primaryScoringRespect + onBallPunish * .75 + offBallRespect * .55
+        : 20;
+      const space = clamp(Math.round(Math.max(
+        shoot * .58 + 13 + shootBonus * .55 + modernRoleSpacing * .85 + primaryScoringRespect * .75 + onBallPunish * .70 + offBallRespect * .95 + (guard || wing ? 5 : big ? -2 : 0),
+        respectFloor
+      )), 20, 100);
+      const pass = clamp(Math.round(bpm * .28 + vorp * .18 + per * .14 + 18 + passBonus + (guard ? 10 : hasPos(card, "C") && card.archetype === "pointCenter" ? 13 : 2)), 40, 100);
+      const finish = clamp(Math.round(ppg * .30 + ts * .23 + per * .18 + 16 + finishBonus + (big ? 6 : 1)), 45, 100);
+      const reb = clamp(Math.round(per * .18 + ws * .16 + bpm * .10 + 28 + reboundBonus + (card.archetype === "pointCenter" ? 7 : 0)), 20, 100);
+      const def = clamp(Math.round(bpm * .22 + ws * .20 + 34 + defenseBonus + (big ? 8 : wing ? 5 : 1) + (tagMatch(card, /冠军/) ? 2 : 0)), 40, 100);
+      const off = clamp(Math.round(ppg * .32 + ts * .18 + per * .18 + bpm * .14 + usage * .10 + shoot * .08), 45, 100);
+      const impact = clamp(Math.round(bpm * .26 + vorp * .18 + ws * .17 + per * .13 + 4 + awardBonus + roleFitBonus + (tagMatch(card, /季后赛|总决赛|冠军/) ? 3 : 0)), 50, 100);
+      const ovr = clamp(Math.round(impact * .30 + off * .23 + def * .20 + Math.max(pass, shoot, finish) * .15 + reb * .06 + usage * .06), 70, 99);
+      const raw = { ovr, off, def, pass, shoot, finish, reb, space, usage, impact };
+      const calibrated = Object.fromEntries(Object.entries(raw).map(([key, value]) => [
+        key,
+        clamp(Math.round(value * .35 + card.manual[key] * .65), key === "ovr" ? 70 : 20, 100)
+      ]));
+      const adjusted = { ...calibrated };
+      if (card.archetype === "twoWayWing" && card.ppg >= 19 && card.per >= 20) {
+        adjusted.usage = Math.max(adjusted.usage, 82);
+        adjusted.impact = Math.max(adjusted.impact, 86);
+      }
+      if (tagMatch(card, /季后赛主攻|强硬解|造犯规/)) {
+        adjusted.usage = Math.max(adjusted.usage, 86);
+        adjusted.off = Math.max(adjusted.off, 88);
+        adjusted.impact = Math.max(adjusted.impact, 90);
+        adjusted.finish = Math.max(adjusted.finish, 86);
+      }
+      if (card.archetype === "connector" && card.ppg >= 15 && card.ts >= .57 && Math.max(adjusted.finish, card.manual.finish) >= 80) {
+        adjusted.usage = Math.max(adjusted.usage, 76);
+        adjusted.off = Math.max(adjusted.off, 82);
+        adjusted.impact = Math.max(adjusted.impact, 84);
+      }
+      if (card.archetype === "pointStopper" && tagMatch(card, /无数据球星|防守|冠军拼图/)) {
+        adjusted.space = Math.max(adjusted.space, 84);
+        adjusted.impact = Math.max(adjusted.impact, 82);
+      }
+      if (card.archetype === "stretchBig" && Math.max(adjusted.def, card.manual.def) >= 88 && (Math.max(adjusted.shoot, card.manual.shoot) >= 82 || tagMatch(card, /空间五号|护框空间/))) {
+        adjusted.space = Math.max(adjusted.space, 88);
+        adjusted.impact = Math.max(adjusted.impact, 82);
+      }
+      if (tagMatch(card, /MVP第二|MVP Runner-Up|MVP第三/)) {
+        adjusted.usage = Math.max(adjusted.usage, 90);
+        adjusted.off = Math.max(adjusted.off, 94);
+        adjusted.impact = Math.max(adjusted.impact, 93);
+      }
+      if (tagMatch(card, /MVP/) && !tagMatch(card, /DPOY|最佳防守球员/)) {
+        adjusted.impact = Math.max(adjusted.impact, 94);
+        adjusted.ovr = Math.max(adjusted.ovr, 92);
+      }
+      if (tagMatch(card, /冠军核心|Finals MVP/)) {
+        adjusted.usage = Math.max(adjusted.usage, 84);
+        adjusted.impact = Math.max(adjusted.impact, 92);
+        adjusted.ovr = Math.max(adjusted.ovr, 90);
+      }
+      if (tagMatch(card, /季后赛爆发|太阳门面|总决赛/) && card.ppg >= 24) {
+        adjusted.usage = Math.max(adjusted.usage, 86);
+        adjusted.off = Math.max(adjusted.off, 91);
+        adjusted.impact = Math.max(adjusted.impact, 88);
+      }
+      if (card.ppg >= 25 && card.ts >= .57 && Math.max(adjusted.off, card.manual.off) >= 90) {
+        adjusted.impact = Math.max(adjusted.impact, 88);
+      }
+      adjusted.ovr = Math.max(adjusted.ovr, clamp(Math.round(
+        adjusted.impact * .30 + adjusted.off * .23 + adjusted.def * .20 + Math.max(adjusted.pass, adjusted.shoot, adjusted.finish) * .15 + adjusted.reb * .06 + adjusted.usage * .06
+      ), 70, 99));
+      return { ...adjusted, ratingSource: "derived-v1-calibrated" };
+    }
+
+    function diff(card, field) {
+      return card[field] - card.manual[field];
+    }
+
+    function maxDiff(card) {
+      return fields.map(field => ({ field, value: diff(card, field), abs: Math.abs(diff(card, field)) })).sort((a, b) => b.abs - a.abs)[0];
+    }
+
+    function diffHtml(value) {
+      const cls = value > 0 ? "up" : value < 0 ? "down" : "flat";
+      const text = value > 0 ? `+${value}` : `${value}`;
+      return `<span class="diff ${cls}">${text}</span>`;
+    }
+
+    function pairHtml(card, field) {
+      const value = diff(card, field);
+      return `<td class="num"><b>${card[field]}</b> / ${card.manual[field]} ${diffHtml(value)}</td>`;
+    }
+
+    function reason(card) {
+      const flags = [];
+      const top = maxDiff(card);
+      flags.push(`${labels[top.field]} ${top.value > 0 ? "被拉高" : "被拉低"} ${Math.abs(top.value)}`);
+      if (Math.abs(diff(card, "def")) >= 10) flags.push("防守 proxy 需审");
+      if (Math.abs(diff(card, "shoot")) >= 10 || Math.abs(diff(card, "space")) >= 10) flags.push("投射/空间需审");
+      if (Math.abs(diff(card, "pass")) >= 10) flags.push("组织需补 AST%");
+      if (Math.abs(diff(card, "reb")) >= 10) flags.push("篮板需补 TRB%");
+      if (card.archetype === "defAnchor" && diff(card, "ovr") < -6) flags.push("防守中轴可能被低估");
+      if (card.archetype === "movementShooter" && diff(card, "space") < 0) flags.push("无球牵引可能被低估");
+      if (card.tags.some(t => /MVP|Finals MVP|冠军核心|DPOY/.test(t)) && diff(card, "impact") < -6) flags.push("荣誉影响力可能偏低");
+      return flags.map(flag => `<span class="flag">${flag}</span>`).join("");
+    }
+
+    function filtered() {
+      const q = document.getElementById("q").value.trim().toLowerCase();
+      const field = document.getElementById("field").value;
+      const direction = document.getElementById("direction").value;
+      const threshold = Number(document.getElementById("threshold").value);
+      const pos = document.getElementById("pos").value;
+      return cards.filter(card => {
+        const hay = `${card.displayName} ${card.name} ${card.displayVersion} ${card.version} ${card.team} ${card.tags.join(" ")}`.toLowerCase();
+        const target = field === "maxAbs" ? maxDiff(card).value : diff(card, field);
+        return (!q || hay.includes(q)) &&
+          (pos === "all" || card.pos.includes(pos)) &&
+          Math.abs(target) >= threshold &&
+          (direction === "abs" || (direction === "up" ? target > 0 : target < 0));
+      }).sort((a, b) => {
+        const fa = field === "maxAbs" ? maxDiff(a).abs : Math.abs(diff(a, field));
+        const fb = field === "maxAbs" ? maxDiff(b).abs : Math.abs(diff(b, field));
+        return fb - fa || b.ovr - a.ovr;
+      });
+    }
+
+    function renderSummary(list) {
+      const avgAbs = fields.reduce((sum, field) => sum + cards.reduce((s, c) => s + Math.abs(diff(c, field)), 0) / Math.max(1, cards.length), 0) / fields.length;
+      const high = cards.filter(c => maxDiff(c).abs >= 12).length;
+      const pulledUp = cards.filter(c => diff(c, "ovr") >= 5).length;
+      const pulledDown = cards.filter(c => diff(c, "ovr") <= -5).length;
+      document.getElementById("summary").innerHTML = [
+        [`${list.length}`, "当前筛选卡数"],
+        [`${cards.length}`, "总卡数"],
+        [avgAbs.toFixed(1), "平均字段绝对差异"],
+        [`${high}`, "最大字段差异 12+ 的卡"],
+        [`+${pulledUp} / -${pulledDown}`, "OVR 拉高/拉低 5+ 数量"]
+      ].map(([value, label]) => `<div class="tile"><b>${value}</b><span>${label}</span></div>`).join("");
+    }
+
+    function render() {
+      const list = filtered();
+      renderSummary(list);
+      document.getElementById("rows").innerHTML = list.map(card => {
+        const top = maxDiff(card);
+        return `
+          <tr>
+            <td class="player"><b>${card.displayName}</b><span>${card.displayVersion}</span></td>
+            <td>${card.team}</td>
+            <td>${card.pos}</td>
+            ${pairHtml(card, "ovr")}
+            ${pairHtml(card, "off")}
+            ${pairHtml(card, "def")}
+            ${pairHtml(card, "pass")}
+            ${pairHtml(card, "shoot")}
+            ${pairHtml(card, "finish")}
+            ${pairHtml(card, "reb")}
+            ${pairHtml(card, "space")}
+            ${pairHtml(card, "usage")}
+            ${pairHtml(card, "impact")}
+            <td>${labels[top.field]} ${diffHtml(top.value)} <span class="bar"><i style="--w:${Math.min(100, top.abs * 5)}%"></i></span></td>
+            <td class="reason">${reason(card)}</td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    async function load() {
+      const source = await fetch("index.html").then(res => res.text());
+      const nameZh = new Function(`return (${extractConst(source, "nameZh", ";\n\n    function localizedVersion")})`)();
+      const rawCards = new Function(`return (${extractConst(source, "rawCards", ";\n\n    const archetypeUsage")})`)();
+      cards = rawCards.map((r, i) => {
+        const base = buildBaseCard(r, i, nameZh);
+        return { ...base, ...deriveRatings(base) };
+      });
+      render();
+    }
+
+    ["q", "field", "direction", "threshold", "pos"].forEach(id => {
+      document.getElementById(id).addEventListener("input", render);
+    });
+
+    load().catch(err => {
+      document.getElementById("rows").innerHTML = `<tr><td colspan="15">${err.message}</td></tr>`;
+    });
+  </script>
+</body>
+</html>
