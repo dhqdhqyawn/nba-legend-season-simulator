@@ -97,7 +97,28 @@
       flex-wrap: wrap;
       gap: 10px;
       justify-content: flex-end;
+      align-items: center;
     }
+
+    .action-menu { position: relative; }
+    .action-menu summary { list-style: none; cursor: pointer; }
+    .action-menu summary::-webkit-details-marker { display: none; }
+    .action-menu-panel {
+      position: absolute;
+      top: calc(100% + 7px);
+      right: 0;
+      z-index: 30;
+      width: 180px;
+      display: grid;
+      gap: 6px;
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fffdf8;
+      box-shadow: var(--shadow);
+    }
+
+    .action-menu-panel .btn { width: 100%; box-shadow: none; }
 
     .btn {
       min-height: 42px;
@@ -141,11 +162,76 @@
 
     .controls {
       display: grid;
-      grid-template-columns: repeat(5, minmax(120px, 1fr));
+      grid-template-columns: minmax(220px, 320px) minmax(0, 1fr);
       gap: 12px;
       padding: 14px;
       margin-bottom: 16px;
     }
+
+    .advanced-settings {
+      min-width: 0;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255,255,255,.72);
+    }
+
+    .advanced-settings > summary {
+      min-height: 40px;
+      padding: 0 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      cursor: pointer;
+      list-style: none;
+      font-size: 13px;
+      font-weight: 900;
+    }
+
+    .advanced-settings > summary::-webkit-details-marker { display: none; }
+    .advanced-summary { color: var(--muted); font-size: 11px; font-weight: 800; text-align: right; }
+    .advanced-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(120px, 1fr));
+      gap: 12px;
+      padding: 12px;
+      border-top: 1px solid var(--line);
+    }
+
+    .flow-progress {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      margin: 0 0 12px;
+    }
+
+    .flow-step {
+      min-height: 46px;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 8px 11px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255,255,255,.62);
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .flow-step b {
+      width: 25px;
+      height: 25px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: rgba(25,23,20,.08);
+      color: var(--ink);
+    }
+
+    .flow-step.active { border-color: var(--green); color: var(--ink); background: rgba(35,122,87,.08); }
+    .flow-step.complete { border-color: rgba(35,122,87,.26); color: var(--green); }
+    .flow-step.complete b { background: var(--green); color: #fff; }
 
     .field label {
       display: block;
@@ -477,7 +563,11 @@
         var(--card);
       padding: 10px;
       box-shadow: 0 10px 22px rgba(25, 23, 20, .09);
+      position: relative;
     }
+
+    .card-preview-close,
+    .card-preview-backdrop { display: none; }
 
     .preview-grid {
       display: grid;
@@ -528,6 +618,9 @@
       line-height: 1.35;
       font-weight: 800;
     }
+
+    .preview-actions { margin-top: 10px; }
+    .preview-actions .pick-btn { width: 100%; }
 
     .cards {
       display: grid;
@@ -1536,7 +1629,7 @@
 
     .season-result-reasons {
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 8px;
     }
 
@@ -1548,6 +1641,47 @@
       font-size: 12px;
       line-height: 1.45;
     }
+
+    .season-result-reason strong,
+    .season-result-reason span,
+    .season-result-reason b { display: block; }
+    .season-result-reason strong { color: var(--ink); font-size: 13px; }
+    .season-result-reason span { margin-top: 5px; color: var(--muted); }
+    .season-result-reason b { margin-top: 7px; color: var(--red); font-size: 11px; }
+
+    .season-overview-details {
+      margin-top: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .season-overview-details > summary,
+    .share-panel > summary {
+      min-height: 42px;
+      padding: 0 12px;
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .season-overview-details .season-result-metrics { padding: 0 10px 10px; }
+
+    .share-panel {
+      margin-top: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      overflow: hidden;
+    }
+
+    .share-panel[hidden] { display: none; }
+    .share-image-wrap { padding: 0 10px 10px; }
+    .share-image-wrap img { width: 100%; max-height: 62svh; object-fit: contain; background: #f3f0ea; border-radius: 8px; }
+    .share-actions { display: flex; gap: 8px; padding: 0 10px 10px; }
+    .share-actions .btn { flex: 1; }
 
     .season-player-table-wrap {
       overflow-x: auto;
@@ -1612,6 +1746,8 @@
     .season-modal-footer {
       padding: 10px 18px;
       display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
       justify-content: flex-end;
       border-top: 1px solid var(--line);
       background: #fffdf8;
@@ -1682,6 +1818,7 @@
       .detail-metrics { grid-template-columns: repeat(3, 1fr); }
       .playoff-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .analysis-list { grid-template-columns: 1fr; }
+      .advanced-grid { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
     }
 
     @media (max-width: 780px) {
@@ -1690,7 +1827,11 @@
       .topbar { align-items: flex-start; flex-direction: column; }
       .actions { justify-content: flex-start; width: 100%; }
       .btn { flex: 1 1 140px; }
-      .controls { grid-template-columns: 1fr 1fr; }
+      .controls { grid-template-columns: 1fr; }
+      .advanced-grid { grid-template-columns: 1fr 1fr; }
+      .flow-progress { gap: 5px; }
+      .flow-step { min-height: 42px; padding: 7px; gap: 6px; }
+      .flow-step b { width: 22px; height: 22px; }
       .cards { grid-template-columns: 1fr; }
       .side { grid-template-columns: 1fr; }
       .top-lineup .lineup { grid-template-columns: 1fr; }
@@ -1707,6 +1848,46 @@
       .wheel-wrap { max-width: 310px; }
       .wheel-label { transform: rotate(calc(var(--i) * 30deg + 15deg)) translateY(-125px) rotate(calc(var(--i) * -30deg - 15deg)); }
       .mobile-simulate.ready { display: block; }
+      .card-preview {
+        display: none;
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 92;
+        width: 100%;
+        min-height: 0;
+        max-height: 84svh;
+        padding: 18px 12px calc(18px + env(safe-area-inset-bottom));
+        border-radius: 8px 8px 0 0;
+        overflow: auto;
+      }
+      .card-preview.is-open { display: block; }
+      .card-preview-close {
+        display: grid;
+        place-items: center;
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        z-index: 3;
+        width: 38px;
+        height: 38px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+        color: var(--ink);
+        font-size: 22px;
+      }
+      .card-preview-backdrop.is-open {
+        display: block;
+        position: fixed;
+        inset: 0;
+        z-index: 91;
+        border: 0;
+        background: rgba(20,18,15,.56);
+      }
+      body.card-preview-open { overflow: hidden; }
+      .season-result-reasons { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -1721,10 +1902,16 @@
         </div>
       </div>
       <div class="actions">
-        <button class="btn secondary" id="rerollBtn">重开卡包</button>
-        <button class="btn secondary" id="clearBtn">清空阵容</button>
-        <button class="btn secondary" id="saveBtn">存档</button>
-        <button class="btn secondary" id="loadBtn">读档</button>
+        <button class="btn secondary" id="rerollBtn">换一包</button>
+        <details class="action-menu" id="actionMenu">
+          <summary class="btn secondary">更多</summary>
+          <div class="action-menu-panel">
+            <button class="btn secondary" id="clearBtn">清空阵容</button>
+            <button class="btn secondary" id="saveBtn">保存进度</button>
+            <button class="btn secondary" id="loadBtn">读取进度</button>
+            <button class="btn secondary" id="importLineupBtn">导入阵容码</button>
+          </div>
+        </details>
         <button class="btn" id="simulateBtn" disabled>模拟赛季</button>
       </div>
     </header>
@@ -1738,41 +1925,55 @@
           <option value="physical">90s/00s 肉搏时代</option>
         </select>
       </div>
-      <div class="field">
-        <label for="poolSelect">卡池偏好</label>
-        <select id="poolSelect">
-          <option value="all">全部巨星卡</option>
-          <option value="mvp">MVP / 冠军核心</option>
-          <option value="guard">后卫盛宴</option>
-          <option value="frontcourt">锋线与内线</option>
-        </select>
-      </div>
-      <div class="field">
-        <label for="positionFilter">候选卡位置筛选</label>
-        <select id="positionFilter">
-          <option value="all">全部位置</option>
-          <option value="1">只看 PG</option>
-          <option value="2">只看 SG</option>
-          <option value="3">只看 SF</option>
-          <option value="4">只看 PF</option>
-          <option value="5">只看 C</option>
-        </select>
-      </div>
-      <div class="field">
-        <label for="injuryRange">伤病/疲劳波动</label>
-        <div class="range-line">
-          <input id="injuryRange" type="range" min="0" max="12" value="5" />
-          <span id="injuryValue">5</span>
+      <details class="advanced-settings">
+        <summary>
+          <span>高级设置</span>
+          <span class="advanced-summary" id="advancedSummary">全部巨星卡 · 波动 5 · 磨合 0</span>
+        </summary>
+        <div class="advanced-grid">
+          <div class="field">
+            <label for="poolSelect">卡池偏好</label>
+            <select id="poolSelect">
+              <option value="all">全部巨星卡</option>
+              <option value="mvp">MVP / 冠军核心</option>
+              <option value="guard">后卫盛宴</option>
+              <option value="frontcourt">锋线与内线</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="positionFilter">候选卡位置筛选</label>
+            <select id="positionFilter">
+              <option value="all">全部位置</option>
+              <option value="1">只看 PG</option>
+              <option value="2">只看 SG</option>
+              <option value="3">只看 SF</option>
+              <option value="4">只看 PF</option>
+              <option value="5">只看 C</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="injuryRange">伤病/疲劳波动</label>
+            <div class="range-line">
+              <input id="injuryRange" type="range" min="0" max="12" value="5" />
+              <span id="injuryValue">5</span>
+            </div>
+          </div>
+          <div class="field">
+            <label for="chemRange">教练磨合加成</label>
+            <div class="range-line">
+              <input id="chemRange" type="range" min="-8" max="8" value="0" />
+              <span id="chemValue">0</span>
+            </div>
+          </div>
         </div>
-      </div>
-      <div class="field">
-        <label for="chemRange">教练磨合加成</label>
-        <div class="range-line">
-          <input id="chemRange" type="range" min="-8" max="8" value="0" />
-          <span id="chemValue">0</span>
-        </div>
-      </div>
+      </details>
     </section>
+
+    <nav class="flow-progress" aria-label="组队进度">
+      <div class="flow-step active" data-flow-step="1"><b>1</b><span>选位置</span></div>
+      <div class="flow-step" data-flow-step="2"><b>2</b><span>选球员</span></div>
+      <div class="flow-step" data-flow-step="3"><b>3</b><span>模拟赛季</span></div>
+    </nav>
 
     <section class="panel top-lineup">
       <div class="lineup-head">
@@ -1801,7 +2002,7 @@
               <div class="pack-main">先开出 20 张候选卡</div>
               <div class="pack-copy">候选卡只展示中文名、赛季版本和身份标签，真正评分会在赛季模拟后揭晓。</div>
             </div>
-            <div class="pack-actions">
+            <div class="pack-actions" hidden>
               <button class="btn" id="openPackBtn">开一包 20 张</button>
               <button class="btn secondary" id="revealHintBtn" disabled>评分未揭晓</button>
             </div>
@@ -1884,7 +2085,6 @@
             </div>
             <div class="season-result-lineup" id="seasonResultLineup"></div>
           </div>
-          <div class="season-result-metrics" id="seasonResultMetrics"></div>
           <section class="season-result-section">
             <div class="season-result-section-head">
               <h3>季后赛路径</h3>
@@ -1898,6 +2098,16 @@
               <span>阵容结构与时代环境</span>
             </div>
             <div class="season-result-reasons" id="seasonResultReasons"></div>
+          </section>
+          <details class="season-overview-details">
+            <summary>查看四项模型评分</summary>
+            <div class="season-result-metrics" id="seasonResultMetrics"></div>
+          </details>
+          <section class="share-panel" id="sharePanel" hidden>
+            <div class="share-image-wrap"><img id="shareImage" alt="赛季结果分享图" /></div>
+            <div class="share-actions">
+              <button class="btn secondary" id="downloadShareBtn" type="button">保存图片</button>
+            </div>
           </section>
         </section>
         <section class="season-modal-panel" id="seasonPlayersPanel" role="tabpanel" aria-labelledby="seasonPlayersTab" data-result-panel="players" hidden>
@@ -1913,10 +2123,14 @@
         </section>
       </div>
       <footer class="season-modal-footer">
+        <button class="btn secondary" id="copyLineupCodeBtn" type="button">复制阵容码</button>
+        <button class="btn" id="generateShareBtn" type="button">生成分享图</button>
         <button class="btn secondary" id="seasonModalDone" type="button">返回阵容</button>
       </footer>
     </section>
   </div>
+
+  <button class="card-preview-backdrop" id="cardPreviewBackdrop" type="button" aria-label="关闭球员详情"></button>
 
   <script>
     if (location.protocol === "file:") {
@@ -2644,11 +2858,14 @@
     let ratingsRevealed = false;
     let activeSlot = 0;
     let previewCardId = null;
+    let cardPreviewOpen = false;
+    let shareImageDataUrl = "";
     let resultModalReturnFocus = null;
 
     const el = {
       cards: document.getElementById("cards"),
       cardPreview: document.getElementById("cardPreview"),
+      cardPreviewBackdrop: document.getElementById("cardPreviewBackdrop"),
       packStatus: document.getElementById("packStatus"),
       openPackBtn: document.getElementById("openPackBtn"),
       revealHintBtn: document.getElementById("revealHintBtn"),
@@ -2663,6 +2880,9 @@
       clearBtn: document.getElementById("clearBtn"),
       saveBtn: document.getElementById("saveBtn"),
       loadBtn: document.getElementById("loadBtn"),
+      importLineupBtn: document.getElementById("importLineupBtn"),
+      actionMenu: document.getElementById("actionMenu"),
+      advancedSummary: document.getElementById("advancedSummary"),
       era: document.getElementById("eraSelect"),
       pool: document.getElementById("poolSelect"),
       posFilter: document.getElementById("positionFilter"),
@@ -2697,7 +2917,12 @@
       seasonResultPlayoffs: document.getElementById("seasonResultPlayoffs"),
       seasonResultReasons: document.getElementById("seasonResultReasons"),
       seasonResultPlayers: document.getElementById("seasonResultPlayers"),
-      seasonResultDetails: document.getElementById("seasonResultDetails")
+      seasonResultDetails: document.getElementById("seasonResultDetails"),
+      copyLineupCodeBtn: document.getElementById("copyLineupCodeBtn"),
+      generateShareBtn: document.getElementById("generateShareBtn"),
+      sharePanel: document.getElementById("sharePanel"),
+      shareImage: document.getElementById("shareImage"),
+      downloadShareBtn: document.getElementById("downloadShareBtn")
     };
 
     function clamp(n, min, max) { return Math.max(min, Math.min(max, n)); }
@@ -2755,9 +2980,12 @@
     }
 
     function openPack() {
+      if (el.actionMenu) el.actionMenu.open = false;
       selected = Array(5).fill(null);
       lastResult = null;
       ratingsRevealed = false;
+      cardPreviewOpen = false;
+      document.body.classList.remove("card-preview-open");
       draft = shuffle(filteredPool()).slice(0, 20);
       previewCardId = draft[0]?.id ?? null;
       activeSlot = 0;
@@ -2854,6 +3082,7 @@
         btn.addEventListener("click", event => {
           event.stopPropagation();
           previewCardId = Number(btn.dataset.previewId);
+          cardPreviewOpen = true;
           renderPreview();
           renderCards();
         });
@@ -2948,19 +3177,49 @@
       el.simulateBtnFloating.textContent = lastResult && ratingsRevealed ? "查看赛季结果" : "模拟整个赛季";
       const positionLabel = el.posFilter.value === "all" ? "全部位置" : slotLabels[Number(el.posFilter.value) - 1];
       el.poolInfo.textContent = draft.length ? `本轮已抽 ${draft.length} 张 · 当前筛选 ${positionLabel} · 显示 ${filteredDraft().length} 张` : "先开卡包，再从候选卡里选五人";
+      const poolLabel = el.pool.options[el.pool.selectedIndex]?.textContent || "全部巨星卡";
+      el.advancedSummary.textContent = `${poolLabel} · 波动 ${el.injury.value} · 磨合 ${el.chem.value}`;
+      const count = selectedCount();
+      document.querySelectorAll("[data-flow-step]").forEach(step => {
+        const number = Number(step.dataset.flowStep);
+        const active = (number === 1 && count === 0) || (number === 2 && count > 0 && count < 5) || (number === 3 && count === 5 && !lastResult);
+        const complete = (number === 1 && count > 0) || (number === 2 && count === 5) || (number === 3 && !!lastResult);
+        step.classList.toggle("active", active);
+        step.classList.toggle("complete", complete);
+      });
+    }
+
+    function closeCardPreview() {
+      const mobileDrawer = window.matchMedia("(max-width: 780px)").matches;
+      cardPreviewOpen = false;
+      document.body.classList.remove("card-preview-open");
+      el.cardPreview.classList.remove("is-open");
+      el.cardPreviewBackdrop.classList.remove("is-open");
+      el.cardPreview.setAttribute("aria-hidden", String(mobileDrawer));
+      renderCards();
     }
 
     function renderPreview() {
       const c = cards.find(card => card.id === previewCardId) || filteredDraft()[0] || draft[0];
+      const mobileDrawer = window.matchMedia("(max-width: 780px)").matches;
+      el.cardPreview.classList.toggle("is-open", cardPreviewOpen);
+      el.cardPreviewBackdrop.classList.toggle("is-open", cardPreviewOpen);
+      el.cardPreview.setAttribute("aria-hidden", String(mobileDrawer && !cardPreviewOpen));
+      document.body.classList.toggle("card-preview-open", mobileDrawer && cardPreviewOpen);
       if (!c) {
         el.cardPreview.innerHTML = `<div class="preview-title">先开一包候选卡</div><div class="preview-copy">这里会显示当前查看球员的卡面和详细信息。</div>`;
         return;
       }
       previewCardId = c.id;
       const isSelected = selected.some(p => p && p.id === c.id);
+      const samePlayerSelected = selected.some(p => p && p.name === c.name && p.id !== c.id);
       const showRatings = ratingsRevealed && isSelected;
+      const ineligible = !canPlay(c);
+      const pickDisabled = !isSelected && (selectedCount() >= 5 || ineligible || samePlayerSelected);
+      const previewPickLabel = isSelected ? "移出阵容" : samePlayerSelected ? "已有该球员" : ineligible ? `不能打 ${slotCodes[activeSlot]}` : `选入 ${slotCodes[activeSlot]}`;
       el.cardPreview.style.setProperty("--accent", c.color);
       el.cardPreview.innerHTML = `
+        <button class="card-preview-close" type="button" data-preview-close aria-label="关闭球员详情">&times;</button>
         <div class="preview-grid">
           <div class="preview-art">${cardImage(c) ? `<img src="${cardImage(c)}" alt="${c.displayName}" loading="lazy" onerror="this.remove()">` : `<span>${c.displayName.slice(0, 2)}</span>`}</div>
           <div>
@@ -2977,6 +3236,7 @@
             </div>
             <div class="chips">${c.tags.slice(0, 4).map(t => `<span class="chip">${t}</span>`).join("")}</div>
             <div class="lock-note">${showRatings ? "评分已揭晓：完整属性和高阶数据已解锁。" : "盲盒阶段：只展示身份信息，真实评分和数据模拟后解锁。"}</div>
+            <div class="preview-actions"><button class="pick-btn ${isSelected ? "remove" : ""}" type="button" data-preview-pick="${c.id}" ${pickDisabled ? "disabled" : ""}>${previewPickLabel}</button></div>
           </div>
         </div>
         <div class="card-section-title">基础属性</div>
@@ -3004,6 +3264,14 @@
           <div><b>${archetypeLabel(c.archetype)}</b><small>类型</small></div>
         </div>
       `;
+      const closePreviewButton = el.cardPreview.querySelector("[data-preview-close]");
+      closePreviewButton?.addEventListener("click", closeCardPreview);
+      el.cardPreview.querySelector("[data-preview-pick]")?.addEventListener("click", () => {
+        cardPreviewOpen = false;
+        document.body.classList.remove("card-preview-open");
+        toggleCard(c.id);
+      });
+      if (mobileDrawer && cardPreviewOpen) requestAnimationFrame(() => closePreviewButton?.focus());
     }
 
     function roleCount(list, predicate) {
@@ -3504,6 +3772,53 @@
       return notes;
     }
 
+    function buildConcreteReasons(r) {
+      const sideGap = Math.abs(r.offense - r.defense);
+      const strongerSide = r.offense >= r.defense ? "进攻" : "防守";
+      const seasonReason = {
+        title: `${r.wins} 胜的常规赛底盘`,
+        detail: `进攻 ${r.offense}、防守 ${r.defense}、兼容 ${r.fit}、高阶影响 ${r.adv}。${sideGap >= 6 ? `${strongerSide}比另一端高 ${sideGap} 分，是胜场的主要来源。` : "攻防差距不大，胜场主要来自整体均衡。"}`,
+        impact: `常规赛 ${r.wins}-${82 - r.wins}`
+      };
+
+      const structures = [
+        { label: "持球创造", value: r.shotCreation, good: "关键回合有人能自行创造出手。", bad: "关键回合更依赖复杂配合，进攻容易断电。" },
+        { label: "组织处理", value: r.playmaking, good: "包夹后仍能把球转到正确位置。", bad: "主攻手被夹击后，第二次处理不够稳定。" },
+        { label: "投射空间", value: r.spacing, good: "弱侧不敢收缩，突破和挡拆路线更宽。", bad: "对手可以收缩禁区，突破和挡拆收益会下降。" },
+        { label: "禁区压力", value: r.rimPressure, good: "能持续制造篮下出手、罚球和协防轮转。", bad: "难以持续迫使对手收缩，外线空位来源偏少。" },
+        { label: "护框质量", value: r.rimProtection, good: "外线被过后仍有篮下兜底。", bad: "第一道防线失守后，禁区缺少可靠补救。" },
+        { label: "领防资源", value: r.pointOfAttack, good: "可以正面对位顶级持球手，减少协防压力。", bad: "顶级后卫更容易进入禁区，内线需要频繁补位。" },
+        { label: "挡拆覆盖", value: r.pnrCoverage, good: "面对持球人和掩护者的二人配合不易露出固定弱点。", bad: "护框不等于能防挡拆，对手会反复攻击中锋移动与外线追防。" },
+        { label: "防守篮板", value: r.defensiveRebound, good: "能结束防守回合，减少对手二次进攻。", bad: "一次防守成功后仍可能丢后场篮板。" }
+      ];
+      const keyStructure = structures.sort((a, b) => Math.abs(b.value - 84) - Math.abs(a.value - 84))[0];
+      const structureGap = Math.round(Math.abs(keyStructure.value - 84));
+      const structurePositive = keyStructure.value >= 84;
+      const structureReason = {
+        title: structurePositive ? "最主要的结构优势" : "最主要的结构短板",
+        detail: `${keyStructure.label} ${Math.round(keyStructure.value)}，${structurePositive ? "高于" : "低于"}模型中性线 84 共 ${structureGap} 分。${structurePositive ? keyStructure.good : keyStructure.bad}`,
+        impact: structurePositive ? "主要加分项" : "主要扣分项"
+      };
+
+      const playoffRounds = r.playoff?.rounds || [];
+      const decisiveRound = playoffRounds[playoffRounds.length - 1];
+      const playoffReason = decisiveRound?.name === "常规赛结束" ? {
+        title: "为什么没有进入季后赛",
+        detail: `球队只取得 ${r.wins} 胜，低于模型设置的 40 胜季后赛门槛，因此没有生成首轮系列赛。`,
+        impact: "附加赛外"
+      } : decisiveRound ? {
+        title: decisiveRound.status === "loss" ? `${decisiveRound.name}为什么出局` : `${decisiveRound.name}结果如何产生`,
+        detail: `赛前晋级率 ${Math.round((decisiveRound.probability || 0) * 100)}%，实际比分 ${decisiveRound.result}。${decisiveRound.status === "loss" ? `本次落在约 ${Math.round((1 - decisiveRound.probability) * 100)}% 的出局区间。` : `本次兑现了约 ${Math.round((decisiveRound.probability || 0) * 100)}% 的晋级区间。`}`,
+        impact: decisiveRound.opponentLabel || r.playoff.seed
+      } : {
+        title: "季后赛路径",
+        detail: "常规赛胜场不足，未生成七场系列赛。",
+        impact: r.playoff?.seed || "附加赛外"
+      };
+
+      return [seasonReason, structureReason, playoffReason];
+    }
+
     function detailMetricItems(r) {
       if (!r) return [
         ["--", "持球创造"], ["--", "组织处理"], ["--", "投射空间"],
@@ -3645,6 +3960,10 @@
       const eraLabel = el.era.options[el.era.selectedIndex]?.textContent || "跨时代环境";
       const playoff = r.playoff;
       const rows = playerSeasonRows(r);
+      shareImageDataUrl = "";
+      el.sharePanel.hidden = true;
+      el.shareImage.removeAttribute("src");
+      el.generateShareBtn.textContent = "生成分享图";
       el.seasonModalKicker.textContent = `${eraLabel} · 82 场常规赛与季后赛`;
       el.seasonResultTier.textContent = tier(r.wins);
       el.seasonResultRecord.textContent = `${r.wins} - ${r.losses}`;
@@ -3673,8 +3992,8 @@
           <span>${round.note}</span>
         </div>
       `).join("");
-      el.seasonResultReasons.innerHTML = buildAnalysis(r).slice(0, 6).map(reason => `
-        <div class="season-result-reason">${reason}</div>
+      el.seasonResultReasons.innerHTML = buildConcreteReasons(r).map(reason => `
+        <div class="season-result-reason"><strong>${reason.title}</strong><span>${reason.detail}</span><b>${reason.impact}</b></div>
       `).join("");
       el.seasonResultPlayers.innerHTML = `
         <table class="season-player-table">
@@ -3720,7 +4039,10 @@
     }
 
     function handleResultModalKeydown(event) {
-      if (!el.seasonModal.classList.contains("is-open")) return;
+      if (!el.seasonModal.classList.contains("is-open")) {
+        if (event.key === "Escape" && cardPreviewOpen) closeCardPreview();
+        return;
+      }
       if (event.key === "Escape") {
         event.preventDefault();
         closeResultModal();
@@ -3757,7 +4079,7 @@
       renderDetailMetrics(r);
       renderPlayoffs(r.playoff);
       renderPlayerSeason(r);
-      el.analysis.innerHTML = buildAnalysis(r).map(n => `<li>${n}</li>`).join("");
+      el.analysis.innerHTML = buildConcreteReasons(r).map(reason => `<li><b>${reason.title}</b><br>${reason.detail}</li>`).join("");
       render();
       if (present) openResultModal(r);
     }
@@ -3777,6 +4099,189 @@
       el.analysis.innerHTML = "";
     }
 
+    function encodeLineupCode(payload) {
+      return `NBA82-${btoa(JSON.stringify(payload)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "")}`;
+    }
+
+    function decodeLineupCode(code) {
+      const raw = String(code || "").trim().replace(/^NBA82-/, "").replace(/-/g, "+").replace(/_/g, "/");
+      const padded = raw + "=".repeat((4 - raw.length % 4) % 4);
+      return JSON.parse(atob(padded));
+    }
+
+    function currentLineupCode() {
+      return encodeLineupCode({
+        v: 1,
+        cards: selected.map(card => card?.id ?? null),
+        era: el.era.value,
+        injury: Number(el.injury.value),
+        chemistry: Number(el.chem.value)
+      });
+    }
+
+    async function copyText(text) {
+      if (navigator.clipboard?.writeText) {
+        try {
+          await navigator.clipboard.writeText(text);
+          return;
+        } catch (_) {}
+      }
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.setAttribute("readonly", "");
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      textarea.remove();
+    }
+
+    async function copyLineupCode() {
+      if (selectedCount() !== 5) return;
+      await copyText(currentLineupCode());
+      el.copyLineupCodeBtn.textContent = "阵容码已复制";
+      setTimeout(() => { el.copyLineupCodeBtn.textContent = "复制阵容码"; }, 1600);
+    }
+
+    function importLineupCode() {
+      el.actionMenu.open = false;
+      const input = prompt("粘贴 NBA82 阵容码");
+      if (!input) return;
+      try {
+        const payload = decodeLineupCode(input);
+        if (payload.v !== 1 || !Array.isArray(payload.cards) || payload.cards.length !== 5) throw new Error("bad payload");
+        const imported = payload.cards.map(id => cards.find(card => card.id === id));
+        if (imported.some((card, index) => !card || !card.slots.includes(index + 1))) throw new Error("bad lineup");
+        if (new Set(imported.map(card => card.name)).size !== imported.length) throw new Error("duplicate player");
+        selected = imported;
+        el.era.value = ["modern", "balanced", "physical"].includes(payload.era) ? payload.era : "modern";
+        el.injury.value = String(clamp(Number(payload.injury ?? 5), 0, 12));
+        el.chem.value = String(clamp(Number(payload.chemistry ?? 0), -8, 8));
+        el.injuryValue.textContent = el.injury.value;
+        el.chemValue.textContent = el.chem.value;
+        const importedIds = new Set(imported.map(card => card.id));
+        draft = [...imported, ...shuffle(filteredPool().filter(card => !importedIds.has(card.id))).slice(0, 15)];
+        ratingsRevealed = false;
+        lastResult = null;
+        activeSlot = 0;
+        previewCardId = imported[0].id;
+        el.posFilter.value = "all";
+        el.actionMenu.open = false;
+        render();
+        resetResult();
+        el.poolInfo.textContent = "阵容码已导入，可以直接模拟赛季";
+        document.querySelector(".top-lineup")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      } catch (_) {
+        alert("阵容码无效，或其中球员不符合固定位置规则。");
+      }
+    }
+
+    function drawPosterText(ctx, text, x, y, maxWidth, lineHeight, maxLines = 2) {
+      const chars = [...String(text)];
+      let line = "";
+      let lineIndex = 0;
+      for (const char of chars) {
+        const test = line + char;
+        if (ctx.measureText(test).width > maxWidth && line) {
+          ctx.fillText(line, x, y + lineIndex * lineHeight);
+          lineIndex += 1;
+          line = char;
+          if (lineIndex >= maxLines - 1) break;
+        } else line = test;
+      }
+      if (lineIndex < maxLines) ctx.fillText(line, x, y + lineIndex * lineHeight);
+    }
+
+    function generateSharePoster() {
+      if (!lastResult || selectedCount() !== 5) return;
+      const canvas = document.createElement("canvas");
+      canvas.width = 1080;
+      canvas.height = 1440;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#f4f0e9";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "#d64032";
+      ctx.fillRect(0, 0, 22, canvas.height);
+      ctx.fillStyle = "#191714";
+      ctx.font = '900 54px "PingFang SC", "Microsoft YaHei", sans-serif';
+      ctx.fillText("NBA 巨星赛季模拟器", 70, 88);
+      ctx.fillStyle = "#6d675f";
+      ctx.font = '700 26px "PingFang SC", "Microsoft YaHei", sans-serif';
+      const eraLabel = el.era.options[el.era.selectedIndex]?.textContent || "跨时代环境";
+      ctx.fillText(`${eraLabel} · 82 场常规赛与季后赛`, 72, 132);
+
+      ctx.fillStyle = "#191714";
+      ctx.fillRect(52, 172, 976, 270);
+      ctx.fillStyle = "#e4af3f";
+      ctx.font = '900 26px "PingFang SC", "Microsoft YaHei", sans-serif';
+      ctx.fillText(tier(lastResult.wins), 84, 225);
+      ctx.fillStyle = "#ffffff";
+      ctx.font = '1000 112px "PingFang SC", "Microsoft YaHei", sans-serif';
+      ctx.fillText(`${lastResult.wins} - ${lastResult.losses}`, 80, 355);
+      ctx.fillStyle = "#c8c2b9";
+      ctx.font = '700 25px "PingFang SC", "Microsoft YaHei", sans-serif';
+      ctx.fillText(`${lastResult.playoff.seed} · 夺冠概率 ${lastResult.playoff.titleOdds}% · PO强度 ${lastResult.playoff.power}`, 84, 404);
+
+      ctx.fillStyle = "#191714";
+      ctx.font = '900 34px "PingFang SC", "Microsoft YaHei", sans-serif';
+      ctx.fillText("首发五人", 66, 505);
+      selectedCards().forEach((card, index) => {
+        const y = 545 + index * 82;
+        ctx.fillStyle = index % 2 ? "#ebe6de" : "#fffdf8";
+        ctx.fillRect(58, y, 964, 68);
+        ctx.fillStyle = "#d64032";
+        ctx.font = '900 24px "PingFang SC", "Microsoft YaHei", sans-serif';
+        ctx.fillText(slotCodes[index], 82, y + 43);
+        ctx.fillStyle = "#191714";
+        ctx.font = '900 28px "PingFang SC", "Microsoft YaHei", sans-serif';
+        ctx.fillText(card.displayName, 160, y + 42);
+        ctx.fillStyle = "#6d675f";
+        ctx.font = '700 20px "PingFang SC", "Microsoft YaHei", sans-serif';
+        drawPosterText(ctx, card.displayVersion, 525, y + 41, 465, 24, 1);
+      });
+
+      ctx.fillStyle = "#191714";
+      ctx.font = '900 34px "PingFang SC", "Microsoft YaHei", sans-serif';
+      ctx.fillText("季后赛路径", 66, 1002);
+      (lastResult.playoff.rounds || []).slice(-4).forEach((round, index) => {
+        const col = index % 2;
+        const row = Math.floor(index / 2);
+        const x = 58 + col * 490;
+        const y = 1032 + row * 132;
+        ctx.fillStyle = round.status === "win" ? "#e5f1eb" : "#f7e7e4";
+        ctx.fillRect(x, y, 468, 112);
+        ctx.fillStyle = "#191714";
+        ctx.font = '900 24px "PingFang SC", "Microsoft YaHei", sans-serif';
+        ctx.fillText(round.name, x + 20, y + 36);
+        ctx.font = '1000 38px "PingFang SC", "Microsoft YaHei", sans-serif';
+        ctx.fillText(round.result, x + 20, y + 83);
+        ctx.fillStyle = "#6d675f";
+        ctx.font = '700 18px "PingFang SC", "Microsoft YaHei", sans-serif';
+        ctx.fillText(`晋级 ${Math.round((round.probability || 0) * 100)}%`, x + 270, y + 77);
+      });
+
+      ctx.fillStyle = "#6d675f";
+      ctx.font = '700 20px "PingFang SC", "Microsoft YaHei", sans-serif';
+      ctx.fillText("阵容码", 66, 1350);
+      ctx.font = '600 15px monospace';
+      drawPosterText(ctx, currentLineupCode(), 66, 1380, 930, 20, 2);
+      shareImageDataUrl = canvas.toDataURL("image/png");
+      el.shareImage.src = shareImageDataUrl;
+      el.sharePanel.hidden = false;
+      el.generateShareBtn.textContent = "分享图已生成";
+      requestAnimationFrame(() => el.sharePanel.scrollIntoView({ behavior: "smooth", block: "start" }));
+    }
+
+    function downloadSharePoster() {
+      if (!shareImageDataUrl) generateSharePoster();
+      if (!shareImageDataUrl) return;
+      const link = document.createElement("a");
+      link.href = shareImageDataUrl;
+      link.download = `nba-season-${lastResult.wins}-${lastResult.losses}.png`;
+      link.click();
+    }
+
     function saveGame() {
       const data = {
         draftIds: draft.map(c => c.id),
@@ -3794,16 +4299,19 @@
         result: lastResult
       };
       localStorage.setItem("nbaMomentPackSave", JSON.stringify(data));
+      el.actionMenu.open = false;
       el.poolInfo.textContent = "已存档到本机浏览器";
     }
 
     function loadGame() {
       const raw = localStorage.getItem("nbaMomentPackSave");
       if (!raw) {
+        el.actionMenu.open = false;
         el.poolInfo.textContent = "还没有存档";
         return;
       }
       const data = JSON.parse(raw);
+      el.actionMenu.open = false;
       el.era.value = data.settings?.era || "modern";
       el.pool.value = data.settings?.pool || "all";
       el.posFilter.value = data.settings?.posFilter || "all";
@@ -3844,7 +4352,7 @@
         renderDetailMetrics(lastResult);
         renderPlayoffs(lastResult.playoff);
         renderPlayerSeason(lastResult);
-        el.analysis.innerHTML = buildAnalysis(lastResult).map(n => `<li>${n}</li>`).join("");
+        el.analysis.innerHTML = buildConcreteReasons(lastResult).map(reason => `<li><b>${reason.title}</b><br>${reason.detail}</li>`).join("");
       } else {
         resetResult();
       }
@@ -3852,15 +4360,31 @@
 
     el.rerollBtn.addEventListener("click", openPack);
     el.openPackBtn.addEventListener("click", openPack);
-    el.clearBtn.addEventListener("click", () => { closeResultModal(); selected = Array(5).fill(null); ratingsRevealed = false; activeSlot = 0; render(); resetResult(); });
+    el.clearBtn.addEventListener("click", () => {
+      closeResultModal();
+      el.actionMenu.open = false;
+      cardPreviewOpen = false;
+      document.body.classList.remove("card-preview-open");
+      selected = Array(5).fill(null);
+      lastResult = null;
+      ratingsRevealed = false;
+      activeSlot = 0;
+      render();
+      resetResult();
+    });
     el.saveBtn.addEventListener("click", saveGame);
     el.loadBtn.addEventListener("click", loadGame);
+    el.importLineupBtn.addEventListener("click", importLineupCode);
     el.simulateBtn.addEventListener("click", () => simulate());
     el.simulateBtnInline.addEventListener("click", () => simulate());
     el.simulateBtnFloating.addEventListener("click", () => lastResult && ratingsRevealed ? openResultModal(lastResult) : simulate());
     el.seasonModalBackdrop.addEventListener("click", closeResultModal);
+    el.cardPreviewBackdrop.addEventListener("click", closeCardPreview);
     el.seasonModalClose.addEventListener("click", closeResultModal);
     el.seasonModalDone.addEventListener("click", closeResultModal);
+    el.copyLineupCodeBtn.addEventListener("click", copyLineupCode);
+    el.generateShareBtn.addEventListener("click", generateSharePoster);
+    el.downloadShareBtn.addEventListener("click", downloadSharePoster);
     document.querySelectorAll("[data-result-tab]").forEach(button => {
       button.addEventListener("click", () => setResultModalTab(button.dataset.resultTab));
     });
@@ -3868,8 +4392,16 @@
     el.pool.addEventListener("change", openPack);
     el.posFilter.addEventListener("change", render);
     el.era.addEventListener("change", () => { if (selectedCount() === 5) simulate({ present: false }); });
-    el.injury.addEventListener("input", () => { el.injuryValue.textContent = el.injury.value; });
-    el.chem.addEventListener("input", () => { el.chemValue.textContent = el.chem.value; });
+    el.injury.addEventListener("input", () => {
+      el.injuryValue.textContent = el.injury.value;
+      const poolLabel = el.pool.options[el.pool.selectedIndex]?.textContent || "全部巨星卡";
+      el.advancedSummary.textContent = `${poolLabel} · 波动 ${el.injury.value} · 磨合 ${el.chem.value}`;
+    });
+    el.chem.addEventListener("input", () => {
+      el.chemValue.textContent = el.chem.value;
+      const poolLabel = el.pool.options[el.pool.selectedIndex]?.textContent || "全部巨星卡";
+      el.advancedSummary.textContent = `${poolLabel} · 波动 ${el.injury.value} · 磨合 ${el.chem.value}`;
+    });
 
     openPack();
     loadCardArtManifest();
