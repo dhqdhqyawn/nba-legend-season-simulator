@@ -188,6 +188,7 @@
       justify-content: space-between;
       gap: 12px;
       margin: 0 0 12px;
+      scroll-margin-top: 16px;
     }
 
     h2 {
@@ -1786,7 +1787,7 @@
           </div>
         </section>
 
-        <div class="draft-head">
+        <div class="draft-head" id="draftHead">
           <div>
             <h2>卡包抽出的候选卡</h2>
             <div class="hint" id="poolInfo"></div>
@@ -2629,6 +2630,7 @@
       openPackBtn: document.getElementById("openPackBtn"),
       revealHintBtn: document.getElementById("revealHintBtn"),
       lineup: document.getElementById("lineup"),
+      draftHead: document.getElementById("draftHead"),
       selectInfo: document.getElementById("selectInfo"),
       poolInfo: document.getElementById("poolInfo"),
       simulateBtn: document.getElementById("simulateBtn"),
@@ -2847,13 +2849,18 @@
       const samePlayerIndex = selected.findIndex(c => c && c.name === card.name && c.id !== id);
       if (existingIndex < 0 && samePlayerIndex >= 0) return;
       if (existingIndex < 0 && !canPlay(card)) return;
-      if (existingIndex === activeSlot) selected[activeSlot] = null;
-      else {
-        if (existingIndex >= 0) selected[existingIndex] = null;
+      if (existingIndex >= 0) {
+        selected[existingIndex] = null;
+        activeSlot = existingIndex;
+        el.posFilter.value = String(activeSlot + 1);
+      } else {
         selected[activeSlot] = card;
         previewCardId = card.id;
         const nextEmpty = selected.findIndex((c, i) => !c && i !== activeSlot);
-        if (nextEmpty >= 0) activeSlot = nextEmpty;
+        if (nextEmpty >= 0) {
+          activeSlot = nextEmpty;
+          el.posFilter.value = String(activeSlot + 1);
+        }
       }
       lastResult = null;
       ratingsRevealed = false;
@@ -2866,10 +2873,13 @@
       if (idx >= 0) {
         selected[idx] = null;
         activeSlot = idx;
+        el.posFilter.value = String(activeSlot + 1);
       }
+      lastResult = null;
       ratingsRevealed = false;
       render();
       resetResult();
+      requestAnimationFrame(() => el.draftHead.scrollIntoView({ behavior: "smooth", block: "start" }));
     }
 
     function renderLineup() {
@@ -2891,7 +2901,9 @@
       el.lineup.querySelectorAll("[data-slot]").forEach(btn => {
         btn.addEventListener("click", () => {
           activeSlot = Number(btn.dataset.slot);
+          el.posFilter.value = String(activeSlot + 1);
           render();
+          requestAnimationFrame(() => el.draftHead.scrollIntoView({ behavior: "smooth", block: "start" }));
         });
       });
       el.lineup.querySelectorAll("[data-remove]").forEach(btn => {
@@ -2907,7 +2919,8 @@
       el.selectInfo.textContent = `已选 ${selectedCount()}/5 · 当前 ${slotLabels[activeSlot]}`;
       el.simulateBtn.disabled = selectedCount() !== 5;
       el.simulateBtnInline.disabled = selectedCount() !== 5;
-      el.poolInfo.textContent = draft.length ? `本轮已抽 ${draft.length} 张，当前显示 ${filteredDraft().length} 张；先点右侧坑位，再选卡` : "先开卡包，再从候选卡里选五人";
+      const positionLabel = el.posFilter.value === "all" ? "全部位置" : slotLabels[Number(el.posFilter.value) - 1];
+      el.poolInfo.textContent = draft.length ? `本轮已抽 ${draft.length} 张 · 当前筛选 ${positionLabel} · 显示 ${filteredDraft().length} 张` : "先开卡包，再从候选卡里选五人";
     }
 
     function renderPreview() {
