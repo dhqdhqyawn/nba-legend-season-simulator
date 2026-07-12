@@ -2050,7 +2050,7 @@
 
         <section class="panel model">
           <b>模型说明</b><br />
-          当前使用“球员评分 derived-v1-calibrated + 阵容模型 derived-v5-stability”：前者由 PPG/TS%/PER/BPM/VORP/WS48、位置、archetype、荣誉与角色标签生成能力分；后者使用时代化组件权重计算胜场，并用种子对阵先验与阵容季后赛实力计算七场系列赛。2KDB/MyTeam 只用于卡面与版本视觉，不参与属性评分。<br />
+          当前使用“球员评分 derived-v1-calibrated + 阵容模型 derived-v6-positional-defense”：前者由 PPG/TS%/PER/BPM/VORP/WS48、位置、archetype、荣誉与角色标签生成能力分；后者按实际站位聚合防守组件、使用时代化权重计算胜场，并用种子对阵先验与阵容季后赛实力计算七场系列赛。2KDB/MyTeam 只用于卡面与版本视觉，不参与属性评分。<br />
           <a href="scoring-model.html" target="_blank" rel="noreferrer" style="color:#e4af3f;font-weight:900">模型说明</a>
           <span style="color:#bdb6aa"> · </span>
           <a href="rating-audit.html" target="_blank" rel="noreferrer" style="color:#e4af3f;font-weight:900">评分审计</a>
@@ -2431,7 +2431,7 @@
       ["Shaquille O'Neal","1999-00 MVP Diesel","Lakers","C","interiorHub",98,99,87,74,42,100,96,25,99,99,29.7,.578,30.6,.283,9.3,9.0,["MVP","冠军核心","禁区统治"]],
       ["Shaquille O'Neal","2001-02 Threepeat","Lakers","C","interiorHub",96,98,84,72,40,99,94,24,97,98,27.2,.590,29.7,.262,7.2,6.0,["三连冠","Finals MVP"]],
       ["Kobe Bryant","2000-01 Afro Kobe","Lakers","SG","shotCreator",94,96,91,84,82,96,73,86,88,94,28.5,.552,24.5,.196,5.3,5.8,["冠军二当家","爆发"]],
-      ["Kobe Bryant","2005-06 81 Point Season","Lakers","SG","shotCreator",97,100,86,82,85,98,70,88,99,96,35.4,.559,28.0,.224,6.4,6.5,["得分王","81分","高使用率"]],
+      ["Kobe Bryant","2005-06 81 Point Season","Lakers","SG","shotCreator",97,100,91,82,85,98,70,88,99,96,35.4,.559,28.0,.224,6.4,6.5,["得分王","81分","高使用率","一防"]],
       ["Kobe Bryant","2007-08 MVP","Lakers","SG","shotCreator",97,98,90,86,87,95,73,90,93,97,28.3,.576,24.2,.208,5.8,6.3,["MVP","总决赛","一防"]],
       ["Kobe Bryant","2009-10 Fifth Ring","Lakers","SG","shotCreator",94,96,88,84,85,92,71,87,91,93,27.0,.545,21.9,.160,4.7,4.3,["冠军核心","关键球"]],
       ["Tim Duncan","2002-03 MVP Champion","Spurs","PF/C","defAnchor",97,95,99,80,73,91,98,78,86,99,23.3,.564,26.9,.248,7.6,7.8,["MVP","冠军核心","护框"]],
@@ -3292,6 +3292,19 @@
       return c.lineupSlot === slot || c.slots.includes(slot);
     }
 
+    function assignedSlot(c, slot) {
+      return c.lineupSlot === slot;
+    }
+
+    function playerAt(list, slot) {
+      return list.find(c => assignedSlot(c, slot)) || list[slot - 1];
+    }
+
+    function winsFromNetStrength(net) {
+      const eliteWinTail = 13 * logistic((net - 52) / 3);
+      return clamp(Math.round(41 + 36 * Math.tanh(net / 32) + eliteWinTail), 18, 82);
+    }
+
     function interiorGravity(c) {
       return playsSlot(c, 5) && c.finish >= 95 && c.usage >= 88 && c.reb >= 90;
     }
@@ -3351,6 +3364,13 @@
     }
 
     function calculateTeam(list) {
+      const pg = playerAt(list, 1);
+      const sg = playerAt(list, 2);
+      const sf = playerAt(list, 3);
+      const pf = playerAt(list, 4);
+      const center = playerAt(list, 5);
+      const perimeter = [pg, sg, sf];
+      const frontcourt = [pf, center];
       const interiorGravityCount = roleCount(list, interiorGravity);
       const eliteInteriorGravityCount = roleCount(list, eliteInteriorGravity);
       const shotCreation = avg(list, "usage") * .45 + avg(list, "finish") * .23 + avg(list, "shoot") * .20 + avg(list, "pass") * .12;
@@ -3363,12 +3383,12 @@
         (c.shoot >= 80 || c.space >= 84 || c.pass >= 84 || c.off >= 90) &&
         c.impact >= 86
       );
-      const stretchRimFive = list.some(c => playsSlot(c, 5) && c.def >= 88 && (c.space >= 86 || c.shoot >= 84));
+      const stretchRimFive = center.def >= 88 && (center.space >= 86 || center.shoot >= 84);
       const multiCreatorFiveOut = highLevelCreators >= 3 && stretchRimFive && respectedSpacers >= 3;
       const modernRolePlayers = roleCount(list, c =>
         ["connector", "pointStopper", "stretchBig", "defAnchor"].includes(c.archetype) &&
         c.def >= 82 &&
-        (c.space >= 78 || c.shoot >= 78 || playsSlot(c, 5))
+        (c.space >= 78 || c.shoot >= 78 || assignedSlot(c, 5))
       );
       const creatorSpacingBonus = multiCreatorFiveOut ? 7.2 : 0;
       const lowSpaceTax = roleCount(list, c => c.space < 60 && !eliteInteriorGravity(c));
@@ -3378,17 +3398,29 @@
       const physicalOffense = shotCreation * .31 + rimPressure * .25 + playmaking * .17 + avg(list, "finish") * .14 + spacing * .08 + avg(list, "off") * .05;
       const balancedOffense = modernOffense * .55 + physicalOffense * .45;
 
-      const rimProtection = avg(list, "def") * .60 + avg(list, "reb") * .36 + roleCount(list, c => playsSlot(c, 5) && c.def >= 80) * 3.8 + roleCount(list, helpRimProtector) * 3.2 + roleCount(list, c => /护框|盖帽|DPOY|篮板王|巨人/.test(c.tags.join(""))) * 1.8;
-      const guardStopper = roleCount(list, c => (playsSlot(c, 1) || playsSlot(c, 2)) && c.def >= 88);
-      const wingStopper = roleCount(list, c => (playsSlot(c, 2) || playsSlot(c, 3)) && c.def >= 88);
-      const pointOfAttack = avg(list, "def") * .78 + guardStopper * 2.8 + wingStopper * 3.0 + roleCount(list, c => c.archetype === "pointStopper" || c.archetype === "twoWayWing") * 2.5;
-      const switchability = avg(list, "def") * .64 + roleCount(list, c => c.slots.length >= 3) * 2.4 + roleCount(list, c => ["twoWayWing", "connector", "defAnchor"].includes(c.archetype)) * 2.0 + roleCount(list, c => (playsSlot(c, 3) || playsSlot(c, 4)) && c.def >= 88) * 2.6;
-      const defensiveRebound = avg(list, "reb") * .92 + roleCount(list, c => c.reb >= 90) * 3.0 + roleCount(list, c => (playsSlot(c, 4) || playsSlot(c, 5)) && c.reb >= 84) * 2.2 + roleCount(list, c => playsSlot(c, 5) && c.reb >= 88) * 1.4;
-      const slowBigRisk = roleCount(list, c => (playsSlot(c, 4) || playsSlot(c, 5)) && c.def >= 78 && c.space >= 86 && c.slots.length <= 2 && c.archetype !== "pointCenter");
-      const pnrCoverage = avg(list, "def") * .48 + pointOfAttack * .22 + switchability * .22 + roleCount(list, c => c.def >= 88 && c.slots.length >= 3) * 2.4 - slowBigRisk * 5.2;
-      const targetabilityRisk = roleCount(list, c => c.def < 76 && c.usage >= 80) * 4.2 + slowBigRisk * 2.3 - guardStopper * 1.4 - wingStopper * .9;
-      const modernDefense = rimProtection * .26 + pointOfAttack * .20 + switchability * .20 + pnrCoverage * .18 + defensiveRebound * .11 + avg(list, "def") * .05 - Math.max(0, targetabilityRisk) * .22;
-      const physicalDefense = rimProtection * .36 + defensiveRebound * .25 + pointOfAttack * .17 + avg(list, "def") * .12 + switchability * .10;
+      const perimeterDefense = pg.def * .28 + sg.def * .32 + sf.def * .30 + Math.max(pg.def, sg.def, sf.def) * .10;
+      const frontcourtDefense = pf.def * .45 + center.def * .55;
+      const centerRimTag = /护框|盖帽|DPOY|篮板王|巨人/.test(center.tags.join(""));
+      const powerForwardRimTag = /护框|盖帽|DPOY|防守/.test(pf.tags.join(""));
+      const rimProtection = center.def * .52 + center.reb * .21 + pf.def * .15 + pf.reb * .07 + avg(list, "def") * .05 + (center.archetype === "defAnchor" ? 2.8 : 0) + (centerRimTag ? 2.2 : 0) + (powerForwardRimTag ? 1.2 : 0);
+      const perimeterStopperBonus = perimeter.reduce((sum, c) => {
+        const continuousQuality = Math.max(0, c.def - 84) * .12;
+        const roleEvidence = c.archetype === "pointStopper" || c.archetype === "twoWayWing" ? .65 : 0;
+        const awardEvidence = c.tags.some(t => /一防|DPOY|领防|防守/.test(t)) ? .55 : 0;
+        return sum + continuousQuality + roleEvidence + awardEvidence;
+      }, 0);
+      const pointOfAttack = perimeterDefense + Math.min(4.5, perimeterStopperBonus);
+      const switchability = avg(list, "def") * .50 + perimeterDefense * .20 + frontcourtDefense * .20 + roleCount(list, c => c.slots.length >= 3) * 1.4 + roleCount(list, c => ["twoWayWing", "connector", "defAnchor"].includes(c.archetype)) * 1.0;
+      const defensiveRebound = pg.reb * .04 + sg.reb * .06 + sf.reb * .14 + pf.reb * .30 + center.reb * .46 + roleCount(frontcourt, c => c.reb >= 90) * 2.0 + (center.reb >= 94 ? 1.5 : 0);
+      const centerMobile = center.slots.length >= 3 || ["pointCenter", "connector"].includes(center.archetype) || center.def >= 96 || center.tags.some(t => /换防/.test(t));
+      const powerForwardMobile = pf.slots.length >= 3 || ["connector", "twoWayWing", "pointCenter"].includes(pf.archetype) || pf.def >= 94 || pf.tags.some(t => /换防/.test(t));
+      const slowBigRisk = (centerMobile ? 0 : 1) + (powerForwardMobile ? 0 : .5);
+      const pnrCoverage = center.def * .42 + pf.def * .18 + pointOfAttack * .22 + switchability * .18 - slowBigRisk * 3.2;
+      const perimeterTargetRisk = perimeter.reduce((sum, c) => sum + Math.max(0, 76 - c.def) * (c.usage >= 80 ? .35 : .20), 0);
+      const frontcourtTargetRisk = frontcourt.reduce((sum, c) => sum + Math.max(0, 78 - c.def) * .25, 0);
+      const targetabilityRisk = perimeterTargetRisk + frontcourtTargetRisk + slowBigRisk * 1.4;
+      const modernDefense = rimProtection * .27 + pointOfAttack * .17 + switchability * .20 + pnrCoverage * .15 + defensiveRebound * .16 + avg(list, "def") * .05 - Math.max(0, targetabilityRisk) * .18;
+      const physicalDefense = rimProtection * .34 + defensiveRebound * .24 + pointOfAttack * .15 + avg(list, "def") * .12 + switchability * .15;
       const balancedDefense = modernDefense * .52 + physicalDefense * .48;
       const advImpact = avg(list, "impact") * .38 + avg(list, "per") * 1.15 + avg(list, "bpm") * 2.1 + avg(list, "vorp") * 1.2 + avg(list, "ws48") * 42;
 
@@ -3425,12 +3457,12 @@
       const wings = roleCount(list, c => playsSlot(c, 2) || playsSlot(c, 3));
       const bigs = roleCount(list, c => playsSlot(c, 4) || playsSlot(c, 5));
       const shooting = respectedSpacers;
-      const rim = roleCount(list, c => playsSlot(c, 5) && bigInteriorPresence(c)) + roleCount(list, helpRimProtector);
-      const traditionalRim = roleCount(list, c => playsSlot(c, 5) && c.finish >= 88 && c.reb >= 84 && (c.def >= 80 || c.tags.some(t => /低位|巨人|禁区|天勾|篮板/.test(t))));
+      const rim = (bigInteriorPresence(center) ? 1 : 0) + (helpRimProtector(pf) ? 1 : 0);
+      const traditionalRim = center.finish >= 88 && center.reb >= 84 && (center.def >= 80 || center.tags.some(t => /低位|巨人|禁区|天勾|篮板/.test(t))) ? 1 : 0;
       const eraProofStars = roleCount(list, eraProofScorer);
       const historicBigs = roleCount(list, historicPointBig);
-      const powerInterior = roleCount(list, c => (playsSlot(c, 4) || playsSlot(c, 5)) && c.reb >= 84 && c.finish >= 88);
-      const lineupSize = avg(list, "reb") + roleCount(list, c => playsSlot(c, 4) || playsSlot(c, 5)) * 2 + roleCount(list, c => playsSlot(c, 3)) * 1.2;
+      const powerInterior = roleCount(frontcourt, c => c.reb >= 84 && c.finish >= 88);
+      const lineupSize = pg.reb * .05 + sg.reb * .08 + sf.reb * .17 + pf.reb * .30 + center.reb * .40;
       const usageLoad = list.reduce((s, c) => s + (archetypeUsage[c.archetype] || .8), 0);
       const hierarchyRelief = roleCount(list, c => c.pass >= 90) * 1.3 + connectors * .9 + respectedSpacers * .45 + eliteInteriorGravityCount * 1.0;
       const pureOnBallOverlap = Math.max(0, roleCount(list, c => c.usage >= 88 && c.pass < 84 && c.space < 84) - 1);
@@ -3500,7 +3532,7 @@
       const styleAdjustment = clamp(eraBonus - eraPenalty + eraOffenseDelta * .14 + eraDefenseDelta * .12, -3.8, 3.8);
       const structureEdge = multiCreatorFiveOut ? 4.5 : fiveOutHelioTemplate ? 3.5 : 0;
       const net = (neutralOffense - 84) * .30 + (neutralDefense - 82) * .28 + (effectiveFit - 70) * .17 + (advImpact - 86) * .18 + talent + styleAdjustment + structureEdge + coachChem + randomSwing + possessionEdge + durabilityFloor * .035;
-      let wins = clamp(Math.round(41 + 36 * Math.tanh(net / 32)), 18, 76);
+      let wins = winsFromNetStrength(net);
       if (el.era.value === "physical" && eraPenalty >= 12) wins = Math.min(wins, 66);
       if (el.era.value === "physical" && eraPenalty >= 18) wins = Math.min(wins, 60);
       const losses = 82 - wins;
@@ -3532,6 +3564,7 @@
         eraPenalty: Math.round(eraPenalty),
         styleAdjustment: Number(styleAdjustment.toFixed(2)),
         structureEdge: Number(structureEdge.toFixed(2)),
+        netStrength: Number(net.toFixed(2)),
         era: el.era.value,
         seasonVariance: Number(randomSwing.toFixed(2)),
         usageLoad: usageLoad.toFixed(2),
@@ -3616,19 +3649,19 @@
       const eraProfiles = {
         modern: {
           offense: { shotCreation: .31, playmaking: .18, spacing: .29, rimPressure: .22 },
-          defense: { rimProtection: .20, pointOfAttack: .18, switchability: .22, pnrCoverage: .24, defensiveRebound: .16 },
-          targetabilityTax: .24,
+          defense: { rimProtection: .22, pointOfAttack: .18, switchability: .20, pnrCoverage: .18, defensiveRebound: .22 },
+          targetabilityTax: .18,
           eraPenaltyTax: 0
         },
         balanced: {
           offense: { shotCreation: .34, playmaking: .19, spacing: .20, rimPressure: .27 },
-          defense: { rimProtection: .27, pointOfAttack: .18, switchability: .16, pnrCoverage: .18, defensiveRebound: .21 },
-          targetabilityTax: .18,
+          defense: { rimProtection: .25, pointOfAttack: .18, switchability: .17, pnrCoverage: .18, defensiveRebound: .22 },
+          targetabilityTax: .16,
           eraPenaltyTax: 0
         },
         physical: {
           offense: { shotCreation: .34, playmaking: .14, spacing: .08, rimPressure: .44 },
-          defense: { rimProtection: .35, pointOfAttack: .16, switchability: .10, pnrCoverage: .12, defensiveRebound: .27 },
+          defense: { rimProtection: .28, pointOfAttack: .18, switchability: .12, pnrCoverage: .18, defensiveRebound: .24 },
           targetabilityTax: .10,
           eraPenaltyTax: .12
         }
@@ -3665,7 +3698,8 @@
       const structureBonus = (r.fit - 82) * .035 + r.structureEdge * .28;
       const closerBonus = closerStrength * .55 + Math.max(0, creatorStrength - 1) * .30;
       const riskTax = r.turnoverRisk * .20 + Math.max(0, Number(r.usageLoad) - 4.25) * 1.2 + r.eraPenalty * profile.eraPenaltyTax;
-      const power = playoffOffense * .54 + playoffDefense * .42 + clamp(r.adv, 40, 110) * .04 + rotationTalentBonus + structureBonus + closerBonus - riskTax;
+      const rawPower = playoffOffense * .54 + playoffDefense * .42 + clamp(r.adv, 40, 110) * .04 + rotationTalentBonus + structureBonus + closerBonus - riskTax;
+      const power = 90 + (rawPower - 90) * .72;
       if (r.wins < 40) {
         return {
           seed: playoffSeed(r.wins),
@@ -3683,7 +3717,7 @@
       const opponentSeed = 9 - seed;
       const firstRoundSeriesPrior = { 1: .93, 2: .91, 3: .82, 4: .56, 5: .44, 6: .18, 7: .09, 8: .07 };
       const expectedPowerBySeed = { 1: 92, 2: 89, 3: 87, 4: 85, 5: 84, 6: 82, 7: 80, 8: 78 };
-      const laterOpponents = seed <= 2 ? [84, 89, 93] : seed <= 4 ? [85, 89, 93] : [90, 94, 97];
+      const laterOpponents = seed <= 2 ? [84, 89, 93] : seed <= 4 ? [85, 89, 93] : [88, 92, 95];
       const roundPlan = [];
       if (isPlayIn) roundPlan.push({ name: "附加赛", opponent: 84, opponentLabel: "附加赛对手", kind: "playIn" });
       roundPlan.push({ name: "首轮", opponent: expectedPowerBySeed[opponentSeed], opponentLabel: `第 ${opponentSeed} 种子`, kind: "seededFirstRound" });

@@ -306,7 +306,7 @@
 <body>
   <main class="page">
     <header class="hero">
-      <span class="eyebrow">当前版本：球员评分 v1-calibrated · 阵容模型 v4-seeded</span>
+      <span class="eyebrow">当前版本：球员评分 v1-calibrated · 阵容模型 v6-positional-defense</span>
       <h1>NBA 时刻卡模拟器评分模型说明</h1>
       <p class="lead">
         这个模型不是用真实历史球队样本训练出来的机器学习模型，而是一个基于篮球知识构造的
@@ -324,7 +324,7 @@
         <div class="step"><b>2. 特征工程</b><span>把个人属性聚合成持球创造、空间、护框、领防、换防、篮板等球队特征。</span></div>
         <div class="step"><b>3. 阵容结构</b><span>识别主攻手、二创点、连接器、传统内线、球权冲突和兼容度。</span></div>
         <div class="step"><b>4. 时代交互</b><span>现代空间、肉搏半场、中性跨时代三套权重体系会改变收益函数。</span></div>
-        <div class="step"><b>5. 胜场映射</b><span>以 41 胜作为中性基准，用饱和曲线把净强度映射为 18 到 76 胜。</span></div>
+        <div class="step"><b>5. 胜场映射</b><span>以 41 胜作为中性基准；常规区间使用饱和曲线，只有历史级极端阵容才进入最高 82 胜的软尾部。</span></div>
       </div>
     </header>
 
@@ -468,11 +468,11 @@
         </div>
         <div class="metric">
           <b>护框质量 rimProtection</b>
-          <span>由 def、reb、传统中锋和 DPOY/盖帽/篮板标签构成，近似防守端禁区下限。</span>
+          <span>主要由实际站在 C 的 def/reb 与实际 PF 的协防能力构成；后卫只通过全队协同占 5%，不会再因换一个控卫就重写护框分。</span>
         </div>
         <div class="metric">
           <b>领防资源 pointOfAttack</b>
-          <span>重点看后场防守、pointStopper 类型和整体 def，用来表示第一道防线质量。</span>
+          <span>只聚合实际 PG/SG/SF 的防守，并连续奖励 def、pointStopper/twoWayWing 与一防/DPOY/领防证据；不再使用 87/88 式硬门槛。</span>
         </div>
         <div class="metric">
           <b>换防弹性 switchability</b>
@@ -480,9 +480,23 @@
         </div>
         <div class="metric">
           <b>防守篮板 defensiveRebound</b>
-          <span>由 reb、高篮板球员和中锋篮板组成，用来约束二次进攻风险。</span>
+          <span>按实际位置加权：PG 4%、SG 6%、SF 14%、PF 30%、C 46%，再加入前场篮板精英奖励。</span>
         </div>
       </div>
+      <div class="formula">rimProtection
+= 52% * C.def + 21% * C.reb
++ 15% * PF.def + 7% * PF.reb
++ 5% * teamAvg.def
++ C/PF rim-protection evidence
+
+pointOfAttack
+= 28% * PG.def + 32% * SG.def + 30% * SF.def
++ 10% * best perimeter def
++ smooth stopper / award evidence (capped at 4.5)
+
+targetabilityRisk
+= continuous shortfall below the targetability floor
++ actual PF/C mobility risk</div>
     </section>
 
     <div class="grid">
@@ -511,20 +525,22 @@ physicalOffense
 
       <section class="dark">
         <h2>防守子模型</h2>
-        <p>防守端也分环境。现代防守更重视换防，肉搏防守更重视护框和篮板。</p>
+        <p>防守端也分环境，但各组件先按实际站位独立计算，之后才进入时代权重；同一个弱点不会以“领防差、所以护框也差”的方式重复扣分。</p>
         <div class="formula">modernDefense
-= 0.30 * rimProtection
-+ 0.23 * pointOfAttack
-+ 0.25 * switchability
-+ 0.14 * defensiveRebound
-+ 0.08 * avg(def)
+= 0.27 * rimProtection
++ 0.17 * pointOfAttack
++ 0.20 * switchability
++ 0.15 * pnrCoverage
++ 0.16 * defensiveRebound
++ 0.05 * avg(def)
+- 0.18 * targetabilityRisk
 
 physicalDefense
-= 0.36 * rimProtection
-+ 0.25 * defensiveRebound
-+ 0.17 * pointOfAttack
+= 0.34 * rimProtection
++ 0.24 * defensiveRebound
++ 0.15 * pointOfAttack
 + 0.12 * avg(def)
-+ 0.10 * switchability</div>
++ 0.15 * switchability</div>
       </section>
     </div>
 
@@ -739,8 +755,9 @@ not era. Changing era does not reroll luck.</div>
 + possessionEdge
 + durabilityFloor * 0.035
 
-wins = round(41 + 36 * tanh(net / 32))
-wins is clipped to [18, 76]
+eliteTail = 13 * logistic((net - 52) / 3)
+wins = round(41 + 36 * tanh(net / 32) + eliteTail)
+wins is clipped to [18, 82]
 
 talent
 = (averageOVR - 82) * 1.45
@@ -748,7 +765,8 @@ talent
 + max(0, secondOVR - 88) * 0.40</div>
       <p>
         其中 41 胜是中性球队基准，offense、defense、fit、advImpact 是主要解释变量。
-        tanh 是饱和映射：中段强度提升会明显增加胜场，但越接近历史极值，新增强度对应的胜场越少，避免大量阵容直接撞到 78 胜。
+        tanh 是主体饱和映射：中段强度提升会明显增加胜场，但越接近历史极值，新增强度对应的胜场越少。
+        eliteTail 是只在 net 接近 52 后才明显启动的平滑尾部，不是给所有强队统一加胜场；回归测试中，只有健康值最优、磨合拉满的历史级五人才会到 82 胜。
         randomSwing 不是完全随机，它由五张卡 ID、伤病值、磨合值生成 deterministic noise：
         同一套阵容和同一组设置会得到同一个波动项。
       </p>
@@ -760,7 +778,7 @@ talent
 
     <div class="grid">
       <section>
-        <h2>八、季后赛模型 v4：显式种子对阵</h2>
+        <h2>八、季后赛模型 v6：位置防守与显式种子对阵</h2>
         <p>
           季后赛层不再把综合进攻、综合防守与它们的子项同时加入，避免重复计权。模型直接从互相区分的
           进攻与防守组件构造 playoff offense 和 playoff defense；常规赛胜场只决定种子与对手路径，
@@ -782,31 +800,35 @@ playoffRimPressure
             <tr>
               <td>现代空间</td>
               <td>创造 31% · 组织 18% · 空间 29% · 禁区 22%</td>
-              <td>护框 20% · 领防 18% · 换防 22% · 挡拆 24% · 篮板 16% · 点名风险惩罚 24%</td>
+              <td>护框 22% · 领防 18% · 换防 20% · 挡拆 18% · 篮板 22% · 点名风险惩罚 18%</td>
             </tr>
             <tr>
               <td>跨时代中性</td>
               <td>创造 34% · 组织 19% · 空间 20% · 禁区 27%</td>
-              <td>护框 27% · 领防 18% · 换防 16% · 挡拆 18% · 篮板 21% · 点名风险惩罚 18%</td>
+              <td>护框 25% · 领防 18% · 换防 17% · 挡拆 18% · 篮板 22% · 点名风险惩罚 16%</td>
             </tr>
             <tr>
               <td>肉搏时代</td>
               <td>创造 34% · 组织 14% · 空间 8% · 禁区 44%</td>
-              <td>护框 35% · 领防 16% · 换防 10% · 挡拆 12% · 篮板 27% · 点名风险惩罚 10%</td>
+              <td>护框 28% · 领防 18% · 换防 12% · 挡拆 18% · 篮板 24% · 点名风险惩罚 10%</td>
             </tr>
           </tbody>
         </table>
-        <div class="formula">playoffPower
+        <div class="formula">rawPlayoffPower
 = 54% * playoffOffense
 + 42% * playoffDefense
 + 4% * advancedImpact
 + rotationTalentResidual
 + lineupStructure
 + smoothCloserDepth
-- turnoverAndUsageRisk</div>
+- turnoverAndUsageRisk
+
+playoffPower
+= 90 + 0.72 * (rawPlayoffPower - 90)</div>
         <p>
           rotationTalent 只使用一次五人排序加权 OVR，识别五个位置都没有明显短板的阵容；关键球员与主攻手
-          使用平滑 sigmoid 得分，不再用“达到阈值突然加一分”的硬切规则。
+          使用平滑 sigmoid 得分，不再用“达到阈值突然加一分”的硬切规则。最后以 90 为季后赛球队中心做 0.72 收缩：
+          普通强队不会被几个固定高强度对手压得过低，极端全明星队也不会因为组件都超过 100 而轻易得到九成以上夺冠率。
         </p>
         <div class="formula">estimatedSeed = f(regularSeasonWins)
 firstRoundOpponentSeed = 9 - estimatedSeed
@@ -828,11 +850,17 @@ titleOdds
 = p(round 1) * p(round 2) * p(round 3) * p(Finals)</div>
         <p>
           四轮概率相乘不是额外惩罚，而是条件概率的链式法则：球队必须连续通过四轮才能夺冠。
-          即使每轮都有 90% 晋级率，四轮全部通过也只有 0.9⁴ = 65.6%。derived-v5-stability 保留这条概率原则，
+          即使每轮都有 90% 晋级率，四轮全部通过也只有 0.9⁴ = 65.6%。derived-v6-positional-defense 保留这条概率原则，
           但把后续轮次的实力差距尺度从 16 收紧到 12，同时把首轮实力残差尺度从 24 收紧到 12，
           让 PO 强度明显领先的球队获得更符合直觉的单轮优势，而不是被普通种子的历史均值压平。夺冠概率不再使用
           55% 的人工封顶，页面显示值就是四轮条件晋级率的真实乘积。
         </p>
+        <div class="formula">laterRoundOpponentStrength
+= seed 1-2: [84, 89, 93]
+= seed 3-4: [85, 89, 93]
+= seed 5-8: [88, 92, 95]
+
+order = conference semifinal, conference final, Finals</div>
         <p>
           首轮不再让所有高种子面对同一个固定强度：模型先依据胜场映射 1 到 8 号种子，再明确生成 1/8、2/7、3/6 或 4/5 对阵。
           历史先验决定该种子对阵的基准概率，阵容的 playoffPower 只对基准作连续修正。1/8 基准参考
@@ -1045,13 +1073,13 @@ impact =
 
     <section class="accent green">
       <h2>十三、落地顺序</h2>
-      <p>当前阵容层模型已切到 derived-v5-stability：保留 derived-v1-calibrated 球员分，并用固定阵容回归集约束胜场、种子对阵和季后赛改动。后面继续补真实组件。</p>
+      <p>当前阵容层模型已切到 derived-v6-positional-defense：保留 derived-v1-calibrated 球员分，并用实际站位防守、固定阵容对照组和季后赛概率回归约束每次改动。后面继续补真实组件。</p>
       <div class="flow">
         <div class="step"><b>Done</b><span>保留现有人工字段为 manual，同时启用 derived-v1 作为主评分。</span></div>
-        <div class="step"><b>Done</b><span>加入固定阵容回归基准、饱和胜场曲线和四轮概率化季后赛。</span></div>
+        <div class="step"><b>Done</b><span>加入哈登/科比与佩顿/科比对照组，约束领防提升不能错误改写护框；加入 82 胜极端软尾部测试。</span></div>
         <div class="step"><b>Next</b><span>新增真实组件字段：USG%、AST%、TRB%、DBPM、3PAr 等。</span></div>
         <div class="step"><b>Next</b><span>球员库里同时展示 manual 分和 derived 分的差异，方便审查异常。</span></div>
-        <div class="step"><b>Next</b><span>继续用历史球队胜场、SRS、种子与系列赛结果校准 derived-v5-stability 的概率映射。</span></div>
+        <div class="step"><b>Next</b><span>继续用历史球队胜场、SRS、种子与系列赛结果校准 derived-v6-positional-defense 的概率映射。</span></div>
         <div class="step"><b>Step 4</b><span>对边界球员做人审：比如罗德曼、追梦、穆托姆博这类 box score 低估型球员。</span></div>
         <div class="step"><b>Step 5</b><span>输出每张卡的评分解释：为什么 shoot 是 96，为什么 def 是 99。</span></div>
       </div>
