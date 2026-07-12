@@ -1825,7 +1825,7 @@
 
         <section class="panel model">
           <b>模型说明</b><br />
-          当前使用“球员评分 derived-v1-calibrated + 阵容模型 derived-v2”：前者由 PPG/TS%/PER/BPM/VORP/WS48、位置、archetype、荣誉与角色标签生成能力分；后者计算胜场与概率化季后赛。2KDB/MyTeam 只用于卡面与版本视觉，不参与属性评分。<br />
+          当前使用“球员评分 derived-v1-calibrated + 阵容模型 derived-v3”：前者由 PPG/TS%/PER/BPM/VORP/WS48、位置、archetype、荣誉与角色标签生成能力分；后者使用时代化组件权重计算胜场、单场胜率与七场系列赛。2KDB/MyTeam 只用于卡面与版本视觉，不参与属性评分。<br />
           <a href="scoring-model.html" target="_blank" rel="noreferrer" style="color:#e4af3f;font-weight:900">模型说明</a>
           <span style="color:#bdb6aa"> · </span>
           <a href="rating-audit.html" target="_blank" rel="noreferrer" style="color:#e4af3f;font-weight:900">评分审计</a>
@@ -3247,21 +3247,81 @@
       return "乐透区/附加赛外";
     }
 
+    function logistic(value) {
+      return 1 / (1 + Math.exp(-value));
+    }
+
+    function bestOfSevenProbability(gameProbability) {
+      const p = clamp(gameProbability, .12, .88);
+      const q = 1 - p;
+      return clamp(35 * p ** 4 * q ** 3 + 21 * p ** 5 * q ** 2 + 7 * p ** 6 * q + p ** 7, .01, .99);
+    }
+
+    function weightedTop(values, weights) {
+      const sorted = [...values].sort((a, b) => b - a);
+      return weights.reduce((sum, weight, index) => sum + (sorted[Math.min(index, sorted.length - 1)] || 0) * weight, 0);
+    }
+
     function calculatePlayoffs(r, list) {
-      const closers = roleCount(list, c => c.usage >= 88 && c.impact >= 92);
-      const postseasonCreators = roleCount(list, c => c.usage >= 84 && c.impact >= 88 && (c.off >= 88 || c.finish >= 88 || c.pass >= 90));
+      const eraProfiles = {
+        modern: {
+          offense: { shotCreation: .31, playmaking: .18, spacing: .29, rimPressure: .22 },
+          defense: { rimProtection: .20, pointOfAttack: .18, switchability: .22, pnrCoverage: .24, defensiveRebound: .16 },
+          targetabilityTax: .24,
+          eraPenaltyTax: 0
+        },
+        balanced: {
+          offense: { shotCreation: .34, playmaking: .19, spacing: .20, rimPressure: .27 },
+          defense: { rimProtection: .27, pointOfAttack: .18, switchability: .16, pnrCoverage: .18, defensiveRebound: .21 },
+          targetabilityTax: .18,
+          eraPenaltyTax: 0
+        },
+        physical: {
+          offense: { shotCreation: .34, playmaking: .14, spacing: .08, rimPressure: .44 },
+          defense: { rimProtection: .35, pointOfAttack: .16, switchability: .10, pnrCoverage: .12, defensiveRebound: .27 },
+          targetabilityTax: .10,
+          eraPenaltyTax: .12
+        }
+      };
+      const profile = eraProfiles[r.era] || eraProfiles.balanced;
+      const individualCreation = list.map(c => c.usage * .45 + c.finish * .23 + c.shoot * .20 + c.pass * .12);
+      const individualPlaymaking = list.map(c => c.pass * .82 + c.usage * .18);
+      const individualRimPressure = list.map(c => c.finish * .68 + c.usage * .22 + c.reb * .10);
+      const playoffShotCreation = weightedTop(individualCreation, [.55, .30, .15]);
+      const playoffPlaymaking = weightedTop(individualPlaymaking, [.65, .35]);
+      const playoffRimPressure = weightedTop(individualRimPressure, [.50, .30, .20]) * .68 + r.rimPressure * .32;
+      const offenseComponents = {
+        shotCreation: playoffShotCreation,
+        playmaking: playoffPlaymaking,
+        spacing: r.spacing,
+        rimPressure: playoffRimPressure
+      };
+      const defenseComponents = {
+        rimProtection: r.rimProtection,
+        pointOfAttack: r.pointOfAttack,
+        switchability: r.switchability,
+        pnrCoverage: r.pnrCoverage,
+        defensiveRebound: r.defensiveRebound
+      };
+      const playoffOffense = Object.entries(profile.offense).reduce((sum, [key, weight]) => sum + offenseComponents[key] * weight, 0);
+      const playoffDefense = Object.entries(profile.defense).reduce((sum, [key, weight]) => sum + defenseComponents[key] * weight, 0) - r.targetabilityRisk * profile.targetabilityTax;
+
+      const softGate = (value, midpoint, width) => logistic((value - midpoint) / width);
+      const closerStrength = list.reduce((sum, c) => sum + softGate(c.usage, 88, 4) * softGate(c.impact, 91, 4), 0);
+      const creatorStrength = list.reduce((sum, c) => sum + softGate(c.usage, 84, 5) * softGate(Math.max(c.off, c.finish, c.pass), 88, 5), 0);
       const rankedOvr = list.map(c => c.ovr).sort((a, b) => b - a);
-      const playoffCore = r.offense * .22 + r.defense * .18 + r.shotCreation * .15 + r.playmaking * .10 + r.rimPressure * .10 + r.rimProtection * .08 + r.pointOfAttack * .06 + r.defensiveRebound * .04 + r.adv * .07;
-      const riskTax = r.turnoverRisk * .28 + Math.max(0, Number(r.usageLoad) - 4.25) * 1.6;
-      const eraEdge = r.era === "physical"
-        ? r.traditionalRim * 1.2 + r.eraProofStars * .9 + r.historicBigs * 1.1 + (r.eliteInteriorGravity || 0) * .8 - r.eraPenalty * .28
-        : r.shooting * .75 + Math.max(0, r.spacing - 88) * .06 + (r.eliteInteriorGravity || 0) * .7;
-      const playoffTalent = (avg(list, "ovr") - 86) * .4 + Math.max(0, rankedOvr[0] - 94) * .5 + postseasonCreators * .9 + r.structureEdge * .5;
-      const power = playoffCore + (r.wins - 50) * .28 + closers * .9 + eraEdge * .45 + playoffTalent - riskTax;
+      const rotationTalent = weightedTop(rankedOvr, [.35, .25, .18, .13, .09]);
+      const rotationTalentBonus = Math.max(0, rotationTalent - 88) * 1.4;
+      const structureBonus = (r.fit - 82) * .035 + r.structureEdge * .28;
+      const closerBonus = closerStrength * .55 + Math.max(0, creatorStrength - 1) * .30;
+      const riskTax = r.turnoverRisk * .20 + Math.max(0, Number(r.usageLoad) - 4.25) * 1.2 + r.eraPenalty * profile.eraPenaltyTax;
+      const power = playoffOffense * .54 + playoffDefense * .42 + clamp(r.adv, 40, 110) * .04 + rotationTalentBonus + structureBonus + closerBonus - riskTax;
       if (r.wins < 40) {
         return {
           seed: playoffSeed(r.wins),
           power: Math.round(power),
+          offense: Math.round(playoffOffense),
+          defense: Math.round(playoffDefense),
           titleOdds: 0,
           rounds: [{ name: "常规赛结束", result: "未进季后赛", status: "loss", note: "胜场不足，模拟器判定为附加赛外或乐透区。" }],
           note: "天赋可能很高，但常规赛结构没有撑进季后赛。"
@@ -3283,8 +3343,9 @@
             ? [["首轮", 81], ["分区半决赛", 85], ["分区决赛", 89], ["总决赛", 93]]
             : [["首轮", 86], ["分区半决赛", 90], ["分区决赛", 94], ["总决赛", 97]];
 
-      const seriesCalibration = 2;
-      const roundProbabilities = roundPlan.map(([, opponent]) => clamp(1 / (1 + Math.exp((opponent - power - seriesCalibration) / 8)), .08, .92));
+      const seedEdge = r.wins >= 60 ? 1.5 : r.wins >= 52 ? 1 : r.wins >= 45 ? .5 : 0;
+      const gameProbabilities = roundPlan.map(([, opponent]) => clamp(logistic((power - opponent + seedEdge) / 16), .12, .88));
+      const roundProbabilities = roundPlan.map(([name], index) => name === "附加赛" ? gameProbabilities[index] : bestOfSevenProbability(gameProbabilities[index]));
       const titleOdds = clamp(Math.round(roundProbabilities.reduce((product, probability) => product * probability, 1) * 100), 1, 55);
 
       const rounds = [];
@@ -3292,24 +3353,31 @@
       roundPlan.forEach(([name, opponent], index) => {
         if (!alive) return;
         const probability = roundProbabilities[index];
-        const roll = seededNoise(`${list.map(c => c.id).join("-")}|${r.era}|${name}|playoff-v2`);
-        const win = roll < probability;
-        const games = name === "附加赛"
-          ? (win ? "胜出" : "出局")
-          : win
-            ? probability >= .82 && roll < .25 ? "4-0"
-              : probability >= .66 ? "4-1"
-                : probability >= .48 ? "4-2"
-                  : "4-3"
-            : probability <= .18 && roll > .75 ? "0-4"
-              : probability <= .34 ? "1-4"
-                : probability <= .52 ? "2-4"
-                  : "3-4";
+        const gameProbability = gameProbabilities[index];
+        let teamWins = 0;
+        let opponentWins = 0;
+        if (name === "附加赛") {
+          const roll = seededNoise(`${list.map(c => c.id).join("-")}|${r.era}|${name}|game-1|playoff-v3`);
+          if (roll < gameProbability) teamWins = 1;
+          else opponentWins = 1;
+        } else {
+          for (let game = 1; game <= 7 && teamWins < 4 && opponentWins < 4; game += 1) {
+            const roll = seededNoise(`${list.map(c => c.id).join("-")}|${r.era}|${name}|game-${game}|playoff-v3`);
+            if (roll < gameProbability) teamWins += 1;
+            else opponentWins += 1;
+          }
+        }
+        const win = teamWins > opponentWins;
+        const games = name === "附加赛" ? (win ? "胜出" : "出局") : `${teamWins}-${opponentWins}`;
         rounds.push({
           name,
           result: games,
           status: win ? "win" : "loss",
-          note: `晋级概率 ${Math.round(probability * 100)}% · 本轮抽样 ${Math.round(roll * 100)}`
+          probability: Number(probability.toFixed(4)),
+          gameProbability: Number(gameProbability.toFixed(4)),
+          note: name === "附加赛"
+            ? `单场晋级率 ${Math.round(gameProbability * 100)}%`
+            : `单场胜率 ${Math.round(gameProbability * 100)}% · 系列赛晋级率 ${Math.round(probability * 100)}%`
         });
         alive = win;
       });
@@ -3319,7 +3387,7 @@
       const note = champion
         ? "这队不只是常规赛强，半场硬解、护框和球权层级足够撑过四轮。"
         : `${exitRound}止步：季后赛模型会放大半场硬解、护框、防守篮板和球权风险。`;
-      return { seed: playoffSeed(r.wins), power: Math.round(power), titleOdds, rounds, note };
+      return { seed: playoffSeed(r.wins), power: Math.round(power), offense: Math.round(playoffOffense), defense: Math.round(playoffDefense), titleOdds, rounds, note };
     }
 
     function buildAnalysis(r) {

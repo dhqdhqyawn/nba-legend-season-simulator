@@ -306,7 +306,7 @@
 <body>
   <main class="page">
     <header class="hero">
-      <span class="eyebrow">当前版本：球员评分 v1-calibrated · 阵容模型 v2</span>
+      <span class="eyebrow">当前版本：球员评分 v1-calibrated · 阵容模型 v3</span>
       <h1>NBA 时刻卡模拟器评分模型说明</h1>
       <p class="lead">
         这个模型不是用真实历史球队样本训练出来的机器学习模型，而是一个基于篮球知识构造的
@@ -760,40 +760,67 @@ talent
 
     <div class="grid">
       <section>
-        <h2>八、季后赛模型</h2>
-        <p>季后赛不是简单沿用常规赛胜场，而是重新构造 playoff power。</p>
-        <div class="formula">playoffPower
-= 0.22 * offense
-+ 0.18 * defense
-+ 0.15 * shotCreation
-+ 0.10 * playmaking
-+ 0.10 * rimPressure
-+ 0.08 * rimProtection
-+ 0.06 * pointOfAttack
-+ 0.04 * defensiveRebound
-+ 0.07 * adv
-+ 0.28 * (wins - 50)
-+ 0.90 * closers
-+ 0.45 * eraEdge
-+ playoffTalent
-- riskTax</div>
+        <h2>八、季后赛模型 v3</h2>
         <p>
-          每一轮先把球队 power 与该轮对手强度转换成独立晋级概率：
+          季后赛层不再把综合进攻、综合防守与它们的子项同时加入，避免重复计权。模型直接从互相区分的
+          进攻与防守组件构造 playoff offense 和 playoff defense；常规赛胜场只决定种子与对手路径，
+          不再额外加入 playoff power。
         </p>
-        <div class="formula">p(round win)
-= clip(logistic((power - opponentStrength + 2.00) / 8), 0.08, 0.92)
+        <div class="formula">playoffShotCreation
+= 55% * 第一创造点 + 30% * 第二创造点 + 15% * 第三创造点
+
+playoffPlaymaking
+= 65% * 第一组织点 + 35% * 第二组织点
+
+playoffRimPressure
+= 68% * 主要三名攻框点 + 32% * 全队禁区压力</div>
+        <table class="table">
+          <thead>
+            <tr><th>时代</th><th>季后赛进攻权重</th><th>季后赛防守权重</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>现代空间</td>
+              <td>创造 31% · 组织 18% · 空间 29% · 禁区 22%</td>
+              <td>护框 20% · 领防 18% · 换防 22% · 挡拆 24% · 篮板 16% · 点名风险惩罚 24%</td>
+            </tr>
+            <tr>
+              <td>跨时代中性</td>
+              <td>创造 34% · 组织 19% · 空间 20% · 禁区 27%</td>
+              <td>护框 27% · 领防 18% · 换防 16% · 挡拆 18% · 篮板 21% · 点名风险惩罚 18%</td>
+            </tr>
+            <tr>
+              <td>肉搏时代</td>
+              <td>创造 34% · 组织 14% · 空间 8% · 禁区 44%</td>
+              <td>护框 35% · 领防 16% · 换防 10% · 挡拆 12% · 篮板 27% · 点名风险惩罚 10%</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="formula">playoffPower
+= 54% * playoffOffense
++ 42% * playoffDefense
++ 4% * advancedImpact
++ rotationTalentResidual
++ lineupStructure
++ smoothCloserDepth
+- turnoverAndUsageRisk</div>
+        <p>
+          rotationTalent 只使用一次五人排序加权 OVR，识别五个位置都没有明显短板的阵容；关键球员与主攻手
+          使用平滑 sigmoid 得分，不再用“达到阈值突然加一分”的硬切规则。
+        </p>
+        <div class="formula">p(single game)
+= clip(logistic((power - opponentStrength + seedEdge) / 16), 0.12, 0.88)
+
+p(best of seven)
+= sum[C(7,k) * p^k * (1-p)^(7-k)], k = 4...7
 
 titleOdds
 = p(round 1) * p(round 2) * p(round 3) * p(Finals)
 titleOdds is capped at 55%</div>
         <p>
-          页面展示的是一次固定抽样路径，但“夺冠概率”是四轮概率的乘积。即使历史级阵容也可能爆冷出局，
-          防守强但进攻不足的球队也不会再因为高阶影响力重复计权而轻易横扫夺冠。
+          页面中的系列赛会逐场模拟，先到四胜晋级；比分、单场胜率与七场系列赛晋级率来自同一套概率。
+          同一阵容和时代仍使用固定种子，因此结果可复现，但不再是一轮只抽一次的伯努利事件。
         </p>
-        <div class="callout">
-          其中 2.00 是统一的系列赛校准截距：它只把所有球队的单轮晋级概率曲线整体上移，不改变球队排序，
-          也不取消四轮连乘。这个修正用于纠正旧版对手强度刻度偏高、争冠队夺冠概率普遍过低的问题。
-        </div>
       </section>
 
       <section>
@@ -993,13 +1020,13 @@ impact =
 
     <section class="accent green">
       <h2>十三、落地顺序</h2>
-      <p>当前阵容层模型已切到 derived-v2：保留 derived-v1-calibrated 球员分，并用固定阵容回归集约束胜场和季后赛改动。后面继续补真实组件。</p>
+      <p>当前阵容层模型已切到 derived-v3：保留 derived-v1-calibrated 球员分，并用固定阵容回归集约束胜场和季后赛改动。后面继续补真实组件。</p>
       <div class="flow">
         <div class="step"><b>Done</b><span>保留现有人工字段为 manual，同时启用 derived-v1 作为主评分。</span></div>
         <div class="step"><b>Done</b><span>加入固定阵容回归基准、饱和胜场曲线和四轮概率化季后赛。</span></div>
         <div class="step"><b>Next</b><span>新增真实组件字段：USG%、AST%、TRB%、DBPM、3PAr 等。</span></div>
         <div class="step"><b>Next</b><span>球员库里同时展示 manual 分和 derived 分的差异，方便审查异常。</span></div>
-        <div class="step"><b>Next</b><span>用历史球队胜场/SRS 校准阵容模型 derived-v2 的权重和胜场映射。</span></div>
+        <div class="step"><b>Next</b><span>用历史球队胜场/SRS 与系列赛结果校准阵容模型 derived-v3 的权重和概率映射。</span></div>
         <div class="step"><b>Step 4</b><span>对边界球员做人审：比如罗德曼、追梦、穆托姆博这类 box score 低估型球员。</span></div>
         <div class="step"><b>Step 5</b><span>输出每张卡的评分解释：为什么 shoot 是 96，为什么 def 是 99。</span></div>
       </div>
