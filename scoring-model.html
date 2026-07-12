@@ -306,7 +306,7 @@
 <body>
   <main class="page">
     <header class="hero">
-      <span class="eyebrow">当前版本：可解释规则评分模型</span>
+      <span class="eyebrow">当前版本：球员评分 v1-calibrated · 阵容模型 v2</span>
       <h1>NBA 时刻卡模拟器评分模型说明</h1>
       <p class="lead">
         这个模型不是用真实历史球队样本训练出来的机器学习模型，而是一个基于篮球知识构造的
@@ -324,7 +324,7 @@
         <div class="step"><b>2. 特征工程</b><span>把个人属性聚合成持球创造、空间、护框、领防、换防、篮板等球队特征。</span></div>
         <div class="step"><b>3. 阵容结构</b><span>识别主攻手、二创点、连接器、传统内线、球权冲突和兼容度。</span></div>
         <div class="step"><b>4. 时代交互</b><span>现代空间、肉搏半场、中性跨时代三套权重体系会改变收益函数。</span></div>
-        <div class="step"><b>5. 胜场映射</b><span>以 41 胜作为中性基准，把净强度 proxy 映射为 18 到 78 胜。</span></div>
+        <div class="step"><b>5. 胜场映射</b><span>以 41 胜作为中性基准，用饱和曲线把净强度映射为 18 到 76 胜。</span></div>
       </div>
     </header>
 
@@ -346,6 +346,11 @@
           这里的系数不是回归训练出来的，而是人工指定的权重。优点是解释性强、调参快、符合直觉；
           缺点是没有经过真实样本校准，容易在边界阵容上出现偏差。
         </p>
+        <div class="callout">
+          位置资格与能力评分分开处理。会组织不等于能占 PG：基础位置来自该版本的真实角色，额外摇摆位只走版本级白名单。
+          当前东契奇可打 PG/SG，现有两张字母哥卡不开放 PG，小萨与老萨只打 PF/C，约基奇保留特殊 PG 资格。
+          同一球员的不同赛季卡可以同时出现在候选池，但一套首发最多选择其中一张。
+        </div>
       </section>
 
       <section class="accent green">
@@ -529,10 +534,12 @@ physicalDefense
         阵容兼容度 fit 是模型里很关键的一层，因为篮球不是五个高分球员的线性叠加。模型会奖励空间点、
         连接器、二次创造点、基本位置结构和护框资源，同时惩罚过多高使用率核心。
       </p>
-      <div class="formula">fit starts at 72
-+ shooting_points * 4.1
-+ connectors * 3.2
-+ secondary_creators * 1.8
+      <div class="formula">fit starts at 50
++ shooting_points * 3.4
++ connectors * 2.5
++ secondary_creators * 1.6
++ generic_engine_support_bonus (max 6)
++ five_out_or_multi_creator_bonus
 + guards_bonus_or_penalty
 + wings_bonus
 + bigs_bonus_or_penalty
@@ -544,10 +551,14 @@ physicalDefense
 - turnover_risk_penalty
 
 具体代码等价于：
-fit = 72
-fit += shooting * 4.1
-fit += connectors * 3.2
-fit += secondaryCreators * 1.8
+fit = 50
+fit += shooting * 3.4
+fit += connectors * 2.5
+fit += secondaryCreators * 1.6
+if primaryEngine:
+  fit += min(6, engineFriendlyRoles * 1.25)
+if fiveOutHelioTemplate: fit += 6
+if multiCreatorFiveOut: fit += 7
 fit += guards >= 1 ? 5 : -5
 fit += wings >= 2 ? 4 : 0
 fit += bigs >= 1 ? 4 : -6
@@ -555,7 +566,7 @@ fit += rim >= 1 ? 5 : -4
 fit += traditionalRim >= 1 ? 2.5 : 0
 fit -= max(0, creators - 2) * 5.8
 fit -= max(0, engines - 1) * 7.4
-fit -= max(0, usageLoad - 4.15) * 8.5
+fit -= max(0, usageLoad - 4.25) * 6.8
 fit -= max(0, turnoverRisk) * 0.45
 fit = clip(fit, 42, 99)</div>
       <p>
@@ -571,6 +582,7 @@ fit = clip(fit, 42, 99)</div>
           <tr><td>engines</td><td>heliocentric 持球大核数量</td><td>多个体系核心共存会被额外惩罚。</td></tr>
           <tr><td>connectors</td><td>无球、连接、防守、空间型角色</td><td>提升阵容流动性和防守稳定性。</td></tr>
           <tr><td>turnoverRisk</td><td>球权负载超标后的风险 proxy</td><td>进入最终净强度时会被扣分。</td></tr>
+          <tr><td>engineFriendlyRoles</td><td>能为任意主控核心提供空间、防守或终结的角色数量</td><td>不再检查球员姓名；勒布朗、东契奇、哈登等使用同一条结构规则。</td></tr>
         </tbody>
       </table>
     </section>
@@ -727,11 +739,17 @@ not era. Changing era does not reroll luck.</div>
 + possessionEdge
 + durabilityFloor * 0.035
 
-wins = round(41 + net)
-wins is clipped to [18, 78]</div>
+wins = round(41 + 36 * tanh(net / 32))
+wins is clipped to [18, 76]
+
+talent
+= (averageOVR - 82) * 1.45
++ max(0, bestOVR - 92) * 0.70
++ max(0, secondOVR - 88) * 0.40</div>
       <p>
         其中 41 胜是中性球队基准，offense、defense、fit、advImpact 是主要解释变量。
-        randomSwing 不是完全随机，它由五张卡 ID、时代、伤病值、磨合值生成 deterministic noise：
+        tanh 是饱和映射：中段强度提升会明显增加胜场，但越接近历史极值，新增强度对应的胜场越少，避免大量阵容直接撞到 78 胜。
+        randomSwing 不是完全随机，它由五张卡 ID、伤病值、磨合值生成 deterministic noise：
         同一套阵容和同一组设置会得到同一个波动项。
       </p>
       <p>
@@ -745,21 +763,32 @@ wins is clipped to [18, 78]</div>
         <h2>八、季后赛模型</h2>
         <p>季后赛不是简单沿用常规赛胜场，而是重新构造 playoff power。</p>
         <div class="formula">playoffPower
-= 0.18 * shotCreation
-+ 0.16 * rimProtection
-+ 0.12 * defensiveRebound
-+ 0.10 * pointOfAttack
-+ 0.20 * adv
-+ 0.14 * fit
+= 0.22 * offense
++ 0.18 * defense
++ 0.15 * shotCreation
 + 0.10 * playmaking
 + 0.10 * rimPressure
-+ regular_season_bonus
-+ closers_bonus
-+ eraEdge
++ 0.08 * rimProtection
++ 0.06 * pointOfAttack
++ 0.04 * defensiveRebound
++ 0.07 * adv
++ 0.28 * (wins - 50)
++ 0.90 * closers
++ 0.45 * eraEdge
++ playoffTalent
 - riskTax</div>
         <p>
-          这体现了一个建模假设：季后赛会放大半场硬解、护框、防守篮板、关键主攻点和球权风险，
-          所以常规赛强不等于一定季后赛无敌。
+          每一轮先把球队 power 与该轮对手强度转换成独立晋级概率：
+        </p>
+        <div class="formula">p(round win)
+= clip(logistic((power - opponentStrength) / 8), 0.08, 0.92)
+
+titleOdds
+= p(round 1) * p(round 2) * p(round 3) * p(Finals)
+titleOdds is capped at 55%</div>
+        <p>
+          页面展示的是一次固定抽样路径，但“夺冠概率”是四轮概率的乘积。即使历史级阵容也可能爆冷出局，
+          防守强但进攻不足的球队也不会再因为高阶影响力重复计权而轻易横扫夺冠。
         </p>
       </section>
 
@@ -816,10 +845,10 @@ TS% = f(real_ts, team_spacing, team_fit)</div>
     </section>
 
     <section>
-      <h2>十一、当前已启用：derived-v1 可复算评分</h2>
+      <h2>十一、球员评分层：derived-v1-calibrated</h2>
       <p>
         现在模拟器已经不再直接使用原来的人工字段作为主评分。原来的 ovr/off/def/pass/shoot/finish/reb/space/usage/impact
-        已经保存在 card.manual 里作为备份；页面展示、位置摇摆和胜场模型使用 derived-v1 生成分。
+        已经保存在 card.manual 里作为备份；页面展示与阵容模型输入使用 derived-v1-calibrated 生成分。
         derived-v1 的输入是现有卡库已经有的真实赛季锚点：PPG、TS%、PER、WS/48、BPM、VORP，
         再叠加位置、archetype、荣誉标签和角色标签校准。
       </p>
@@ -960,12 +989,13 @@ impact =
 
     <section class="accent green">
       <h2>十三、落地顺序</h2>
-      <p>当前已经完成 Step 1 的一部分：主模型切到 derived-v1，旧人工分保存在 manual 里。后面继续补真实组件。</p>
+      <p>当前阵容层模型已切到 derived-v2：保留 derived-v1-calibrated 球员分，并用固定阵容回归集约束胜场和季后赛改动。后面继续补真实组件。</p>
       <div class="flow">
         <div class="step"><b>Done</b><span>保留现有人工字段为 manual，同时启用 derived-v1 作为主评分。</span></div>
+        <div class="step"><b>Done</b><span>加入固定阵容回归基准、饱和胜场曲线和四轮概率化季后赛。</span></div>
         <div class="step"><b>Next</b><span>新增真实组件字段：USG%、AST%、TRB%、DBPM、3PAr 等。</span></div>
         <div class="step"><b>Next</b><span>球员库里同时展示 manual 分和 derived 分的差异，方便审查异常。</span></div>
-        <div class="step"><b>Next</b><span>用历史球队胜场/SRS 校准 derived-v1 的权重和胜场映射。</span></div>
+        <div class="step"><b>Next</b><span>用历史球队胜场/SRS 校准阵容模型 derived-v2 的权重和胜场映射。</span></div>
         <div class="step"><b>Step 4</b><span>对边界球员做人审：比如罗德曼、追梦、穆托姆博这类 box score 低估型球员。</span></div>
         <div class="step"><b>Step 5</b><span>输出每张卡的评分解释：为什么 shoot 是 96，为什么 def 是 99。</span></div>
       </div>

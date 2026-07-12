@@ -1825,7 +1825,7 @@
 
         <section class="panel model">
           <b>模型说明</b><br />
-          当前使用 derived-v1 可复算评分：由 PPG/TS%/PER/BPM/VORP/WS48、位置、archetype、荣誉与角色标签生成能力分。2KDB/MyTeam 只用于卡面与版本视觉，不参与属性评分。胜场会综合持球创造、组织、空间、禁区压力、护框、领防、换防、篮板、球权风险、时代规则适配和磨合。<br />
+          当前使用“球员评分 derived-v1-calibrated + 阵容模型 derived-v2”：前者由 PPG/TS%/PER/BPM/VORP/WS48、位置、archetype、荣誉与角色标签生成能力分；后者计算胜场与概率化季后赛。2KDB/MyTeam 只用于卡面与版本视觉，不参与属性评分。<br />
           <a href="scoring-model.html" target="_blank" rel="noreferrer" style="color:#e4af3f;font-weight:900">模型说明</a>
           <span style="color:#bdb6aa"> · </span>
           <a href="rating-audit.html" target="_blank" rel="noreferrer" style="color:#e4af3f;font-weight:900">评分审计</a>
@@ -2248,14 +2248,14 @@
       ["Kawhi Leonard","2016-17 Two-Way Peak","Spurs","SF","twoWayWing",96,96,99,80,90,92,76,92,86,94,25.5,.610,27.6,.264,7.1,6.7,["DPOY级","MVP第三"]],
       ["Kawhi Leonard","2018-19 Raptors Klaw","Raptors","SF","twoWayWing",96,97,96,78,88,93,78,90,90,92,26.6,.606,25.8,.224,5.0,5.7,["Finals MVP","季后赛"]],
       ["OG Anunoby","2022-23 Raptors Stopper","Raptors","SF/PF","pointStopper",86,78,94,68,82,78,64,84,45,86,16.8,.586,13.2,.104,1.8,1.9,["锋线领防","底角空间","换防"]],
-      ["Giannis Antetokounmpo","2018-19 MVP Freak","Bucks","PF","slasher",97,97,96,86,68,99,96,72,90,97,27.7,.644,30.9,.292,10.8,7.4,["MVP","转换怪物"]],
+      ["Giannis Antetokounmpo","2018-19 MVP Freak","Bucks","SF/PF/C","slasher",97,97,96,86,68,99,96,72,90,97,27.7,.644,30.9,.292,10.8,7.4,["MVP","转换怪物"]],
       ["Giannis Antetokounmpo","2020-21 Finals 50","Bucks","PF/C","slasher",98,98,97,84,66,100,97,70,91,98,28.1,.633,29.2,.244,8.8,7.5,["Finals MVP","50分封神"]],
       ["Nikola Jokic","2020-21 MVP Joker","Nuggets","C","pointCenter",96,97,78,99,88,91,94,90,86,96,26.4,.647,31.3,.301,8.6,8.8,["MVP","组织中锋"]],
       ["Nikola Jokic","2022-23 Champion Joker","Nuggets","C","pointCenter",98,99,82,100,90,93,96,92,84,99,24.5,.701,31.5,.308,8.8,8.7,["Finals MVP","冠军核心"]],
       ["Nikola Jokic","2023-24 Third MVP","Nuggets","C","pointCenter",98,99,83,100,90,94,97,92,86,99,26.4,.650,31.0,.299,10.6,9.2,["MVP","中锋大脑"]],
       ["Joel Embiid","2022-23 MVP Process","76ers","C","interiorHub",97,99,90,78,82,97,93,84,94,90,33.1,.655,31.4,.259,7.3,6.4,["MVP","得分王"]],
-      ["Luka Doncic","2019-20 Bubble Luka","Mavericks","PG/SF","heliocentric",94,96,76,96,86,93,87,88,92,88,28.8,.585,27.6,.207,5.4,5.8,["持球大核","季后赛绝杀"]],
-      ["Luka Doncic","2023-24 Scoring Maestro","Mavericks","PG","heliocentric",97,99,76,98,90,94,88,92,98,91,33.9,.617,28.1,.220,8.0,7.3,["得分王","总决赛"]],
+      ["Luka Doncic","2019-20 Bubble Luka","Mavericks","PG/SG/SF","heliocentric",94,96,76,96,86,93,87,88,92,88,28.8,.585,27.6,.207,5.4,5.8,["持球大核","季后赛绝杀"]],
+      ["Luka Doncic","2023-24 Scoring Maestro","Mavericks","PG/SG","heliocentric",97,99,76,98,90,94,88,92,98,91,33.9,.617,28.1,.220,8.0,7.3,["得分王","总决赛"]],
       ["Jayson Tatum","2023-24 Champion Wing","Celtics","SF/PF","twoWayWing",94,94,88,84,88,90,86,91,84,93,26.9,.604,22.3,.189,5.1,5.4,["冠军核心","双向锋线"]],
       ["Anthony Davis","2017-18 Pelicans Monster","Pelicans","PF/C","defAnchor",95,96,97,72,75,96,94,78,88,89,28.1,.612,28.9,.241,5.2,5.3,["一防","空接护框"]],
       ["Anthony Davis","2019-20 Lakers Bubble","Lakers","PF/C","defAnchor",95,95,98,74,78,95,94,80,84,91,26.1,.610,27.4,.250,5.9,5.5,["冠军二当家","护框"]],
@@ -2352,7 +2352,7 @@
       ["Michael Porter Jr.","2022-23 Nuggets Sniper Wing","Nuggets","SF/PF","movementShooter",85,84,72,62,94,82,76,96,62,82,17.4,.620,14.6,.109,1.2,2.0,["冠军侧翼","高点投射","篮板"]],
       ["Darius Garland","2021-22 Cavs Maestro","Cavaliers","PG","floorGeneral",87,88,66,92,90,82,42,92,78,78,21.7,.576,19.1,.118,2.4,3.1,["全明星控卫","挡拆","抛投"]],
       ["Evan Mobley","2022-23 Cavs Switch Big","Cavaliers","PF/C","defAnchor",87,78,94,74,66,84,86,70,56,84,16.2,.591,17.8,.149,3.5,3.6,["换防内线","护框","年轻核心"]],
-      ["Pascal Siakam","2018-19 Title MIP","Raptors","PF","connector",88,86,84,78,74,88,82,76,68,88,16.9,.628,18.7,.177,3.4,3.5,["最快进步","冠军拼图"]],
+      ["Pascal Siakam","2018-19 Title MIP","Raptors","PF","connector",88,86,84,78,82,88,82,84,68,88,16.9,.628,18.7,.177,3.4,3.5,["最快进步","冠军拼图"]],
       ["Bam Adebayo","2019-20 Bubble Anchor","Heat","C/PF","connector",88,82,94,84,62,84,88,66,62,86,15.9,.598,20.3,.168,3.4,3.7,["换防中锋","策应"]],
       ["Andre Iguodala","2014-15 Finals Stopper","Warriors","SF","connector",86,76,94,80,74,78,68,78,48,88,7.8,.540,11.7,.131,2.0,2.5,["Finals MVP","防守奇兵"]],
       ["Robert Horry","2001-02 Big Shot Role","Lakers","PF","connector",82,72,82,70,82,72,70,86,42,84,6.8,.552,12.1,.137,1.5,1.8,["大心脏","空间拼图"]],
@@ -2403,19 +2403,21 @@
     const slotLabels = ["PG 控卫", "SG 分卫", "SF 小前", "PF 大前", "C 中锋"];
     const slotCodes = ["PG", "SG", "SF", "PF", "C"];
     const posMap = { PG: 1, SG: 2, SF: 3, PF: 4, C: 5 };
-    const pointSwingNames = new Set([
-      "LeBron James",
-      "Giannis Antetokounmpo",
-      "Draymond Green",
-      "Nikola Jokic",
-      "Luka Doncic",
-      "James Harden",
-      "Russell Westbrook",
-      "Magic Johnson",
-      "Scottie Pippen",
-      "Grant Hill",
-      "Penny Hardaway"
+    const pointGuardSlotCards = new Set([
+      "LeBron James|2008-09 Cavs MVP",
+      "LeBron James|2012-13 Heat Apex",
+      "LeBron James|2015-16 Cleveland Block",
+      "LeBron James|2019-20 Lakers Point Forward",
+      "Nikola Jokic|2020-21 MVP Joker",
+      "Nikola Jokic|2022-23 Champion Joker",
+      "Nikola Jokic|2023-24 Third MVP",
+      "Scottie Pippen|1993-94 Point Forward",
+      "Grant Hill|1996-97 Point Forward"
     ]);
+
+    function cardSlotKey(card) {
+      return `${card.name}|${card.version}`;
+    }
 
     function baseSlots(pos) {
       return [...new Set(pos.split("/").map(p => posMap[p]).filter(Boolean))];
@@ -2424,8 +2426,7 @@
     function expandedSlots(card) {
       const slots = new Set(baseSlots(card.pos));
       const base = baseSlots(card.pos);
-      if (pointSwingNames.has(card.name) || (card.pass >= 92 && ["heliocentric", "floorGeneral", "pointCenter"].includes(card.archetype))) slots.add(1);
-      if (base.includes(2) && card.pass >= 84 && card.usage >= 78) slots.add(1);
+      if (pointGuardSlotCards.has(cardSlotKey(card))) slots.add(1);
       if (card.archetype === "twoWayWing" || card.archetype === "connector") {
         if (base.includes(2) || base.includes(3)) { slots.add(2); slots.add(3); }
         if (base.includes(3) && card.reb >= 78) { slots.add(3); slots.add(4); }
@@ -2554,19 +2555,27 @@
         adjusted.off = Math.max(adjusted.off, 88);
         adjusted.impact = Math.max(adjusted.impact, 90);
         adjusted.finish = Math.max(adjusted.finish, 86);
+        adjusted.ovr = Math.max(adjusted.ovr, 90);
       }
       if (card.archetype === "connector" && card.ppg >= 15 && card.ts >= .57 && Math.max(adjusted.finish, card.manual.finish) >= 80) {
         adjusted.usage = Math.max(adjusted.usage, 76);
         adjusted.off = Math.max(adjusted.off, 82);
         adjusted.impact = Math.max(adjusted.impact, 84);
+        adjusted.ovr = Math.max(adjusted.ovr, 84);
+        if (tagMatch(card, /冠军拼图/) && card.manual.shoot >= 78) {
+          adjusted.shoot = Math.max(adjusted.shoot, 80);
+          adjusted.space = Math.max(adjusted.space, 82);
+        }
       }
       if (card.archetype === "pointStopper" && tagMatch(card, /无数据球星|防守|冠军拼图/)) {
         adjusted.space = Math.max(adjusted.space, 84);
         adjusted.impact = Math.max(adjusted.impact, 82);
+        adjusted.ovr = Math.max(adjusted.ovr, 82);
       }
       if (card.archetype === "stretchBig" && Math.max(adjusted.def, card.manual.def) >= 88 && (Math.max(adjusted.shoot, card.manual.shoot) >= 82 || tagMatch(card, /空间五号|护框空间/))) {
         adjusted.space = Math.max(adjusted.space, 88);
         adjusted.impact = Math.max(adjusted.impact, 82);
+        adjusted.ovr = Math.max(adjusted.ovr, 84);
       }
       if (tagMatch(card, /MVP第二|MVP Runner-Up|MVP第三/)) {
         adjusted.usage = Math.max(adjusted.usage, 90);
@@ -2593,6 +2602,9 @@
       adjusted.ovr = Math.max(adjusted.ovr, clamp(Math.round(
         adjusted.impact * .30 + adjusted.off * .23 + adjusted.def * .20 + Math.max(adjusted.pass, adjusted.shoot, adjusted.finish) * .15 + adjusted.reb * .06 + adjusted.usage * .06
       ), 70, 99));
+      if (card.manual.ovr >= 97 && tagMatch(card, /MVP|Finals MVP|冠军核心/)) {
+        adjusted.ovr = Math.max(adjusted.ovr, card.manual.ovr - 1);
+      }
 
       return { ...adjusted, ratingSource: "derived-v1-calibrated" };
     }
@@ -2744,10 +2756,17 @@
 
     function cardHtml(c) {
       const isSelected = selected.some(p => p && p.id === c.id);
+      const samePlayerSelected = selected.some(p => p && p.name === c.name && p.id !== c.id);
       const showRatings = ratingsRevealed && isSelected;
       const ineligible = !canPlay(c);
-      const disabled = !isSelected && ((selectedCount() >= 5) || ineligible);
-      const pickLabel = isSelected ? "移出阵容" : ineligible ? `不能打 ${slotCodes[activeSlot]}` : `选入 ${slotCodes[activeSlot]}`;
+      const disabled = !isSelected && ((selectedCount() >= 5) || ineligible || samePlayerSelected);
+      const pickLabel = isSelected
+        ? "移出阵容"
+        : samePlayerSelected
+          ? "已有该球员"
+          : ineligible
+            ? `不能打 ${slotCodes[activeSlot]}`
+            : `选入 ${slotCodes[activeSlot]}`;
       const visibleTags = c.tags.slice(0, 4).map(t => `<span class="chip">${t}</span>`).join("");
       return `
         <article class="player-card ${isSelected ? "selected" : ""} ${showRatings ? "fresh" : ""} ${disabled ? "disabled" : ""} ${ineligible ? "ineligible" : ""}" style="--accent:${c.color}" data-id="${c.id}">
@@ -2825,6 +2844,8 @@
       const card = cards.find(c => c.id === id);
       if (!card) return;
       const existingIndex = selected.findIndex(c => c && c.id === id);
+      const samePlayerIndex = selected.findIndex(c => c && c.name === card.name && c.id !== id);
+      if (existingIndex < 0 && samePlayerIndex >= 0) return;
       if (existingIndex < 0 && !canPlay(card)) return;
       if (existingIndex === activeSlot) selected[activeSlot] = null;
       else {
@@ -3069,14 +3090,13 @@
         (c.usage >= 76 && c.finish >= 80 && c.def >= 78 && c.usage < 90) ||
         (["twoWayWing", "connector", "slasher"].includes(c.archetype) && c.usage >= 74 && c.finish >= 78)
       );
-      const lebronFriendlyRoles = roleCount(list, c =>
-        c.name !== "LeBron James" &&
+      const heliocentricEngine = list.some(c => c.pass >= 92 && c.usage >= 90 && ["heliocentric", "floorGeneral", "pointCenter"].includes(c.archetype));
+      const engineFriendlyRoles = roleCount(list, c =>
+        !(c.pass >= 92 && c.usage >= 90 && ["heliocentric", "floorGeneral", "pointCenter"].includes(c.archetype)) &&
         c.def >= 82 &&
         (c.space >= 82 || c.shoot >= 80 || c.finish >= 80) &&
         (c.usage <= 84 || ["connector", "pointStopper", "stretchBig", "defAnchor"].includes(c.archetype))
       );
-      const hasLeBronEngine = list.some(c => c.name === "LeBron James" && c.pass >= 92 && c.usage >= 90);
-      const heliocentricEngine = list.some(c => c.pass >= 92 && c.usage >= 90 && ["heliocentric", "floorGeneral", "pointCenter"].includes(c.archetype));
       const highLevelSecondary = roleCount(list, c =>
         c.archetype !== "heliocentric" &&
         c.usage >= 82 &&
@@ -3107,13 +3127,13 @@
       const turnoverRisk = Math.max(0, usageLoad - 4.18) * 5.4 + Math.max(0, creators - 2) * 2.2 + pureOnBallOverlap * 2.4 - secondaryCreators * 1.2 - hierarchyRelief;
       const durabilityFloor = avg(list, "impact") * .20 + avg(list, "ws48") * 70 + roleCount(list, c => c.ovr >= 94) * 1.2 - Number(el.injury.value) * .35;
 
-      let fit = 72;
-      fit += shooting * 4.1;
-      fit += connectors * 3.2;
-      fit += secondaryCreators * 1.8;
-      if (hasLeBronEngine) fit += Math.min(8, lebronFriendlyRoles * 1.7);
-      if (fiveOutHelioTemplate) fit += 7.5;
-      if (multiCreatorFiveOut) fit += 8.5;
+      let fit = 50;
+      fit += shooting * 3.4;
+      fit += connectors * 2.5;
+      fit += secondaryCreators * 1.6;
+      if (heliocentricEngine) fit += Math.min(6, engineFriendlyRoles * 1.25);
+      if (fiveOutHelioTemplate) fit += 6.0;
+      if (multiCreatorFiveOut) fit += 7.0;
       fit += guards >= 1 ? 5 : -5;
       fit += wings >= 2 ? 4 : 0;
       fit += bigs >= 1 ? 4 : -6;
@@ -3157,17 +3177,20 @@
       const coachChem = Number(el.chem.value);
       const lineupSeed = list.map(c => c.id).sort((a, b) => a - b).join("-");
       const seasonNoise = seededNoise(`${lineupSeed}|${injuryVol}|${coachChem}`);
-      const randomSwing = (seasonNoise - .5) * (5 + injuryVol * .65);
-      const talent = (avg(list, "ovr") - 84) * 1.8;
+      const randomSwing = (seasonNoise - .5) * (3 + injuryVol * .35);
+      const rankedOvr = list.map(c => c.ovr).sort((a, b) => b - a);
+      const averageOvr = avg(list, "ovr");
+      const topEndTalent = Math.max(0, rankedOvr[0] - 92) * .70 + Math.max(0, rankedOvr[1] - 88) * .40;
+      const talent = (averageOvr - 82) * 1.45 + topEndTalent;
       const possessionEdge = (defensiveRebound - 78) * .055 + (pointOfAttack - 78) * .035 - Math.max(0, turnoverRisk) * .12;
       const neutralOffense = balancedOffense;
       const neutralDefense = balancedDefense;
       const eraOffenseDelta = offense - neutralOffense;
       const eraDefenseDelta = defense - neutralDefense;
       const styleAdjustment = clamp(eraBonus - eraPenalty + eraOffenseDelta * .14 + eraDefenseDelta * .12, -3.8, 3.8);
-      const structureEdge = multiCreatorFiveOut ? 5.2 : fiveOutHelioTemplate ? 4.0 : 0;
+      const structureEdge = multiCreatorFiveOut ? 4.5 : fiveOutHelioTemplate ? 3.5 : 0;
       const net = (neutralOffense - 84) * .30 + (neutralDefense - 82) * .28 + (effectiveFit - 70) * .17 + (advImpact - 86) * .18 + talent + styleAdjustment + structureEdge + coachChem + randomSwing + possessionEdge + durabilityFloor * .035;
-      let wins = clamp(Math.round(41 + net), 18, 78);
+      let wins = clamp(Math.round(41 + 36 * Math.tanh(net / 32)), 18, 76);
       if (el.era.value === "physical" && eraPenalty >= 12) wins = Math.min(wins, 66);
       if (el.era.value === "physical" && eraPenalty >= 18) wins = Math.min(wins, 60);
       const losses = 82 - wins;
@@ -3181,7 +3204,7 @@
         creators, engines, connectors, secondaryCreators, guards, wings, bigs, shooting, rim, traditionalRim,
         interiorGravity: interiorGravityCount,
         eliteInteriorGravity: eliteInteriorGravityCount,
-        lebronFriendlyRoles: hasLeBronEngine ? lebronFriendlyRoles : 0,
+        engineFriendlyRoles: heliocentricEngine ? engineFriendlyRoles : 0,
         fiveOutHelioTemplate: fiveOutHelioTemplate ? 1 : 0,
         multiCreatorFiveOut: multiCreatorFiveOut ? 1 : 0,
         eraProofStars, historicBigs, powerInterior, eraStyle,
@@ -3226,13 +3249,15 @@
 
     function calculatePlayoffs(r, list) {
       const closers = roleCount(list, c => c.usage >= 88 && c.impact >= 92);
-      const playoffResilience = r.shotCreation * .18 + r.rimProtection * .16 + r.defensiveRebound * .12 + r.pointOfAttack * .10 + r.adv * .20 + r.fit * .14 + r.playmaking * .10 + r.rimPressure * .10;
-      const riskTax = r.turnoverRisk * .42 + Math.max(0, Number(r.usageLoad) - 4.25) * 2.2;
+      const postseasonCreators = roleCount(list, c => c.usage >= 84 && c.impact >= 88 && (c.off >= 88 || c.finish >= 88 || c.pass >= 90));
+      const rankedOvr = list.map(c => c.ovr).sort((a, b) => b - a);
+      const playoffCore = r.offense * .22 + r.defense * .18 + r.shotCreation * .15 + r.playmaking * .10 + r.rimPressure * .10 + r.rimProtection * .08 + r.pointOfAttack * .06 + r.defensiveRebound * .04 + r.adv * .07;
+      const riskTax = r.turnoverRisk * .28 + Math.max(0, Number(r.usageLoad) - 4.25) * 1.6;
       const eraEdge = r.era === "physical"
         ? r.traditionalRim * 1.2 + r.eraProofStars * .9 + r.historicBigs * 1.1 + (r.eliteInteriorGravity || 0) * .8 - r.eraPenalty * .28
         : r.shooting * .75 + Math.max(0, r.spacing - 88) * .06 + (r.eliteInteriorGravity || 0) * .7;
-      const power = playoffResilience + (r.wins - 50) * .42 + closers * 1.15 + eraEdge - riskTax;
-      const titleOdds = clamp(Math.round((power - 79) * 3.2 + (r.wins - 48) * 1.4), 1, 86);
+      const playoffTalent = (avg(list, "ovr") - 86) * .4 + Math.max(0, rankedOvr[0] - 94) * .5 + postseasonCreators * .9 + r.structureEdge * .5;
+      const power = playoffCore + (r.wins - 50) * .28 + closers * .9 + eraEdge * .45 + playoffTalent - riskTax;
       if (r.wins < 40) {
         return {
           seed: playoffSeed(r.wins),
@@ -3246,38 +3271,44 @@
       const isPlayIn = r.wins < 45;
       const roundPlan = isPlayIn
         ? [
-            ["附加赛", 82],
+            ["附加赛", 84],
             ["首轮", 88],
             ["分区半决赛", 91],
             ["分区决赛", 94],
-            ["总决赛", 96]
+            ["总决赛", 97]
           ]
         : r.wins >= 60
-          ? [["首轮", 83], ["分区半决赛", 88], ["分区决赛", 92], ["总决赛", 95]]
+          ? [["首轮", 79], ["分区半决赛", 84], ["分区决赛", 89], ["总决赛", 93]]
           : r.wins >= 52
-            ? [["首轮", 86], ["分区半决赛", 90], ["分区决赛", 93], ["总决赛", 96]]
-            : [["首轮", 89], ["分区半决赛", 92], ["分区决赛", 95], ["总决赛", 97]];
+            ? [["首轮", 81], ["分区半决赛", 85], ["分区决赛", 89], ["总决赛", 93]]
+            : [["首轮", 86], ["分区半决赛", 90], ["分区决赛", 94], ["总决赛", 97]];
+
+      const roundProbabilities = roundPlan.map(([, opponent]) => clamp(1 / (1 + Math.exp((opponent - power) / 8)), .08, .92));
+      const titleOdds = clamp(Math.round(roundProbabilities.reduce((product, probability) => product * probability, 1) * 100), 1, 55);
 
       const rounds = [];
       let alive = true;
       roundPlan.forEach(([name, opponent], index) => {
         if (!alive) return;
-        const noise = (seededNoise(`${r.wins}|${r.era}|${r.usageLoad}|${name}|${r.seasonVariance}`) - .5) * (name === "附加赛" ? 5.5 : 4.2);
-        const margin = power - opponent + noise;
-        const win = margin >= 0;
+        const probability = roundProbabilities[index];
+        const roll = seededNoise(`${list.map(c => c.id).join("-")}|${r.era}|${name}|playoff-v2`);
+        const win = roll < probability;
         const games = name === "附加赛"
           ? (win ? "胜出" : "出局")
-          : margin >= 8 ? "4-0"
-            : margin >= 4 ? "4-1"
-              : margin >= 0 ? "4-2"
-                : margin > -3 ? "3-4"
-                  : margin > -7 ? "2-4"
-                    : "1-4";
+          : win
+            ? probability >= .82 && roll < .25 ? "4-0"
+              : probability >= .66 ? "4-1"
+                : probability >= .48 ? "4-2"
+                  : "4-3"
+            : probability <= .18 && roll > .75 ? "0-4"
+              : probability <= .34 ? "1-4"
+                : probability <= .52 ? "2-4"
+                  : "3-4";
         rounds.push({
           name,
           result: games,
           status: win ? "win" : "loss",
-          note: win ? `系列赛强度 +${Math.max(0, Math.round(margin))}` : `对手强度压过 ${Math.abs(Math.round(margin))}`
+          note: `晋级概率 ${Math.round(probability * 100)}% · 本轮抽样 ${Math.round(roll * 100)}`
         });
         alive = win;
       });
@@ -3638,11 +3669,22 @@
       el.chemValue.textContent = el.chem.value;
       draft = (data.draftIds || []).map(id => cards.find(c => c.id === id)).filter(Boolean);
       selected = (data.selectedIds || []).slice(0, 5).map(id => id == null ? null : cards.find(c => c.id === id) || null);
+      const loadedPlayerNames = new Set();
+      selected = selected.map(card => {
+        if (!card || loadedPlayerNames.has(card.name)) return null;
+        loadedPlayerNames.add(card.name);
+        return card;
+      });
       while (selected.length < 5) selected.push(null);
       activeSlot = clamp(Number(data.activeSlot || 0), 0, 4);
       previewCardId = data.previewCardId ?? draft[0]?.id ?? null;
       ratingsRevealed = !!data.ratingsRevealed;
       lastResult = data.result || null;
+      if (selectedCount() < 5 && lastResult) {
+        ratingsRevealed = false;
+        lastResult = null;
+        activeSlot = selected.findIndex(card => !card);
+      }
       if (lastResult && ratingsRevealed && !lastResult.playoff && selectedCount() === 5) {
         lastResult.playoff = calculatePlayoffs(lastResult, selectedCards());
       }

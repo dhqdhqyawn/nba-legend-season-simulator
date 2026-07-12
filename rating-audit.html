@@ -490,19 +490,27 @@
         adjusted.off = Math.max(adjusted.off, 88);
         adjusted.impact = Math.max(adjusted.impact, 90);
         adjusted.finish = Math.max(adjusted.finish, 86);
+        adjusted.ovr = Math.max(adjusted.ovr, 90);
       }
       if (card.archetype === "connector" && card.ppg >= 15 && card.ts >= .57 && Math.max(adjusted.finish, card.manual.finish) >= 80) {
         adjusted.usage = Math.max(adjusted.usage, 76);
         adjusted.off = Math.max(adjusted.off, 82);
         adjusted.impact = Math.max(adjusted.impact, 84);
+        adjusted.ovr = Math.max(adjusted.ovr, 84);
+        if (tagMatch(card, /冠军拼图/) && card.manual.shoot >= 78) {
+          adjusted.shoot = Math.max(adjusted.shoot, 80);
+          adjusted.space = Math.max(adjusted.space, 82);
+        }
       }
       if (card.archetype === "pointStopper" && tagMatch(card, /无数据球星|防守|冠军拼图/)) {
         adjusted.space = Math.max(adjusted.space, 84);
         adjusted.impact = Math.max(adjusted.impact, 82);
+        adjusted.ovr = Math.max(adjusted.ovr, 82);
       }
       if (card.archetype === "stretchBig" && Math.max(adjusted.def, card.manual.def) >= 88 && (Math.max(adjusted.shoot, card.manual.shoot) >= 82 || tagMatch(card, /空间五号|护框空间/))) {
         adjusted.space = Math.max(adjusted.space, 88);
         adjusted.impact = Math.max(adjusted.impact, 82);
+        adjusted.ovr = Math.max(adjusted.ovr, 84);
       }
       if (tagMatch(card, /MVP第二|MVP Runner-Up|MVP第三/)) {
         adjusted.usage = Math.max(adjusted.usage, 90);
@@ -529,6 +537,9 @@
       adjusted.ovr = Math.max(adjusted.ovr, clamp(Math.round(
         adjusted.impact * .30 + adjusted.off * .23 + adjusted.def * .20 + Math.max(adjusted.pass, adjusted.shoot, adjusted.finish) * .15 + adjusted.reb * .06 + adjusted.usage * .06
       ), 70, 99));
+      if (card.manual.ovr >= 97 && tagMatch(card, /MVP|Finals MVP|冠军核心/)) {
+        adjusted.ovr = Math.max(adjusted.ovr, card.manual.ovr - 1);
+      }
       return { ...adjusted, ratingSource: "derived-v1-calibrated" };
     }
 
