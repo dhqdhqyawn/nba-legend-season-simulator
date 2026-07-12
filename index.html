@@ -1617,6 +1617,25 @@
       background: #fffdf8;
     }
 
+    .mobile-simulate {
+      display: none;
+      position: fixed;
+      left: 12px;
+      right: 12px;
+      bottom: calc(12px + env(safe-area-inset-bottom));
+      z-index: 70;
+      min-height: 54px;
+      border: 1px solid #2d2a26;
+      border-radius: 8px;
+      background: var(--ink);
+      color: #fff;
+      font-size: 16px;
+      font-weight: 950;
+      box-shadow: 0 12px 28px rgba(20, 18, 15, .24);
+    }
+
+    body.result-modal-open .mobile-simulate { display: none; }
+
     @media (max-width: 760px) {
       .season-modal { padding: 0; place-items: stretch; }
       .season-modal-dialog { width: 100%; max-height: 100svh; border: 0; border-radius: 0; }
@@ -1666,6 +1685,7 @@
     }
 
     @media (max-width: 780px) {
+      body { padding-bottom: calc(82px + env(safe-area-inset-bottom)); }
       .app { width: min(100% - 20px, 1460px); padding-top: 10px; }
       .topbar { align-items: flex-start; flex-direction: column; }
       .actions { justify-content: flex-start; width: 100%; }
@@ -1686,6 +1706,7 @@
       .wheel-stage { grid-template-columns: 1fr; }
       .wheel-wrap { max-width: 310px; }
       .wheel-label { transform: rotate(calc(var(--i) * 30deg + 15deg)) translateY(-125px) rotate(calc(var(--i) * -30deg - 15deg)); }
+      .mobile-simulate.ready { display: block; }
     }
   </style>
 </head>
@@ -1826,7 +1847,7 @@
 
         <section class="panel model">
           <b>模型说明</b><br />
-          当前使用“球员评分 derived-v1-calibrated + 阵容模型 derived-v3”：前者由 PPG/TS%/PER/BPM/VORP/WS48、位置、archetype、荣誉与角色标签生成能力分；后者使用时代化组件权重计算胜场、单场胜率与七场系列赛。2KDB/MyTeam 只用于卡面与版本视觉，不参与属性评分。<br />
+          当前使用“球员评分 derived-v1-calibrated + 阵容模型 derived-v4-seeded”：前者由 PPG/TS%/PER/BPM/VORP/WS48、位置、archetype、荣誉与角色标签生成能力分；后者使用时代化组件权重计算胜场，并用种子对阵先验与阵容季后赛实力计算七场系列赛。2KDB/MyTeam 只用于卡面与版本视觉，不参与属性评分。<br />
           <a href="scoring-model.html" target="_blank" rel="noreferrer" style="color:#e4af3f;font-weight:900">模型说明</a>
           <span style="color:#bdb6aa"> · </span>
           <a href="rating-audit.html" target="_blank" rel="noreferrer" style="color:#e4af3f;font-weight:900">评分审计</a>
@@ -1836,6 +1857,8 @@
       </aside>
     </div>
   </main>
+
+  <button class="mobile-simulate" id="simulateBtnFloating" type="button">模拟整个赛季</button>
 
   <div class="season-modal" id="seasonModal" aria-hidden="true">
     <div class="season-modal-backdrop" id="seasonModalBackdrop" aria-hidden="true"></div>
@@ -2635,6 +2658,7 @@
       poolInfo: document.getElementById("poolInfo"),
       simulateBtn: document.getElementById("simulateBtn"),
       simulateBtnInline: document.getElementById("simulateBtnInline"),
+      simulateBtnFloating: document.getElementById("simulateBtnFloating"),
       rerollBtn: document.getElementById("rerollBtn"),
       clearBtn: document.getElementById("clearBtn"),
       saveBtn: document.getElementById("saveBtn"),
@@ -2919,6 +2943,9 @@
       el.selectInfo.textContent = `已选 ${selectedCount()}/5 · 当前 ${slotLabels[activeSlot]}`;
       el.simulateBtn.disabled = selectedCount() !== 5;
       el.simulateBtnInline.disabled = selectedCount() !== 5;
+      el.simulateBtnFloating.disabled = selectedCount() !== 5;
+      el.simulateBtnFloating.classList.toggle("ready", selectedCount() === 5);
+      el.simulateBtnFloating.textContent = lastResult && ratingsRevealed ? "查看赛季结果" : "模拟整个赛季";
       const positionLabel = el.posFilter.value === "all" ? "全部位置" : slotLabels[Number(el.posFilter.value) - 1];
       el.poolInfo.textContent = draft.length ? `本轮已抽 ${draft.length} 张 · 当前筛选 ${positionLabel} · 显示 ${filteredDraft().length} 张` : "先开卡包，再从候选卡里选五人";
     }
@@ -3251,13 +3278,23 @@
       return "天赋很高但结构危险";
     }
 
+    function estimatedPlayoffSeed(wins) {
+      if (wins >= 61) return 1;
+      if (wins >= 57) return 2;
+      if (wins >= 54) return 3;
+      if (wins >= 51) return 4;
+      if (wins >= 48) return 5;
+      if (wins >= 45) return 6;
+      if (wins >= 43) return 7;
+      if (wins >= 40) return 8;
+      return null;
+    }
+
     function playoffSeed(wins) {
-      if (wins >= 62) return "联盟前二种子";
-      if (wins >= 56) return "分区前二种子";
-      if (wins >= 50) return "主场优势种子";
-      if (wins >= 45) return "季后赛下半区";
-      if (wins >= 40) return "附加赛球队";
-      return "乐透区/附加赛外";
+      const seed = estimatedPlayoffSeed(wins);
+      if (!seed) return "乐透区/附加赛外";
+      if (wins < 45) return `附加赛区（晋级后第 ${seed} 种子）`;
+      return `分区第 ${seed} 种子`;
     }
 
     function logistic(value) {
@@ -3268,6 +3305,22 @@
       const p = clamp(gameProbability, .12, .88);
       const q = 1 - p;
       return clamp(35 * p ** 4 * q ** 3 + 21 * p ** 5 * q ** 2 + 7 * p ** 6 * q + p ** 7, .01, .99);
+    }
+
+    function logit(probability) {
+      const p = clamp(probability, .001, .999);
+      return Math.log(p / (1 - p));
+    }
+
+    function seriesToGameProbability(seriesProbability) {
+      let low = .01;
+      let high = .99;
+      for (let i = 0; i < 48; i += 1) {
+        const mid = (low + high) / 2;
+        if (bestOfSevenProbability(mid) < seriesProbability) low = mid;
+        else high = mid;
+      }
+      return (low + high) / 2;
     }
 
     function weightedTop(values, weights) {
@@ -3342,40 +3395,48 @@
       }
 
       const isPlayIn = r.wins < 45;
-      const roundPlan = isPlayIn
-        ? [
-            ["附加赛", 84],
-            ["首轮", 88],
-            ["分区半决赛", 91],
-            ["分区决赛", 94],
-            ["总决赛", 97]
-          ]
-        : r.wins >= 60
-          ? [["首轮", 79], ["分区半决赛", 84], ["分区决赛", 89], ["总决赛", 93]]
-          : r.wins >= 52
-            ? [["首轮", 81], ["分区半决赛", 85], ["分区决赛", 89], ["总决赛", 93]]
-            : [["首轮", 86], ["分区半决赛", 90], ["分区决赛", 94], ["总决赛", 97]];
+      const seed = estimatedPlayoffSeed(r.wins);
+      const opponentSeed = 9 - seed;
+      const firstRoundSeriesPrior = { 1: .93, 2: .91, 3: .82, 4: .56, 5: .44, 6: .18, 7: .09, 8: .07 };
+      const expectedPowerBySeed = { 1: 92, 2: 89, 3: 87, 4: 85, 5: 84, 6: 82, 7: 80, 8: 78 };
+      const laterOpponents = seed <= 2 ? [84, 89, 93] : seed <= 4 ? [85, 89, 93] : [90, 94, 97];
+      const roundPlan = [];
+      if (isPlayIn) roundPlan.push({ name: "附加赛", opponent: 84, opponentLabel: "附加赛对手", kind: "playIn" });
+      roundPlan.push({ name: "首轮", opponent: expectedPowerBySeed[opponentSeed], opponentLabel: `第 ${opponentSeed} 种子`, kind: "seededFirstRound" });
+      roundPlan.push(
+        { name: "分区半决赛", opponent: laterOpponents[0], opponentLabel: "分区半决赛对手", kind: "power" },
+        { name: "分区决赛", opponent: laterOpponents[1], opponentLabel: "分区决赛对手", kind: "power" },
+        { name: "总决赛", opponent: laterOpponents[2], opponentLabel: "另一分区冠军", kind: "power" }
+      );
 
-      const seedEdge = r.wins >= 60 ? 1.5 : r.wins >= 52 ? 1 : r.wins >= 45 ? .5 : 0;
-      const gameProbabilities = roundPlan.map(([, opponent]) => clamp(logistic((power - opponent + seedEdge) / 16), .12, .88));
-      const roundProbabilities = roundPlan.map(([name], index) => name === "附加赛" ? gameProbabilities[index] : bestOfSevenProbability(gameProbabilities[index]));
+      const seedEdge = seed <= 2 ? 1.5 : seed <= 4 ? 1 : seed <= 6 ? .5 : 0;
+      const gameProbabilities = roundPlan.map(round => {
+        if (round.kind === "seededFirstRound") {
+          const baselineGameProbability = seriesToGameProbability(firstRoundSeriesPrior[seed]);
+          const powerResidual = (power - expectedPowerBySeed[seed]) / 24;
+          return clamp(logistic(logit(baselineGameProbability) + powerResidual), .12, .88);
+        }
+        return clamp(logistic((power - round.opponent + seedEdge) / 16), .12, .88);
+      });
+      const roundProbabilities = roundPlan.map((round, index) => round.name === "附加赛" ? gameProbabilities[index] : bestOfSevenProbability(gameProbabilities[index]));
       const titleOdds = clamp(Math.round(roundProbabilities.reduce((product, probability) => product * probability, 1) * 100), 1, 55);
 
       const rounds = [];
       let alive = true;
-      roundPlan.forEach(([name, opponent], index) => {
+      roundPlan.forEach((round, index) => {
         if (!alive) return;
+        const { name, opponentLabel } = round;
         const probability = roundProbabilities[index];
         const gameProbability = gameProbabilities[index];
         let teamWins = 0;
         let opponentWins = 0;
         if (name === "附加赛") {
-          const roll = seededNoise(`${list.map(c => c.id).join("-")}|${r.era}|${name}|game-1|playoff-v3`);
+          const roll = seededNoise(`${list.map(c => c.id).join("-")}|${r.era}|${name}|game-1|playoff-v4-seeded-bracket`);
           if (roll < gameProbability) teamWins = 1;
           else opponentWins = 1;
         } else {
           for (let game = 1; game <= 7 && teamWins < 4 && opponentWins < 4; game += 1) {
-            const roll = seededNoise(`${list.map(c => c.id).join("-")}|${r.era}|${name}|game-${game}|playoff-v3`);
+            const roll = seededNoise(`${list.map(c => c.id).join("-")}|${r.era}|${name}|game-${game}|playoff-v4-seeded-bracket`);
             if (roll < gameProbability) teamWins += 1;
             else opponentWins += 1;
           }
@@ -3386,11 +3447,12 @@
           name,
           result: games,
           status: win ? "win" : "loss",
+          opponentLabel,
           probability: Number(probability.toFixed(4)),
           gameProbability: Number(gameProbability.toFixed(4)),
           note: name === "附加赛"
             ? `单场晋级率 ${Math.round(gameProbability * 100)}%`
-            : `单场胜率 ${Math.round(gameProbability * 100)}% · 系列赛晋级率 ${Math.round(probability * 100)}%`
+            : `${name === "首轮" ? `对阵${opponentLabel} · ` : ""}单场胜率 ${Math.round(gameProbability * 100)}% · 系列赛晋级率 ${Math.round(probability * 100)}%${name === "首轮" ? seed < opponentSeed ? ` · 爆冷风险 ${Math.round((1 - probability) * 100)}%` : ` · 爆冷机会 ${Math.round(probability * 100)}%` : ""}`
         });
         alive = win;
       });
@@ -3795,6 +3857,7 @@
     el.loadBtn.addEventListener("click", loadGame);
     el.simulateBtn.addEventListener("click", () => simulate());
     el.simulateBtnInline.addEventListener("click", () => simulate());
+    el.simulateBtnFloating.addEventListener("click", () => lastResult && ratingsRevealed ? openResultModal(lastResult) : simulate());
     el.seasonModalBackdrop.addEventListener("click", closeResultModal);
     el.seasonModalClose.addEventListener("click", closeResultModal);
     el.seasonModalDone.addEventListener("click", closeResultModal);

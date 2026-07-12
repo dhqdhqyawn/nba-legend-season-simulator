@@ -306,7 +306,7 @@
 <body>
   <main class="page">
     <header class="hero">
-      <span class="eyebrow">当前版本：球员评分 v1-calibrated · 阵容模型 v3</span>
+      <span class="eyebrow">当前版本：球员评分 v1-calibrated · 阵容模型 v4-seeded</span>
       <h1>NBA 时刻卡模拟器评分模型说明</h1>
       <p class="lead">
         这个模型不是用真实历史球队样本训练出来的机器学习模型，而是一个基于篮球知识构造的
@@ -760,7 +760,7 @@ talent
 
     <div class="grid">
       <section>
-        <h2>八、季后赛模型 v3</h2>
+        <h2>八、季后赛模型 v4：显式种子对阵</h2>
         <p>
           季后赛层不再把综合进攻、综合防守与它们的子项同时加入，避免重复计权。模型直接从互相区分的
           进攻与防守组件构造 playoff offense 和 playoff defense；常规赛胜场只决定种子与对手路径，
@@ -808,7 +808,17 @@ playoffRimPressure
           rotationTalent 只使用一次五人排序加权 OVR，识别五个位置都没有明显短板的阵容；关键球员与主攻手
           使用平滑 sigmoid 得分，不再用“达到阈值突然加一分”的硬切规则。
         </p>
-        <div class="formula">p(single game)
+        <div class="formula">estimatedSeed = f(regularSeasonWins)
+firstRoundOpponentSeed = 9 - estimatedSeed
+
+firstRoundPrior(series)
+= {1v8: 93%, 2v7: 91%, 3v6: 82%, 4v5: 56%}
+
+logit(p(first-round game))
+= logit(inverseBestOfSeven(seedPrior))
++ (playoffPower - expectedPowerForSeed) / 24
+
+p(later-round game)
 = clip(logistic((power - opponentStrength + seedEdge) / 16), 0.12, 0.88)
 
 p(best of seven)
@@ -818,8 +828,16 @@ titleOdds
 = p(round 1) * p(round 2) * p(round 3) * p(Finals)
 titleOdds is capped at 55%</div>
         <p>
-          页面中的系列赛会逐场模拟，先到四胜晋级；比分、单场胜率与七场系列赛晋级率来自同一套概率。
-          同一阵容和时代仍使用固定种子，因此结果可复现，但不再是一轮只抽一次的伯努利事件。
+          首轮不再让所有高种子面对同一个固定强度：模型先依据胜场映射 1 到 8 号种子，再明确生成 1/8、2/7、3/6 或 4/5 对阵。
+          历史先验决定该种子对阵的基准概率，阵容的 playoffPower 只对基准作连续修正。1/8 基准参考
+          <a href="https://www.nba.com/magic/history-no-1-vs-no-8-nba-playoffs-20200810" target="_blank" rel="noreferrer">NBA 官方统计</a>中
+          1 号种子截至 2020 年取得 67 胜 5 负的首轮系列赛记录；2/7 基准参考
+          <a href="https://www.nba.com/news/the-athletic-warriors-validate-jimmy-butler-trade-with-playoff-series-upset-over-rockets" target="_blank" rel="noreferrer">16 队季后赛时代的历史爆冷次数</a>。
+          页面会直接展示对手种子、晋级率与爆冷风险。
+        </p>
+        <p>
+          页面中的系列赛仍逐场模拟，先到四胜晋级；比分、单场胜率与七场系列赛晋级率来自同一套概率。
+          同一阵容和时代使用固定模拟种子，因此结果可复现，但不是一轮只抽一次的伯努利事件。
         </p>
       </section>
 
@@ -1020,13 +1038,13 @@ impact =
 
     <section class="accent green">
       <h2>十三、落地顺序</h2>
-      <p>当前阵容层模型已切到 derived-v3：保留 derived-v1-calibrated 球员分，并用固定阵容回归集约束胜场和季后赛改动。后面继续补真实组件。</p>
+      <p>当前阵容层模型已切到 derived-v4-seeded：保留 derived-v1-calibrated 球员分，并用固定阵容回归集约束胜场、种子对阵和季后赛改动。后面继续补真实组件。</p>
       <div class="flow">
         <div class="step"><b>Done</b><span>保留现有人工字段为 manual，同时启用 derived-v1 作为主评分。</span></div>
         <div class="step"><b>Done</b><span>加入固定阵容回归基准、饱和胜场曲线和四轮概率化季后赛。</span></div>
         <div class="step"><b>Next</b><span>新增真实组件字段：USG%、AST%、TRB%、DBPM、3PAr 等。</span></div>
         <div class="step"><b>Next</b><span>球员库里同时展示 manual 分和 derived 分的差异，方便审查异常。</span></div>
-        <div class="step"><b>Next</b><span>用历史球队胜场/SRS 与系列赛结果校准阵容模型 derived-v3 的权重和概率映射。</span></div>
+        <div class="step"><b>Next</b><span>继续用历史球队胜场、SRS、种子与系列赛结果校准 derived-v4-seeded 的概率映射。</span></div>
         <div class="step"><b>Step 4</b><span>对边界球员做人审：比如罗德曼、追梦、穆托姆博这类 box score 低估型球员。</span></div>
         <div class="step"><b>Step 5</b><span>输出每张卡的评分解释：为什么 shoot 是 96，为什么 def 是 99。</span></div>
       </div>
