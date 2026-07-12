@@ -781,7 +781,7 @@ talent
           每一轮先把球队 power 与该轮对手强度转换成独立晋级概率：
         </p>
         <div class="formula">p(round win)
-= clip(logistic((power - opponentStrength + 3.25) / 8), 0.08, 0.92)
+= clip(logistic((power - opponentStrength + 2.00) / 8), 0.08, 0.92)
 
 titleOdds
 = p(round 1) * p(round 2) * p(round 3) * p(Finals)
@@ -791,7 +791,7 @@ titleOdds is capped at 55%</div>
           防守强但进攻不足的球队也不会再因为高阶影响力重复计权而轻易横扫夺冠。
         </p>
         <div class="callout">
-          其中 3.25 是统一的系列赛校准截距：它只把所有球队的单轮晋级概率曲线整体上移，不改变球队排序，
+          其中 2.00 是统一的系列赛校准截距：它只把所有球队的单轮晋级概率曲线整体上移，不改变球队排序，
           也不取消四轮连乘。这个修正用于纠正旧版对手强度刻度偏高、争冠队夺冠概率普遍过低的问题。
         </div>
       </section>
