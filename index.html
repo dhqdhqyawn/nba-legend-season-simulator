@@ -2050,7 +2050,7 @@
 
         <section class="panel model">
           <b>模型说明</b><br />
-          当前使用“球员评分 derived-v1-calibrated + 阵容模型 derived-v4-seeded”：前者由 PPG/TS%/PER/BPM/VORP/WS48、位置、archetype、荣誉与角色标签生成能力分；后者使用时代化组件权重计算胜场，并用种子对阵先验与阵容季后赛实力计算七场系列赛。2KDB/MyTeam 只用于卡面与版本视觉，不参与属性评分。<br />
+          当前使用“球员评分 derived-v1-calibrated + 阵容模型 derived-v5-stability”：前者由 PPG/TS%/PER/BPM/VORP/WS48、位置、archetype、荣誉与角色标签生成能力分；后者使用时代化组件权重计算胜场，并用种子对阵先验与阵容季后赛实力计算七场系列赛。2KDB/MyTeam 只用于卡面与版本视觉，不参与属性评分。<br />
           <a href="scoring-model.html" target="_blank" rel="noreferrer" style="color:#e4af3f;font-weight:900">模型说明</a>
           <span style="color:#bdb6aa"> · </span>
           <a href="rating-audit.html" target="_blank" rel="noreferrer" style="color:#e4af3f;font-weight:900">评分审计</a>
@@ -3577,6 +3577,20 @@
       return clamp(35 * p ** 4 * q ** 3 + 21 * p ** 5 * q ** 2 + 7 * p ** 6 * q + p ** 7, .01, .99);
     }
 
+    function seriesScoreProbability(gameProbability, teamWins, opponentWins) {
+      const p = clamp(gameProbability, .12, .88);
+      const q = 1 - p;
+      if (teamWins === 4 && opponentWins >= 0 && opponentWins <= 3) {
+        const combinations = [1, 4, 10, 20][opponentWins];
+        return combinations * p ** 4 * q ** opponentWins;
+      }
+      if (opponentWins === 4 && teamWins >= 0 && teamWins <= 3) {
+        const combinations = [1, 4, 10, 20][teamWins];
+        return combinations * p ** teamWins * q ** 4;
+      }
+      return 0;
+    }
+
     function logit(probability) {
       const p = clamp(probability, .001, .999);
       return Math.log(p / (1 - p));
@@ -3683,10 +3697,10 @@
       const gameProbabilities = roundPlan.map(round => {
         if (round.kind === "seededFirstRound") {
           const baselineGameProbability = seriesToGameProbability(firstRoundSeriesPrior[seed]);
-          const powerResidual = (power - expectedPowerBySeed[seed]) / 24;
+          const powerResidual = (power - expectedPowerBySeed[seed]) / 12;
           return clamp(logistic(logit(baselineGameProbability) + powerResidual), .12, .88);
         }
-        return clamp(logistic((power - round.opponent + seedEdge) / 16), .12, .88);
+        return clamp(logistic((power - round.opponent + seedEdge) / 12), .12, .88);
       });
       const roundProbabilities = roundPlan.map((round, index) => round.name === "附加赛" ? gameProbabilities[index] : bestOfSevenProbability(gameProbabilities[index]));
       const titleOdds = clamp(Math.round(roundProbabilities.reduce((product, probability) => product * probability, 1) * 100), 1, 55);
@@ -3720,6 +3734,7 @@
           opponentLabel,
           probability: Number(probability.toFixed(4)),
           gameProbability: Number(gameProbability.toFixed(4)),
+          scoreProbability: name === "附加赛" ? Number((win ? gameProbability : 1 - gameProbability).toFixed(4)) : Number(seriesScoreProbability(gameProbability, teamWins, opponentWins).toFixed(4)),
           note: name === "附加赛"
             ? `单场晋级率 ${Math.round(gameProbability * 100)}%`
             : `${name === "首轮" ? `对阵${opponentLabel} · ` : ""}单场胜率 ${Math.round(gameProbability * 100)}% · 系列赛晋级率 ${Math.round(probability * 100)}%${name === "首轮" ? seed < opponentSeed ? ` · 爆冷风险 ${Math.round((1 - probability) * 100)}%` : ` · 爆冷机会 ${Math.round(probability * 100)}%` : ""}`
@@ -3797,21 +3812,25 @@
       const structureGap = Math.round(Math.abs(keyStructure.value - 84));
       const structurePositive = keyStructure.value >= 84;
       const structureReason = {
-        title: structurePositive ? "最主要的结构优势" : "最主要的结构短板",
-        detail: `${keyStructure.label} ${Math.round(keyStructure.value)}，${structurePositive ? "高于" : "低于"}模型中性线 84 共 ${structureGap} 分。${structurePositive ? keyStructure.good : keyStructure.bad}`,
-        impact: structurePositive ? "主要加分项" : "主要扣分项"
+        title: structurePositive ? "模型中的最大优势" : "模型中的相对短板",
+        detail: `${keyStructure.label} ${Math.round(keyStructure.value)}，${structurePositive ? "高于" : "低于"}模型中性线 84 共 ${structureGap} 分。${structurePositive ? keyStructure.good : keyStructure.bad}这项已经计入球队实力和晋级率，不等于某轮实际赛果的直接原因。`,
+        impact: "已计入实力分"
       };
 
       const playoffRounds = r.playoff?.rounds || [];
       const decisiveRound = playoffRounds[playoffRounds.length - 1];
+      const exactScorePercent = (decisiveRound?.scoreProbability || 0) * 100;
+      const exactScoreLabel = exactScorePercent > 0 && exactScorePercent < 10 ? exactScorePercent.toFixed(1) : Math.round(exactScorePercent);
       const playoffReason = decisiveRound?.name === "常规赛结束" ? {
         title: "为什么没有进入季后赛",
         detail: `球队只取得 ${r.wins} 胜，低于模型设置的 40 胜季后赛门槛，因此没有生成首轮系列赛。`,
         impact: "附加赛外"
       } : decisiveRound ? {
-        title: decisiveRound.status === "loss" ? `${decisiveRound.name}为什么出局` : `${decisiveRound.name}结果如何产生`,
-        detail: `赛前晋级率 ${Math.round((decisiveRound.probability || 0) * 100)}%，实际比分 ${decisiveRound.result}。${decisiveRound.status === "loss" ? `本次落在约 ${Math.round((1 - decisiveRound.probability) * 100)}% 的出局区间。` : `本次兑现了约 ${Math.round((decisiveRound.probability || 0) * 100)}% 的晋级区间。`}`,
-        impact: decisiveRound.opponentLabel || r.playoff.seed
+        title: decisiveRound.status === "loss" && decisiveRound.probability >= .65 ? "强队为什么仍然出局" : decisiveRound.status === "loss" ? `${decisiveRound.name}出局如何产生` : `${decisiveRound.name}结果如何产生`,
+        detail: decisiveRound.status === "loss"
+          ? `赛前晋级率 ${Math.round((decisiveRound.probability || 0) * 100)}%，输掉整轮的概率约 ${Math.round((1 - decisiveRound.probability) * 100)}%。实际比分 ${decisiveRound.result}${exactScorePercent ? `，恰好出现这个比分的概率约 ${exactScoreLabel}%` : ""}。${decisiveRound.probability >= .65 ? "球队仍是明显热门，本次固定赛季抽样落入了冷门尾部。" : "这个结果处在模型允许的正常出局区间。"}`
+          : `赛前晋级率 ${Math.round((decisiveRound.probability || 0) * 100)}%，实际比分 ${decisiveRound.result}${exactScorePercent ? `，恰好出现这个比分的概率约 ${exactScoreLabel}%` : ""}。本次固定赛季抽样兑现了晋级结果。`,
+        impact: decisiveRound.status === "loss" && decisiveRound.probability >= .65 ? "低概率冷门" : (decisiveRound.opponentLabel || r.playoff.seed)
       } : {
         title: "季后赛路径",
         detail: "常规赛胜场不足，未生成七场系列赛。",

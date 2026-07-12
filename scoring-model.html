@@ -816,10 +816,10 @@ firstRoundPrior(series)
 
 logit(p(first-round game))
 = logit(inverseBestOfSeven(seedPrior))
-+ (playoffPower - expectedPowerForSeed) / 24
++ (playoffPower - expectedPowerForSeed) / 12
 
 p(later-round game)
-= clip(logistic((power - opponentStrength + seedEdge) / 16), 0.12, 0.88)
+= clip(logistic((power - opponentStrength + seedEdge) / 12), 0.12, 0.88)
 
 p(best of seven)
 = sum[C(7,k) * p^k * (1-p)^(7-k)], k = 4...7
@@ -827,6 +827,12 @@ p(best of seven)
 titleOdds
 = p(round 1) * p(round 2) * p(round 3) * p(Finals)
 titleOdds is capped at 55%</div>
+        <p>
+          四轮概率相乘不是额外惩罚，而是条件概率的链式法则：球队必须连续通过四轮才能夺冠。
+          即使每轮都有 90% 晋级率，四轮全部通过也只有 0.9⁴ = 65.6%。derived-v5-stability 保留这条概率原则，
+          但把后续轮次的实力差距尺度从 16 收紧到 12，同时把首轮实力残差尺度从 24 收紧到 12，
+          让 PO 强度明显领先的球队获得更符合直觉的单轮优势，而不是被普通种子的历史均值压平。
+        </p>
         <p>
           首轮不再让所有高种子面对同一个固定强度：模型先依据胜场映射 1 到 8 号种子，再明确生成 1/8、2/7、3/6 或 4/5 对阵。
           历史先验决定该种子对阵的基准概率，阵容的 playoffPower 只对基准作连续修正。1/8 基准参考
@@ -837,7 +843,8 @@ titleOdds is capped at 55%</div>
         </p>
         <p>
           页面中的系列赛仍逐场模拟，先到四胜晋级；比分、单场胜率与七场系列赛晋级率来自同一套概率。
-          同一阵容和时代使用固定模拟种子，因此结果可复现，但不是一轮只抽一次的伯努利事件。
+          同一阵容和时代使用固定模拟种子，因此结果可复现，但不是一轮只抽一次的伯努利事件。结果解释会分别展示
+          “输掉整轮的概率”和“恰好出现当前比分的概率”，避免把两者混为一谈。
         </p>
       </section>
 
@@ -1038,13 +1045,13 @@ impact =
 
     <section class="accent green">
       <h2>十三、落地顺序</h2>
-      <p>当前阵容层模型已切到 derived-v4-seeded：保留 derived-v1-calibrated 球员分，并用固定阵容回归集约束胜场、种子对阵和季后赛改动。后面继续补真实组件。</p>
+      <p>当前阵容层模型已切到 derived-v5-stability：保留 derived-v1-calibrated 球员分，并用固定阵容回归集约束胜场、种子对阵和季后赛改动。后面继续补真实组件。</p>
       <div class="flow">
         <div class="step"><b>Done</b><span>保留现有人工字段为 manual，同时启用 derived-v1 作为主评分。</span></div>
         <div class="step"><b>Done</b><span>加入固定阵容回归基准、饱和胜场曲线和四轮概率化季后赛。</span></div>
         <div class="step"><b>Next</b><span>新增真实组件字段：USG%、AST%、TRB%、DBPM、3PAr 等。</span></div>
         <div class="step"><b>Next</b><span>球员库里同时展示 manual 分和 derived 分的差异，方便审查异常。</span></div>
-        <div class="step"><b>Next</b><span>继续用历史球队胜场、SRS、种子与系列赛结果校准 derived-v4-seeded 的概率映射。</span></div>
+        <div class="step"><b>Next</b><span>继续用历史球队胜场、SRS、种子与系列赛结果校准 derived-v5-stability 的概率映射。</span></div>
         <div class="step"><b>Step 4</b><span>对边界球员做人审：比如罗德曼、追梦、穆托姆博这类 box score 低估型球员。</span></div>
         <div class="step"><b>Step 5</b><span>输出每张卡的评分解释：为什么 shoot 是 96，为什么 def 是 99。</span></div>
       </div>
