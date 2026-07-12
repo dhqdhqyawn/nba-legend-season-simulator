@@ -3283,7 +3283,8 @@
             ? [["首轮", 81], ["分区半决赛", 85], ["分区决赛", 89], ["总决赛", 93]]
             : [["首轮", 86], ["分区半决赛", 90], ["分区决赛", 94], ["总决赛", 97]];
 
-      const roundProbabilities = roundPlan.map(([, opponent]) => clamp(1 / (1 + Math.exp((opponent - power) / 8)), .08, .92));
+      const seriesCalibration = 3.25;
+      const roundProbabilities = roundPlan.map(([, opponent]) => clamp(1 / (1 + Math.exp((opponent - power - seriesCalibration) / 8)), .08, .92));
       const titleOdds = clamp(Math.round(roundProbabilities.reduce((product, probability) => product * probability, 1) * 100), 1, 55);
 
       const rounds = [];
