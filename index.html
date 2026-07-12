@@ -3703,7 +3703,7 @@
         return clamp(logistic((power - round.opponent + seedEdge) / 12), .12, .88);
       });
       const roundProbabilities = roundPlan.map((round, index) => round.name === "附加赛" ? gameProbabilities[index] : bestOfSevenProbability(gameProbabilities[index]));
-      const titleOdds = clamp(Math.round(roundProbabilities.reduce((product, probability) => product * probability, 1) * 100), 1, 55);
+      const titleOdds = clamp(Math.round(roundProbabilities.reduce((product, probability) => product * probability, 1) * 100), 1, 99);
 
       const rounds = [];
       let alive = true;
