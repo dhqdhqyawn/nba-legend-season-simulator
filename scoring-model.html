@@ -929,10 +929,10 @@ TS% = f(real_ts, team_spacing, team_fit)</div>
     </section>
 
     <section>
-      <h2>十一、球员评分层：derived-v1-calibrated</h2>
+      <h2>十一、球员评分层：derived-v1.1-defense-evidence</h2>
       <p>
         现在模拟器已经不再直接使用原来的人工字段作为主评分。原来的 ovr/off/def/pass/shoot/finish/reb/space/usage/impact
-        已经保存在 card.manual 里作为备份；页面展示与阵容模型输入使用 derived-v1-calibrated 生成分。
+        已经保存在 card.manual 里作为备份；页面展示与阵容模型输入使用 derived-v1.1-defense-evidence 生成分。
         derived-v1 的输入是现有卡库已经有的真实赛季锚点：PPG、TS%、PER、WS/48、BPM、VORP，
         再叠加位置、archetype、荣誉标签和角色标签校准。
       </p>
@@ -942,6 +942,25 @@ TS% = f(real_ts, team_spacing, team_fit)</div>
         由于当前卡库还没有 USG%、AST%、TRB%、DBPM、3PAr 等更细字段，derived-v1 仍然是 proxy 模型，
         但它已经比直接手填能力分更可解释、可复算。
       </div>
+      <div class="formula">defenseEvidenceFloor
+= max(
+    manual.def - 4,
+    DPOY ? 95 : 0,
+    All-Defense First Team ? 91 : 0,
+    All-Defense Second Team ? 87 : 0,
+    pointStopper ? 86 : 0,
+    defAnchor ? 88 : 0,
+    twoWayWing ? 82 : 0,
+    explicit 3-and-D / stopper evidence ? 84 : 0
+  )
+
+derived.def = max(calibrated.def, defenseEvidenceFloor)</div>
+      <p>
+        防守单独设置证据下限，是因为当前输入只有总 BPM 和 WS/48，没有 DBPM、D-EPM、D-LEBRON 等防守专属变量；
+        让通用高阶数据把一名已获一防/二防的球员大幅下调，会产生系统性测量误差。当季一防/二防证据按
+        <a href="https://www.nba.com/news/history-all-defensive-team" target="_blank" rel="noreferrer">NBA 官方逐年最佳防守阵容</a>
+        核对。该规则是信息不足时的保守约束，不代表奖项本身等于完整防守能力。
+      </p>
       <table class="table">
         <thead>
           <tr><th>目标字段</th><th>建议真实数据组件</th><th>公式思路</th><th>现在缺什么</th></tr>
@@ -1073,7 +1092,7 @@ impact =
 
     <section class="accent green">
       <h2>十三、落地顺序</h2>
-      <p>当前阵容层模型已切到 derived-v6-positional-defense：保留 derived-v1-calibrated 球员分，并用实际站位防守、固定阵容对照组和季后赛概率回归约束每次改动。后面继续补真实组件。</p>
+      <p>当前阵容层模型已切到 derived-v6-positional-defense：使用 derived-v1.1-defense-evidence 球员分，并用实际站位防守、固定阵容对照组和季后赛概率回归约束每次改动。后面继续补真实组件。</p>
       <div class="flow">
         <div class="step"><b>Done</b><span>保留现有人工字段为 manual，同时启用 derived-v1 作为主评分。</span></div>
         <div class="step"><b>Done</b><span>加入哈登/科比与佩顿/科比对照组，约束领防提升不能错误改写护框；加入 82 胜极端软尾部测试。</span></div>

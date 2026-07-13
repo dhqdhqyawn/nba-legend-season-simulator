@@ -2050,7 +2050,7 @@
 
         <section class="panel model">
           <b>模型说明</b><br />
-          当前使用“球员评分 derived-v1-calibrated + 阵容模型 derived-v6-positional-defense”：前者由 PPG/TS%/PER/BPM/VORP/WS48、位置、archetype、荣誉与角色标签生成能力分；后者按实际站位聚合防守组件、使用时代化权重计算胜场，并用种子对阵先验与阵容季后赛实力计算七场系列赛。2KDB/MyTeam 只用于卡面与版本视觉，不参与属性评分。<br />
+          当前使用“球员评分 derived-v1.1-defense-evidence + 阵容模型 derived-v6-positional-defense”：前者由 PPG/TS%/PER/BPM/VORP/WS48、位置、archetype、荣誉与角色标签生成能力分，并用官方防阵/DPOY与明确防守角色保护防守评分；后者按实际站位聚合防守组件、使用时代化权重计算胜场，并用种子对阵先验与阵容季后赛实力计算七场系列赛。2KDB/MyTeam 只用于卡面与版本视觉，不参与属性评分。<br />
           <a href="scoring-model.html" target="_blank" rel="noreferrer" style="color:#e4af3f;font-weight:900">模型说明</a>
           <span style="color:#bdb6aa"> · </span>
           <a href="rating-audit.html" target="_blank" rel="noreferrer" style="color:#e4af3f;font-weight:900">评分审计</a>
@@ -2421,22 +2421,22 @@
 
     const rawCards = [
       ["Michael Jordan","1987-88 DPOY Scoring King","Bulls","SG","twoWayWing",98,99,98,88,86,97,78,94,96,99,31.7,.603,31.7,.308,13.0,12.5,["MVP","DPOY","得分王"]],
-      ["Michael Jordan","1990-91 First Ring","Bulls","SG","twoWayWing",99,99,96,89,88,98,77,93,97,99,31.5,.605,32.0,.321,12.0,10.8,["MVP","冠军核心","Finals MVP"]],
-      ["Michael Jordan","1995-96 72 Win Revenge","Bulls","SG","twoWayWing",98,98,97,86,90,95,76,92,95,99,30.4,.582,29.4,.317,9.8,8.6,["MVP","72胜","冠军核心"]],
-      ["Scottie Pippen","1993-94 Point Forward","Bulls","SF","connector",94,88,97,92,83,88,86,83,86,94,22.0,.544,23.2,.194,7.7,7.8,["一阵","组织前锋","防守"]],
+      ["Michael Jordan","1990-91 First Ring","Bulls","SG","twoWayWing",99,99,96,89,88,98,77,93,97,99,31.5,.605,32.0,.321,12.0,10.8,["MVP","冠军核心","Finals MVP","一防"]],
+      ["Michael Jordan","1995-96 72 Win Revenge","Bulls","SG","twoWayWing",98,98,97,86,90,95,76,92,95,99,30.4,.582,29.4,.317,9.8,8.6,["MVP","72胜","冠军核心","一防"]],
+      ["Scottie Pippen","1993-94 Point Forward","Bulls","SF","connector",94,88,97,92,83,88,86,83,86,94,22.0,.544,23.2,.194,7.7,7.8,["一阵","组织前锋","防守","一防"]],
       ["Dennis Rodman","1991-92 Rebound Apex","Pistons","PF","defAnchor",91,66,97,72,46,69,99,40,48,89,9.8,.572,17.8,.168,2.7,3.8,["篮板王","DPOY级","蓝领神卡"]],
       ["Hakeem Olajuwon","1993-94 MVP Dream","Rockets","C","defAnchor",97,96,99,78,68,94,95,74,84,98,27.3,.565,25.3,.210,7.0,7.3,["MVP","DPOY","冠军核心"]],
       ["Hakeem Olajuwon","1994-95 Playoff Dream","Rockets","C","defAnchor",96,95,98,77,70,94,94,75,84,98,27.8,.563,26.0,.177,6.8,6.0,["Finals MVP","脚步大师","护框"]],
       ["Shaquille O'Neal","1994-95 Magic Finals Run","Magic","C","interiorHub",94,96,84,70,44,99,95,30,95,94,29.3,.602,28.6,.230,7.0,6.2,["年轻鲨鱼","总决赛"]],
-      ["Shaquille O'Neal","1999-00 MVP Diesel","Lakers","C","interiorHub",98,99,87,74,42,100,96,25,99,99,29.7,.578,30.6,.283,9.3,9.0,["MVP","冠军核心","禁区统治"]],
+      ["Shaquille O'Neal","1999-00 MVP Diesel","Lakers","C","interiorHub",98,99,87,74,42,100,96,25,99,99,29.7,.578,30.6,.283,9.3,9.0,["MVP","冠军核心","禁区统治","二防"]],
       ["Shaquille O'Neal","2001-02 Threepeat","Lakers","C","interiorHub",96,98,84,72,40,99,94,24,97,98,27.2,.590,29.7,.262,7.2,6.0,["三连冠","Finals MVP"]],
-      ["Kobe Bryant","2000-01 Afro Kobe","Lakers","SG","shotCreator",94,96,91,84,82,96,73,86,88,94,28.5,.552,24.5,.196,5.3,5.8,["冠军二当家","爆发"]],
+      ["Kobe Bryant","2000-01 Afro Kobe","Lakers","SG","shotCreator",94,96,91,84,82,96,73,86,88,94,28.5,.552,24.5,.196,5.3,5.8,["冠军二当家","爆发","二防"]],
       ["Kobe Bryant","2005-06 81 Point Season","Lakers","SG","shotCreator",97,100,91,82,85,98,70,88,99,96,35.4,.559,28.0,.224,6.4,6.5,["得分王","81分","高使用率","一防"]],
       ["Kobe Bryant","2007-08 MVP","Lakers","SG","shotCreator",97,98,90,86,87,95,73,90,93,97,28.3,.576,24.2,.208,5.8,6.3,["MVP","总决赛","一防"]],
-      ["Kobe Bryant","2009-10 Fifth Ring","Lakers","SG","shotCreator",94,96,88,84,85,92,71,87,91,93,27.0,.545,21.9,.160,4.7,4.3,["冠军核心","关键球"]],
-      ["Tim Duncan","2002-03 MVP Champion","Spurs","PF/C","defAnchor",97,95,99,80,73,91,98,78,86,99,23.3,.564,26.9,.248,7.6,7.8,["MVP","冠军核心","护框"]],
-      ["Tim Duncan","2006-07 Title Anchor","Spurs","PF/C","defAnchor",94,91,98,78,70,89,96,72,80,96,20.0,.579,26.1,.230,6.2,6.0,["冠军核心","防守中轴"]],
-      ["David Robinson","1994-95 MVP Admiral","Spurs","C","defAnchor",96,97,99,76,70,95,96,72,90,97,27.6,.602,29.1,.273,10.7,8.7,["MVP","盖帽","海军上将"]],
+      ["Kobe Bryant","2009-10 Fifth Ring","Lakers","SG","shotCreator",94,96,88,84,85,92,71,87,91,93,27.0,.545,21.9,.160,4.7,4.3,["冠军核心","关键球","一防"]],
+      ["Tim Duncan","2002-03 MVP Champion","Spurs","PF/C","defAnchor",97,95,99,80,73,91,98,78,86,99,23.3,.564,26.9,.248,7.6,7.8,["MVP","冠军核心","护框","一防"]],
+      ["Tim Duncan","2006-07 Title Anchor","Spurs","PF/C","defAnchor",94,91,98,78,70,89,96,72,80,96,20.0,.579,26.1,.230,6.2,6.0,["冠军核心","防守中轴","一防"]],
+      ["David Robinson","1994-95 MVP Admiral","Spurs","C","defAnchor",96,97,99,76,70,95,96,72,90,97,27.6,.602,29.1,.273,10.7,8.7,["MVP","盖帽","海军上将","一防"]],
       ["Karl Malone","1996-97 MVP Mailman","Jazz","PF","interiorHub",95,97,85,78,70,96,91,75,88,96,27.4,.600,28.9,.268,8.0,7.8,["MVP","挡拆终结"]],
       ["John Stockton","1989-90 Assist Machine","Jazz","PG","floorGeneral",94,90,87,99,84,80,58,86,75,97,17.2,.607,23.9,.214,8.1,6.8,["助攻王","抢断王","控场"]],
       ["Charles Barkley","1992-93 MVP Suns","Suns","PF","interiorHub",96,97,82,84,75,96,96,78,91,95,25.6,.596,25.9,.242,8.0,7.1,["MVP","篮板怪","转换"]],
@@ -2445,28 +2445,28 @@
       ["Chris Mullin","1990-91 Run TMC Shooter","Warriors","SF/SG","movementShooter",91,94,76,82,96,86,70,98,82,90,25.7,.604,23.9,.190,4.8,5.0,["Run TMC","左手射手","全明星"]],
       ["Mitch Richmond","1996-97 Rock Scorer","Kings","SG","shotCreator",90,93,76,74,88,86,62,90,84,86,25.9,.558,19.8,.140,3.2,3.6,["强壮分卫","国王核心","全明星"]],
       ["Tim Hardaway","1996-97 Heat Crossover","Heat","PG","floorGeneral",90,90,78,94,88,82,48,90,80,88,20.3,.556,21.5,.174,4.6,4.7,["杀手变向","热火核心","组织"]],
-      ["Joe Dumars","1988-89 Finals MVP Guard","Pistons","SG/PG","pointStopper",90,87,94,84,84,82,50,86,66,92,17.2,.571,17.8,.170,3.6,3.8,["Finals MVP","后场领防","坏孩子"]],
+      ["Joe Dumars","1988-89 Finals MVP Guard","Pistons","SG/PG","pointStopper",90,87,94,84,84,82,50,86,66,92,17.2,.571,17.8,.170,3.6,3.8,["Finals MVP","后场领防","坏孩子","一防"]],
       ["Gary Payton","1995-96 Glove DPOY","Sonics","PG","pointStopper",93,88,98,91,80,82,63,82,78,95,19.3,.538,21.6,.182,5.8,6.3,["DPOY","控卫防守","总决赛"]],
       ["Shawn Kemp","1995-96 Reign Man","Sonics","PF","verticalBig",91,90,84,70,50,95,91,54,82,89,19.6,.631,22.6,.205,3.9,4.2,["暴扣","总决赛"]],
       ["Allen Iverson","2000-01 MVP Answer","76ers","PG/SG","shotCreator",95,98,78,82,80,94,55,82,98,93,31.1,.518,24.0,.190,4.8,4.5,["MVP","得分王","孤胆英雄"]],
       ["Vince Carter","2000-01 Half Man","Raptors","SG/SF","shotCreator",92,94,80,78,86,97,68,88,88,91,27.6,.551,25.0,.189,5.1,5.7,["扣篮王","锋卫摇摆"]],
       ["Tracy McGrady","2002-03 Scoring Apex","Magic","SG/SF","shotCreator",95,98,82,84,86,95,70,88,96,93,32.1,.564,30.3,.262,9.7,7.4,["得分王","魔术大核"]],
       ["Tracy McGrady","2004-05 Rockets Carry","Rockets","SG/SF","shotCreator",94,96,80,84,86,93,72,88,94,92,25.7,.526,22.9,.143,5.8,5.3,["火箭核心","持球得分","锋卫摇摆"]],
-      ["Kevin Garnett","2003-04 MVP Big Ticket","Timberwolves","PF/C","defAnchor",97,94,99,88,78,90,100,82,88,99,24.2,.547,29.4,.272,10.0,9.9,["MVP","DPOY级","全能内线"]],
+      ["Kevin Garnett","2003-04 MVP Big Ticket","Timberwolves","PF/C","defAnchor",97,94,99,88,78,90,100,82,88,99,24.2,.547,29.4,.272,10.0,9.9,["MVP","DPOY级","全能内线","一防"]],
       ["Kevin Garnett","2007-08 Celtics DPOY","Celtics","PF/C","defAnchor",95,88,100,82,74,86,94,78,72,97,18.8,.588,25.3,.265,7.4,5.5,["DPOY","冠军防守","换防中轴"]],
-      ["Kevin Garnett","1999-00 Young Wolf","Timberwolves","PF/C","connector",93,91,94,84,76,92,95,78,84,94,22.9,.545,23.6,.172,5.7,5.4,["全能前锋","篮板支点","防守核心"]],
+      ["Kevin Garnett","1999-00 Young Wolf","Timberwolves","PF/C","connector",93,91,94,84,76,92,95,78,84,94,22.9,.545,23.6,.172,5.7,5.4,["全能前锋","篮板支点","防守核心","一防"]],
       ["Karl-Anthony Towns","2021-22 Wolves Stretch Five","Timberwolves","C/PF","stretchBig",91,94,72,74,94,90,94,96,82,88,24.6,.642,24.1,.204,5.0,4.4,["空间五号","三分大个","篮板支点"]],
       ["Karl-Anthony Towns","2025-26 Knicks Finals Big","Knicks","C/PF","stretchBig",92,93,76,80,93,88,93,95,76,90,21.8,.620,22.2,.180,4.4,4.5,["冠军二当家","总决赛空间内线","高位策应"]],
       ["Dirk Nowitzki","2006-07 MVP","Mavericks","PF","stretchBig",95,97,80,76,96,88,85,98,88,96,24.6,.605,27.6,.278,8.3,7.4,["MVP","空间四号位"]],
       ["Dirk Nowitzki","2010-11 Title Run","Mavericks","PF","stretchBig",94,96,78,75,95,87,82,98,84,94,23.0,.612,23.4,.213,4.5,4.6,["冠军核心","金鸡独立"]],
       ["Steve Nash","2005-06 MVP Engine","Suns","PG","floorGeneral",94,94,70,100,98,78,50,99,82,92,18.8,.632,23.3,.212,5.0,4.9,["MVP","助攻王","7秒进攻"]],
-      ["Dwyane Wade","2008-09 Scoring Wade","Heat","SG","slasher",96,98,91,88,76,98,70,78,96,94,30.2,.574,30.4,.232,10.6,9.6,["得分王","盖帽后卫"]],
+      ["Dwyane Wade","2008-09 Scoring Wade","Heat","SG","slasher",96,98,91,88,76,98,70,78,96,94,30.2,.574,30.4,.232,10.6,9.6,["得分王","盖帽后卫","二防"]],
       ["Dwyane Wade","2005-06 Finals Flash","Heat","SG","slasher",95,97,88,86,74,97,68,76,91,95,27.2,.577,27.6,.240,7.5,6.8,["Finals MVP","突破"]],
-      ["LeBron James","2008-09 Cavs MVP","Cavaliers","SF","heliocentric",98,99,94,94,82,99,83,84,96,99,28.4,.591,31.7,.318,13.2,11.8,["MVP","66胜","持球大核"]],
-      ["LeBron James","2012-13 Heat Apex","Heat","SF/PF","heliocentric",99,99,97,96,88,99,87,90,93,100,26.8,.640,31.6,.322,11.7,9.8,["MVP","冠军核心","攻防巅峰"]],
+      ["LeBron James","2008-09 Cavs MVP","Cavaliers","SF","heliocentric",98,99,94,94,82,99,83,84,96,99,28.4,.591,31.7,.318,13.2,11.8,["MVP","66胜","持球大核","一防"]],
+      ["LeBron James","2012-13 Heat Apex","Heat","SF/PF","heliocentric",99,99,97,96,88,99,87,90,93,100,26.8,.640,31.6,.322,11.7,9.8,["MVP","冠军核心","攻防巅峰","一防"]],
       ["LeBron James","2015-16 Cleveland Block","Cavaliers","SF/PF","heliocentric",98,98,94,95,80,98,88,82,94,99,25.3,.588,27.5,.242,9.6,8.4,["Finals MVP","3-1逆转"]],
       ["LeBron James","2019-20 Lakers Point Forward","Lakers","PG/SF","heliocentric",96,96,90,98,82,94,86,84,88,97,25.3,.577,25.5,.204,6.7,6.1,["助攻王","冠军核心"]],
-      ["Chris Paul","2007-08 Hornets Maestro","Hornets","PG","floorGeneral",96,94,92,100,86,84,58,88,82,96,21.1,.576,28.3,.284,10.4,8.6,["MVP第二","助攻抢断王"]],
+      ["Chris Paul","2007-08 Hornets Maestro","Hornets","PG","floorGeneral",96,94,92,100,86,84,58,88,82,96,21.1,.576,28.3,.284,10.4,8.6,["MVP第二","助攻抢断王","二防"]],
       ["Chris Paul","2020-21 Suns Revival","Suns","PG","floorGeneral",91,88,86,96,87,76,54,90,70,90,16.4,.599,21.4,.201,3.6,3.8,["老炮","总决赛"]],
       ["Carmelo Anthony","2008-09 Nuggets WCF Melo","Nuggets","SF/PF","shotCreator",93,95,76,74,80,94,78,82,90,89,22.8,.532,19.7,.120,3.1,3.2,["西决甜瓜","强侧单挑","掘金核心"]],
       ["Carmelo Anthony","2012-13 Scoring Melo","Knicks","SF/PF","shotCreator",92,96,74,72,84,94,76,86,94,90,28.7,.560,24.8,.184,4.7,3.8,["得分王","三威胁"]],
@@ -2485,11 +2485,11 @@
       ["Stephen Curry","2021-22 Finals Chef","Warriors","PG","movementShooter",95,97,80,89,99,88,62,100,84,94,25.5,.601,21.4,.173,4.8,4.4,["Finals MVP","冠军核心"]],
       ["Klay Thompson","2015-16 Splash Wing","Warriors","SG","movementShooter",90,91,84,72,98,82,58,99,70,90,22.1,.597,18.6,.144,1.8,2.7,["3&D","无球"]],
       ["Draymond Green","2016-17 DPOY Connector","Warriors","PF/C","connector",91,78,99,90,76,78,88,82,60,92,10.2,.522,16.5,.146,5.4,5.0,["DPOY","组织内线","换防"]],
-      ["Kawhi Leonard","2016-17 Two-Way Peak","Spurs","SF","twoWayWing",96,96,99,80,90,92,76,92,86,94,25.5,.610,27.6,.264,7.1,6.7,["DPOY级","MVP第三"]],
-      ["Kawhi Leonard","2018-19 Raptors Klaw","Raptors","SF","twoWayWing",96,97,96,78,88,93,78,90,90,92,26.6,.606,25.8,.224,5.0,5.7,["Finals MVP","季后赛"]],
-      ["OG Anunoby","2022-23 Raptors Stopper","Raptors","SF/PF","pointStopper",86,78,94,68,82,78,64,84,45,86,16.8,.586,13.2,.104,1.8,1.9,["锋线领防","底角空间","换防"]],
-      ["Giannis Antetokounmpo","2018-19 MVP Freak","Bucks","SF/PF/C","slasher",97,97,96,86,68,99,96,72,90,97,27.7,.644,30.9,.292,10.8,7.4,["MVP","转换怪物"]],
-      ["Giannis Antetokounmpo","2020-21 Finals 50","Bucks","PF/C","slasher",98,98,97,84,66,100,97,70,91,98,28.1,.633,29.2,.244,8.8,7.5,["Finals MVP","50分封神"]],
+      ["Kawhi Leonard","2016-17 Two-Way Peak","Spurs","SF","twoWayWing",96,96,99,80,90,92,76,92,86,94,25.5,.610,27.6,.264,7.1,6.7,["DPOY级","MVP第三","一防"]],
+      ["Kawhi Leonard","2018-19 Raptors Klaw","Raptors","SF","twoWayWing",96,97,96,78,88,93,78,90,90,92,26.6,.606,25.8,.224,5.0,5.7,["Finals MVP","季后赛","二防"]],
+      ["OG Anunoby","2022-23 Raptors Stopper","Raptors","SF/PF","pointStopper",86,78,94,68,82,78,64,84,45,86,16.8,.586,13.2,.104,1.8,1.9,["锋线领防","底角空间","换防","二防"]],
+      ["Giannis Antetokounmpo","2018-19 MVP Freak","Bucks","SF/PF/C","slasher",97,97,96,86,68,99,96,72,90,97,27.7,.644,30.9,.292,10.8,7.4,["MVP","转换怪物","一防"]],
+      ["Giannis Antetokounmpo","2020-21 Finals 50","Bucks","PF/C","slasher",98,98,97,84,66,100,97,70,91,98,28.1,.633,29.2,.244,8.8,7.5,["Finals MVP","50分封神","一防"]],
       ["Nikola Jokic","2020-21 MVP Joker","Nuggets","C","pointCenter",96,97,78,99,88,91,94,90,86,96,26.4,.647,31.3,.301,8.6,8.8,["MVP","组织中锋"]],
       ["Nikola Jokic","2022-23 Champion Joker","Nuggets","C","pointCenter",98,99,82,100,90,93,96,92,84,99,24.5,.701,31.5,.308,8.8,8.7,["Finals MVP","冠军核心"]],
       ["Nikola Jokic","2023-24 Third MVP","Nuggets","C","pointCenter",98,99,83,100,90,94,97,92,86,99,26.4,.650,31.0,.299,10.6,9.2,["MVP","中锋大脑"]],
@@ -2498,27 +2498,27 @@
       ["Luka Doncic","2023-24 Scoring Maestro","Mavericks","PG/SG","heliocentric",97,99,76,98,90,94,88,92,98,91,33.9,.617,28.1,.220,8.0,7.3,["得分王","总决赛"]],
       ["Jayson Tatum","2023-24 Champion Wing","Celtics","SF/PF","twoWayWing",94,94,88,84,88,90,86,91,84,93,26.9,.604,22.3,.189,5.1,5.4,["冠军核心","双向锋线"]],
       ["Anthony Davis","2017-18 Pelicans Monster","Pelicans","PF/C","defAnchor",95,96,97,72,75,96,94,78,88,89,28.1,.612,28.9,.241,5.2,5.3,["一防","空接护框"]],
-      ["Anthony Davis","2019-20 Lakers Bubble","Lakers","PF/C","defAnchor",95,95,98,74,78,95,94,80,84,91,26.1,.610,27.4,.250,5.9,5.5,["冠军二当家","护框"]],
+      ["Anthony Davis","2019-20 Lakers Bubble","Lakers","PF/C","defAnchor",95,95,98,74,78,95,94,80,84,91,26.1,.610,27.4,.250,5.9,5.5,["冠军二当家","护框","一防"]],
       ["Damian Lillard","2019-20 Bubble Dame","Blazers","PG","movementShooter",94,97,70,90,98,87,55,99,91,88,30.0,.627,26.9,.225,5.5,5.2,["超远三分","园区爆发"]],
       ["Jimmy Butler","2019-20 Bubble Heat","Heat","SF","twoWayWing",92,90,94,86,72,88,82,76,75,92,19.9,.585,23.6,.221,4.5,4.7,["硬汉","总决赛","季后赛主攻","造犯规","强硬解"]],
       ["Shai Gilgeous-Alexander","2023-24 MVP Runner-Up","Thunder","SG/PG","slasher",96,98,91,86,79,96,70,80,92,92,30.1,.636,29.3,.275,7.1,6.8,["MVP第二","中距离"]],
       ["Kevin Love","2013-14 Outlet King","Timberwolves","PF/C","stretchBig",90,92,70,78,89,86,96,92,86,86,26.1,.591,26.9,.245,6.6,5.3,["篮板","长传","空间"]],
       ["Blake Griffin","2013-14 Lob City Point PF","Clippers","PF","verticalBig",91,93,74,82,69,96,86,72,86,88,24.1,.583,23.9,.205,5.4,4.7,["空接之城","组织四号"]],
-      ["Paul George","2013-14 Pacers Two-Way Star","Pacers","SF/SG","twoWayWing",91,89,94,78,86,88,80,88,82,87,21.7,.555,20.1,.167,4.7,4.5,["步行者门面","双向锋线","东决"]],
-      ["Paul George","2018-19 OKC Peak","Thunder","SF","twoWayWing",94,96,95,80,91,90,82,93,88,89,28.0,.583,23.3,.201,5.5,5.3,["MVP第三","抢断王"]],
+      ["Paul George","2013-14 Pacers Two-Way Star","Pacers","SF/SG","twoWayWing",91,89,94,78,86,88,80,88,82,87,21.7,.555,20.1,.167,4.7,4.5,["步行者门面","双向锋线","东决","一防"]],
+      ["Paul George","2018-19 OKC Peak","Thunder","SF","twoWayWing",94,96,95,80,91,90,82,93,88,89,28.0,.583,23.3,.201,5.5,5.3,["MVP第三","抢断王","一防"]],
       ["Paul George","2020-21 Clippers WCF Carry","Clippers","SF/SG","twoWayWing",92,93,88,82,88,90,82,90,86,88,23.3,.598,20.5,.154,4.6,4.3,["西决单核","季后赛硬撑","双向侧翼"]],
       ["Yao Ming","2006-07 Peak Yao","Rockets","C","interiorHub",91,92,82,66,78,92,88,80,84,82,25.0,.601,26.5,.230,3.9,3.2,["低位","巨人中投"]],
       ["Manu Ginobili","2007-08 Sixth Man Star","Spurs","SG","connector",90,91,82,86,88,88,58,90,76,86,19.5,.612,24.3,.232,5.0,4.5,["最佳第六人","妖刀"]],
       ["Tony Parker","2012-13 Finals Engine","Spurs","PG","slasher",90,91,74,90,78,90,48,80,78,88,20.3,.588,23.0,.206,4.7,4.1,["突破控卫","总决赛"]],
       ["Ray Allen","2005-06 Sonics Sniper","SuperSonics","SG","movementShooter",91,94,74,78,99,84,58,100,82,89,25.1,.587,21.4,.162,3.4,4.3,["三分大师","无球"]],
       ["Paul Pierce","2007-08 Truth Title","Celtics","SF","shotCreator",90,90,82,78,86,86,72,88,76,90,19.6,.599,19.6,.207,3.9,3.5,["Finals MVP","强硬"]],
-      ["Rajon Rondo","2011-12 Playoff Conductor","Celtics","PG","floorGeneral",87,78,86,96,54,80,68,55,66,84,11.9,.483,17.2,.135,3.1,3.4,["助攻","防守控卫"]],
+      ["Rajon Rondo","2011-12 Playoff Conductor","Celtics","PG","floorGeneral",87,78,86,96,54,80,68,55,66,84,11.9,.483,17.2,.135,3.1,3.4,["助攻","防守控卫","二防"]],
       ["Ben Wallace","2003-04 DPOY Wall","Pistons","C","defAnchor",88,58,100,62,25,70,99,20,42,90,9.5,.441,17.3,.190,4.3,4.9,["DPOY","冠军防守"]],
-      ["Chauncey Billups","2005-06 Mr Big Shot","Pistons","PG","floorGeneral",89,88,84,88,90,78,54,92,68,91,18.5,.602,23.4,.254,5.4,4.8,["控场","关键球"]],
+      ["Chauncey Billups","2005-06 Mr Big Shot","Pistons","PG","floorGeneral",89,88,84,88,90,78,54,92,68,91,18.5,.602,23.4,.254,5.4,4.8,["控场","关键球","二防"]],
       ["Richard Hamilton","2005-06 Rip Midrange","Pistons","SG","movementShooter",87,88,82,76,86,78,48,88,66,86,20.1,.548,16.8,.131,2.2,2.8,["无球中投","活塞进攻","面具侠"]],
       ["Tayshaun Prince","2003-04 Pistons Wing Stopper","Pistons","SF","pointStopper",84,72,94,70,76,76,64,78,42,86,10.3,.520,12.8,.116,1.9,2.2,["长臂锋线","冠军拼图","追帽"]],
       ["Pau Gasol","2009-10 Lakers Skill Big","Lakers","PF/C","connector",90,88,84,82,76,86,91,78,70,90,18.3,.593,22.9,.220,4.2,4.5,["冠军拼图","策应"]],
-      ["Jason Kidd","2002-03 Nets Maestro","Nets","PG","floorGeneral",92,84,90,97,78,80,78,80,74,93,18.7,.526,22.2,.175,6.8,6.4,["总决赛","大三双"]],
+      ["Jason Kidd","2002-03 Nets Maestro","Nets","PG","floorGeneral",92,84,90,97,78,80,78,80,74,93,18.7,.526,22.2,.175,6.8,6.4,["总决赛","大三双","二防"]],
       ["Grant Hill","1996-97 Point Forward","Pistons","SF","connector",92,91,82,91,72,92,82,74,84,87,21.4,.556,25.5,.223,7.9,7.0,["全能前锋","组织"]],
       ["Penny Hardaway","1995-96 Magic Penny","Magic","PG/SG","floorGeneral",92,92,80,90,82,91,64,84,82,84,21.7,.605,24.6,.229,6.9,5.8,["魔术控锋","总决赛班底"]],
       ["Alonzo Mourning","1998-99 DPOY Heat","Heat","C","defAnchor",91,88,99,60,45,88,92,35,78,86,20.1,.563,24.6,.216,4.7,4.3,["DPOY","盖帽王"]],
@@ -2560,7 +2560,7 @@
       ["Shawn Marion","2005-06 Matrix Suns","Suns","SF/PF","twoWayWing",91,88,90,74,78,90,92,82,74,92,21.8,.591,23.6,.214,5.2,5.4,["骇客","太阳锋线","篮板防守"]],
       ["Michael Finley","1999-00 Mavs All-Star","Mavericks","SG/SF","shotCreator",88,90,74,76,84,86,70,84,82,84,22.6,.538,18.9,.120,3.4,3.5,["小牛全明星","锋卫摇摆","中距离"]],
       ["Steve Francis","2001-02 Franchise","Rockets","PG","slasher",88,90,70,84,78,92,72,80,84,80,21.6,.563,21.6,.159,4.4,4.2,["弗老大","弹跳控卫","火箭核心"]],
-      ["Latrell Sprewell","1993-94 Warriors Two-Way","Warriors","SG/SF","twoWayWing",88,88,88,78,78,90,62,80,82,86,21.0,.548,18.2,.119,3.6,4.0,["狂人","双向锋卫","速度"]],
+      ["Latrell Sprewell","1993-94 Warriors Two-Way","Warriors","SG/SF","twoWayWing",88,88,88,78,78,90,62,80,82,86,21.0,.548,18.2,.119,3.6,4.0,["狂人","双向锋卫","速度","二防"]],
       ["Michael Redd","2006-07 Bucks Flamethrower","Bucks","SG","movementShooter",88,92,64,66,96,80,48,98,84,84,26.7,.585,19.3,.132,2.5,3.1,["左手射手","雄鹿火力","高产三分"]],
       ["Devin Booker","2021-22 Suns 64 Wins","Suns","PG/SG","shotCreator",91,94,74,78,90,88,58,92,80,88,26.8,.576,21.3,.156,3.6,3.9,["64胜","得分后卫"]],
       ["Devin Booker","2020-21 Finals Booker","Suns","PG/SG","shotCreator",91,94,72,78,88,88,56,90,82,88,25.6,.587,19.2,.109,2.7,3.2,["总决赛","太阳门面","中距离"]],
@@ -2569,7 +2569,7 @@
       ["Trae Young","2021-22 Deep Range Playmaker","Hawks","PG","heliocentric",90,94,55,96,94,82,42,96,90,80,28.4,.603,25.4,.181,4.8,4.3,["超远三分","助攻"]],
       ["Ja Morant","2021-22 Flying Grizzly","Grizzlies","PG","slasher",90,92,70,84,76,98,58,78,86,78,27.4,.575,24.4,.171,3.9,3.8,["爆扣控卫","快攻"]],
       ["Zion Williamson","2020-21 Paint Force","Pelicans","PF","slasher",89,93,62,74,42,99,78,45,88,72,27.0,.649,27.1,.205,4.3,3.6,["禁区效率","怪力"]],
-      ["Victor Wembanyama","2023-24 Rookie Alien","Spurs","C/PF","defAnchor",89,86,97,76,78,90,90,80,82,78,21.4,.565,23.1,.085,5.2,3.8,["新秀","盖帽王","未来"]],
+      ["Victor Wembanyama","2023-24 Rookie Alien","Spurs","C/PF","defAnchor",89,86,97,76,78,90,90,80,82,78,21.4,.565,23.1,.085,5.2,3.8,["新秀","盖帽王","未来","一防"]],
       ["Alperen Sengun","2023-24 Baby Joker","Rockets","C","pointCenter",87,88,72,84,68,88,88,70,80,76,21.1,.585,22.0,.140,3.3,3.2,["策应中锋","低位"]],
       ["Tyrese Haliburton","2023-24 Assist Engine","Pacers","PG","floorGeneral",89,91,66,98,92,78,46,94,72,82,20.1,.605,23.6,.174,6.0,5.1,["助攻","快节奏"]],
       ["Anthony Edwards","2023-24 Wolves Face","Timberwolves","SG","twoWayWing",91,92,86,80,84,94,68,86,84,86,25.9,.575,19.7,.130,3.7,4.1,["核心锋卫","攻防爆发"]],
@@ -2591,15 +2591,15 @@
       ["Desmond Bane","2023-24 Grizzlies Shooter","Grizzlies","SG","movementShooter",86,88,76,78,93,82,56,94,76,78,23.7,.583,18.4,.094,2.6,2.7,["强壮射手","副攻","空间"]],
       ["Michael Porter Jr.","2022-23 Nuggets Sniper Wing","Nuggets","SF/PF","movementShooter",85,84,72,62,94,82,76,96,62,82,17.4,.620,14.6,.109,1.2,2.0,["冠军侧翼","高点投射","篮板"]],
       ["Darius Garland","2021-22 Cavs Maestro","Cavaliers","PG","floorGeneral",87,88,66,92,90,82,42,92,78,78,21.7,.576,19.1,.118,2.4,3.1,["全明星控卫","挡拆","抛投"]],
-      ["Evan Mobley","2022-23 Cavs Switch Big","Cavaliers","PF/C","defAnchor",87,78,94,74,66,84,86,70,56,84,16.2,.591,17.8,.149,3.5,3.6,["换防内线","护框","年轻核心"]],
+      ["Evan Mobley","2022-23 Cavs Switch Big","Cavaliers","PF/C","defAnchor",87,78,94,74,66,84,86,70,56,84,16.2,.591,17.8,.149,3.5,3.6,["换防内线","护框","年轻核心","一防"]],
       ["Pascal Siakam","2018-19 Title MIP","Raptors","PF","connector",88,86,84,78,82,88,82,84,68,88,16.9,.628,18.7,.177,3.4,3.5,["最快进步","冠军拼图"]],
-      ["Bam Adebayo","2019-20 Bubble Anchor","Heat","C/PF","connector",88,82,94,84,62,84,88,66,62,86,15.9,.598,20.3,.168,3.4,3.7,["换防中锋","策应"]],
+      ["Bam Adebayo","2019-20 Bubble Anchor","Heat","C/PF","connector",88,82,94,84,62,84,88,66,62,86,15.9,.598,20.3,.168,3.4,3.7,["换防中锋","策应","二防"]],
       ["Andre Iguodala","2014-15 Finals Stopper","Warriors","SF","connector",86,76,94,80,74,78,68,78,48,88,7.8,.540,11.7,.131,2.0,2.5,["Finals MVP","防守奇兵"]],
       ["Robert Horry","2001-02 Big Shot Role","Lakers","PF","connector",82,72,82,70,82,72,70,86,42,84,6.8,.552,12.1,.137,1.5,1.8,["大心脏","空间拼图"]],
-      ["Shane Battier","2008-09 No-Stats Star","Rockets","SF","pointStopper",84,70,94,68,78,70,62,82,38,86,7.3,.574,9.6,.100,1.8,2.2,["无数据球星","防守"]],
-      ["Mikal Bridges","2021-22 Iron Wing","Suns","SF","pointStopper",86,78,92,74,82,80,62,84,52,92,14.2,.627,14.4,.170,3.4,3.5,["铁人","3&D"]],
+      ["Shane Battier","2008-09 No-Stats Star","Rockets","SF","pointStopper",84,70,94,68,78,70,62,82,38,86,7.3,.574,9.6,.100,1.8,2.2,["无数据球星","防守","二防"]],
+      ["Mikal Bridges","2021-22 Iron Wing","Suns","SF","pointStopper",86,78,92,74,82,80,62,84,52,92,14.2,.627,14.4,.170,3.4,3.5,["铁人","3&D","一防"]],
       ["Andrew Wiggins","2021-22 Warriors Finals Wing","Warriors","SF/SG","twoWayWing",87,82,89,70,84,86,70,86,58,85,17.2,.560,15.0,.105,0.7,1.4,["冠军侧翼","领防锋线","篮板冲击"]],
-      ["Andrei Kirilenko","2003-04 AK47","Jazz","SF/PF","connector",90,84,98,80,70,84,82,72,66,84,16.5,.559,22.6,.182,7.5,6.5,["盖帽前锋","全能防守"]],
+      ["Andrei Kirilenko","2003-04 AK47","Jazz","SF/PF","connector",90,84,98,80,70,84,82,72,66,84,16.5,.559,22.6,.182,7.5,6.5,["盖帽前锋","全能防守","二防"]],
       ["Chris Bosh","2009-10 Raptors Star","Raptors","PF/C","stretchBig",91,92,76,70,78,88,92,80,82,85,24.0,.592,25.0,.182,4.0,4.0,["空间内线","龙王"]],
       ["Chris Bosh","2012-13 Heat Spacing Big","Heat","C/PF","stretchBig",88,86,82,70,82,84,78,86,62,88,16.6,.592,20.0,.175,2.5,3.0,["冠军拼图","小球中锋"]],
       ["LaMelo Ball","2021-22 Flair PG","Hornets","PG","floorGeneral",86,86,64,90,86,82,62,88,78,72,20.1,.554,18.7,.111,3.3,3.1,["花式传球","年轻"]],
@@ -2619,8 +2619,8 @@
       ["Mike Conley","2016-17 Grit Grind Guard","Grizzlies","PG","floorGeneral",88,88,80,88,86,78,46,88,64,86,20.5,.604,23.2,.209,4.3,4.1,["稳健控卫","防守"]],
       ["Jamal Murray","2022-23 Bubble Echo","Nuggets","PG/SG","shotCreator",89,91,70,84,88,86,54,90,76,82,20.0,.571,17.9,.117,2.8,3.2,["冠军二当家","挡拆"]],
       ["Aaron Gordon","2022-23 Dunker Connector","Nuggets","PF","connector",86,80,86,76,66,90,78,70,48,86,16.3,.617,17.2,.163,2.7,3.0,["冠军拼图","空切"]],
-      ["Jrue Holiday","2020-21 Title Stopper","Bucks","PG/SG","pointStopper",88,84,96,86,78,82,58,80,62,88,17.7,.592,19.6,.116,3.8,4.2,["防守后卫","冠军拼图"]],
-      ["Brook Lopez","2022-23 Splash Mountain DPOY2","Bucks","C","stretchBig",86,78,94,60,86,76,78,90,48,84,15.9,.630,16.7,.155,3.0,3.4,["护框","空间五号"]],
+      ["Jrue Holiday","2020-21 Title Stopper","Bucks","PG/SG","pointStopper",88,84,96,86,78,82,58,80,62,88,17.7,.592,19.6,.116,3.8,4.2,["防守后卫","冠军拼图","一防"]],
+      ["Brook Lopez","2022-23 Splash Mountain DPOY2","Bucks","C","stretchBig",86,78,94,60,86,76,78,90,48,84,15.9,.630,16.7,.155,3.0,3.4,["护框","空间五号","一防"]],
       ["Jaylen Brown","2023-24 Finals MVP","Celtics","SG/SF","twoWayWing",91,90,88,76,82,92,72,84,78,88,23.0,.580,17.1,.125,2.7,3.6,["Finals MVP","双向侧翼"]]
     ];
 
@@ -2786,6 +2786,18 @@
         clamp(Math.round(value * .35 + card.manual[key] * .65), key === "ovr" ? 70 : 20, 100)
       ]));
       const adjusted = { ...calibrated };
+      const defenseEvidenceFloor = Math.max(
+        card.manual.def - 4,
+        tagMatch(card, /DPOY(?!级)|最佳防守球员/) ? 95 : 0,
+        tagMatch(card, /DPOY级/) ? 92 : 0,
+        tagMatch(card, /一防/) ? 91 : 0,
+        tagMatch(card, /二防/) ? 87 : 0,
+        card.archetype === "pointStopper" ? 86 : 0,
+        card.archetype === "defAnchor" ? 88 : 0,
+        card.archetype === "twoWayWing" ? 82 : 0,
+        tagMatch(card, /3&D|领防|防守控卫|防守后卫|后场领防|锋线领防|防守奇兵|冠军防守/) ? 84 : 0
+      );
+      adjusted.def = Math.max(adjusted.def, defenseEvidenceFloor);
       if (card.archetype === "twoWayWing" && card.ppg >= 19 && card.per >= 20) {
         adjusted.usage = Math.max(adjusted.usage, 82);
         adjusted.impact = Math.max(adjusted.impact, 86);
@@ -2846,7 +2858,7 @@
         adjusted.ovr = Math.max(adjusted.ovr, card.manual.ovr - 1);
       }
 
-      return { ...adjusted, ratingSource: "derived-v1-calibrated" };
+      return { ...adjusted, ratingSource: "derived-v1.1-defense-evidence" };
     }
 
     const cards = rawCards.map((r, i) => {

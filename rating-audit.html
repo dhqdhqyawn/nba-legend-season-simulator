@@ -280,7 +280,7 @@
     <header>
       <div>
         <h1>评分审计</h1>
-        <p class="sub">对比旧人工分 manual 与当前 derived-v1 公式分。这个页面用来找高估、低估和字段异常，不参与抽卡玩法。</p>
+        <p class="sub">对比旧人工分 manual 与当前 derived-v1.1-defense-evidence 公式分。这个页面用来找高估、低估和字段异常，不参与抽卡玩法。</p>
       </div>
       <nav class="links">
         <a href="index.html">模拟器</a>
@@ -288,6 +288,15 @@
         <a href="scoring-model.html">模型说明</a>
       </nav>
     </header>
+
+    <section class="panel" style="padding:16px 18px;margin-bottom:14px">
+      <h2 style="margin:0 0 8px;font-size:18px">防守证据审计已启用</h2>
+      <p class="sub" style="margin:0">
+        当前防守派生分会保留 manual.def - 4 的先验下限，并对当季 DPOY、一防、二防以及明确的领防/护框角色设置证据下限。
+        这能避免总 BPM、WS/48 等非防守专属变量把基德、科比、克莱一类球员机械压低；奖项记录来自
+        <a href="https://www.nba.com/news/history-all-defensive-team" target="_blank" rel="noreferrer">NBA 官方逐年最佳防守阵容</a>。
+      </p>
+    </section>
 
     <section class="filters">
       <input id="q" placeholder="搜索球员、版本、球队、标签">
@@ -481,6 +490,18 @@
         clamp(Math.round(value * .35 + card.manual[key] * .65), key === "ovr" ? 70 : 20, 100)
       ]));
       const adjusted = { ...calibrated };
+      const defenseEvidenceFloor = Math.max(
+        card.manual.def - 4,
+        tagMatch(card, /DPOY(?!级)|最佳防守球员/) ? 95 : 0,
+        tagMatch(card, /DPOY级/) ? 92 : 0,
+        tagMatch(card, /一防/) ? 91 : 0,
+        tagMatch(card, /二防/) ? 87 : 0,
+        card.archetype === "pointStopper" ? 86 : 0,
+        card.archetype === "defAnchor" ? 88 : 0,
+        card.archetype === "twoWayWing" ? 82 : 0,
+        tagMatch(card, /3&D|领防|防守控卫|防守后卫|后场领防|锋线领防|防守奇兵|冠军防守/) ? 84 : 0
+      );
+      adjusted.def = Math.max(adjusted.def, defenseEvidenceFloor);
       if (card.archetype === "twoWayWing" && card.ppg >= 19 && card.per >= 20) {
         adjusted.usage = Math.max(adjusted.usage, 82);
         adjusted.impact = Math.max(adjusted.impact, 86);
@@ -540,7 +561,7 @@
       if (card.manual.ovr >= 97 && tagMatch(card, /MVP|Finals MVP|冠军核心/)) {
         adjusted.ovr = Math.max(adjusted.ovr, card.manual.ovr - 1);
       }
-      return { ...adjusted, ratingSource: "derived-v1-calibrated" };
+      return { ...adjusted, ratingSource: "derived-v1.1-defense-evidence" };
     }
 
     function diff(card, field) {

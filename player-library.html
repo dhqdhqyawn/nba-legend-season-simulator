@@ -317,7 +317,7 @@
     <header>
       <div>
         <h1>NBA 时刻卡球员库</h1>
-        <p class="sub">读取模拟器同一份卡池，展示 derived-v1-calibrated 球员评分、中文名、代表赛季、摇摆位置与高阶数据。</p>
+        <p class="sub">读取模拟器同一份卡池，展示 derived-v1.1-defense-evidence 球员评分、中文名、代表赛季、摇摆位置与高阶数据。</p>
       </div>
       <div class="header-actions">
         <a href="index.html">模拟器</a>
@@ -601,6 +601,18 @@
         clamp(Math.round(value * .35 + card.manual[key] * .65), key === "ovr" ? 70 : 20, 100)
       ]));
       const adjusted = { ...calibrated };
+      const defenseEvidenceFloor = Math.max(
+        card.manual.def - 4,
+        tagMatch(card, /DPOY(?!级)|最佳防守球员/) ? 95 : 0,
+        tagMatch(card, /DPOY级/) ? 92 : 0,
+        tagMatch(card, /一防/) ? 91 : 0,
+        tagMatch(card, /二防/) ? 87 : 0,
+        card.archetype === "pointStopper" ? 86 : 0,
+        card.archetype === "defAnchor" ? 88 : 0,
+        card.archetype === "twoWayWing" ? 82 : 0,
+        tagMatch(card, /3&D|领防|防守控卫|防守后卫|后场领防|锋线领防|防守奇兵|冠军防守/) ? 84 : 0
+      );
+      adjusted.def = Math.max(adjusted.def, defenseEvidenceFloor);
       if (card.archetype === "twoWayWing" && card.ppg >= 19 && card.per >= 20) {
         adjusted.usage = Math.max(adjusted.usage, 82);
         adjusted.impact = Math.max(adjusted.impact, 86);
@@ -660,7 +672,7 @@
       if (card.manual.ovr >= 97 && tagMatch(card, /MVP|Finals MVP|冠军核心/)) {
         adjusted.ovr = Math.max(adjusted.ovr, card.manual.ovr - 1);
       }
-      return { ...adjusted, ratingSource: "derived-v1-calibrated" };
+      return { ...adjusted, ratingSource: "derived-v1.1-defense-evidence" };
     }
 
     function render() {
