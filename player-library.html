@@ -376,13 +376,7 @@
     };
     const posMap = { PG: 1, SG: 2, SF: 3, PF: 4, C: 5 };
     const slotCodes = ["PG", "SG", "SF", "PF", "C"];
-    const pointGuardSlotCards = new Set([
-      "LeBron James|2008-09 Cavs MVP", "LeBron James|2012-13 Heat Apex",
-      "LeBron James|2015-16 Cleveland Block", "LeBron James|2019-20 Lakers Point Forward",
-      "Nikola Jokic|2020-21 MVP Joker", "Nikola Jokic|2022-23 Champion Joker",
-      "Nikola Jokic|2023-24 Third MVP", "Scottie Pippen|1993-94 Point Forward",
-      "Grant Hill|1996-97 Point Forward"
-    ]);
+    let positionOverrides = new Map();
 
     function cardSlotKey(card) {
       return `${card.name}|${card.version}`;
@@ -492,20 +486,13 @@
       return [...new Set(pos.split("/").map(p => posMap[p]).filter(Boolean))];
     }
 
-    function expandedSlots(card) {
-      const slots = new Set(baseSlots(card.pos));
-      const base = baseSlots(card.pos);
-      if (pointGuardSlotCards.has(cardSlotKey(card))) slots.add(1);
-      if (card.archetype === "twoWayWing" || card.archetype === "connector") {
-        if (base.includes(2) || base.includes(3)) { slots.add(2); slots.add(3); }
-        if (base.includes(3) && card.reb >= 78) { slots.add(3); slots.add(4); }
-        if (base.includes(4) && !base.includes(5)) slots.add(4);
-      }
-      if (card.name === "Draymond Green") slots.add(3);
-      if (["stretchBig", "defAnchor", "interiorHub", "pointCenter"].includes(card.archetype)) {
-        if (slots.has(4) || slots.has(5)) { slots.add(4); slots.add(5); }
-      }
-      return [...slots].sort((a, b) => a - b);
+    function positionEligibility(card) {
+      const override = positionOverrides.get(cardSlotKey(card));
+      const positions = override?.positions || card.pos.split("/");
+      return {
+        slots: [...new Set(positions.map(position => posMap[position]).filter(Boolean))].sort((a, b) => a - b),
+        positionEvidence: override?.evidence || `卡片原始位置：${card.pos}`
+      };
     }
 
     function slotText(slots) {
@@ -524,6 +511,7 @@
         },
         ppg: r[15], ts: r[16], per: r[17], ws48: r[18], bpm: r[19], vorp: r[20],
         tags: r[21],
+        risk: r[22] || {},
         image: headshotUrl(r[0]),
         color: palette[i % palette.length]
       };
@@ -768,10 +756,11 @@
       const source = await fetch("index.html").then(r => r.text());
       const nameZh = new Function(`return (${extractConst(source, "nameZh", ";\n\n    function localizedVersion")})`)();
       const rawCards = new Function(`return (${extractConst(source, "rawCards", ";\n\n    const archetypeUsage")})`)();
+      positionOverrides = new Function(`return (${extractConst(source, "positionOverrides", ";\n\n    function cardSlotKey")})`)();
       cards = rawCards.map((r, i) => {
         const base = buildBaseCard(r, i, nameZh);
         return { ...base, ...deriveRatings(base) };
-      }).map(card => ({ ...card, slots: expandedSlots(card) }));
+      }).map(card => ({ ...card, ...positionEligibility(card) }));
       populateTeamFilter();
       render();
       loadCardArtManifest();
