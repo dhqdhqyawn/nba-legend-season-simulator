@@ -5983,7 +5983,12 @@
       const boxScoreGap = list.reduce((sum, card) => sum + Number(card.risk?.boxScoreGap || 0), 0);
       const disciplineRisk = list.reduce((sum, card) => sum + Number(card.risk?.defensiveDiscipline || 0), 0);
       const decisionRisk = list.reduce((sum, card) => sum + Number(card.risk?.decisionMaking || 0), 0);
-      const riskPenalty = clamp(boxScoreGap * .90 + disciplineRisk * .40 + decisionRisk * .35 + roleVolatility * .10, 0, 3.2);
+      const specialRiskExposure = list.reduce((sum, card) => sum + cardSpecialRiskExposure(card), 0);
+      const seasonIncident = resolveSpecialSeasonIncident(list, `${lineupSeed}|${el.era.value}|${injuryVol}|${coachChem}`, injuryVol);
+      const specialRiskPenalty = clamp(specialRiskExposure * .12 + Number(seasonIncident?.penalty || 0), 0, 1.8);
+      const riskPenalty = clamp(boxScoreGap * .90 + disciplineRisk * .40 + decisionRisk * .35 + roleVolatility * .10 + specialRiskPenalty, 0, 4.2);
+      const lineupBonds = activeLineupBonds(list);
+      const bondPenalty = clamp(lineupBonds.reduce((sum, bond) => sum + bond.penalty, 0), 0, 2.4);
       const randomSwing = (seasonNoise - .5) * (1.6 + injuryVol * .18 + roleVolatility * .25 + durabilityExposure * 1.0);
       const rankedOvr = list.map(c => c.ovr).sort((a, b) => b - a);
       const averageOvr = avg(list, "ovr");
@@ -6006,7 +6011,7 @@
       const fitPrior = (effectiveFit - 75) * .045;
       // Rebounding, point-of-attack defense and turnover control already enter the
       // selected schemes. Do not add them again after aggregation.
-      const rawNet = schemeNet + qualityPrior + fitPrior + structureEdge + coachChem + randomSwing - physicalTranslationTax - riskPenalty - availabilityPenalty;
+      const rawNet = schemeNet + qualityPrior + fitPrior + structureEdge + coachChem + randomSwing - physicalTranslationTax - riskPenalty - availabilityPenalty - bondPenalty;
       const net = rawNet;
       const healthyRawNet = rawNet - randomSwing + riskPenalty + availabilityPenalty;
       const healthyNet = healthyRawNet;
@@ -6025,6 +6030,15 @@
         disciplineRisk,
         decisionRisk,
         riskPenalty,
+        specialRiskExposure,
+        specialRiskPenalty,
+        specialIncident: seasonIncident ? {
+          cardId: seasonIncident.card.id,
+          tag: seasonIncident.tag,
+          eventId: seasonIncident.eventId
+        } : null,
+        lineupBonds,
+        bondPenalty,
         durabilityExposure,
         availabilityPenalty,
         healthyWins,
@@ -6090,6 +6104,13 @@
         era: el.era.value,
         seasonVariance: Number(randomSwing.toFixed(2)),
         riskPenalty: Number(riskPenalty.toFixed(2)),
+        specialRiskPenalty: Number(specialRiskPenalty.toFixed(2)),
+        bondPenalty: Number(bondPenalty.toFixed(2)),
+        lineupBonds: lineupBonds.map(bond => ({
+          id: bond.id,
+          penalty: bond.penalty,
+          players: bond.cards.map(card => ({ id: card.id, name: card.name, displayName: card.displayName, version: card.version }))
+        })),
         durabilityExposure: Number(durabilityExposure.toFixed(3)),
         availabilityPenalty: Number(availabilityPenalty.toFixed(2)),
         seasonStory,
@@ -6142,6 +6163,104 @@
 
     function injuryTextFor(card) {
       return injuryEventLabels[card.eventProfile?.injury] || injuryEventLabels.availability;
+    }
+
+    const lineupBondRules = [
+      {
+        id: "draymond-poole-practice-fight",
+        penalty: 1.05,
+        players: [{ name: "Draymond Green" }, { name: "Jordan Poole" }],
+        title: "{0}和{1}的训练冲突撕裂更衣室",
+        detail: "季前训练中，{0}与{1}的口角升级为肢体冲突。教练组暂时把两人分开训练，队友也不得不反复调解，球队在赛季开局重新建立沟通和信任。",
+        impact: "训练冲突 · 开局磨合受损"
+      },
+      {
+        id: "artest-oneal-palace-brawl",
+        penalty: 1.55,
+        players: [{ name: "Ron Artest" }, { name: "Jermaine O'Neal" }],
+        title: "{0}和{1}卷入奥本山宫冲突",
+        detail: "底线冲突一路蔓延到看台，{0}与{1}双双卷入事件。联盟随后开出长期停赛，球队失去最重要的侧翼领防与内线支点，只能彻底重排整个赛季。",
+        impact: "大规模冲突 · 核心轮换长期缺阵"
+      },
+      {
+        id: "young-russell-recording-scandal",
+        penalty: .78,
+        players: [{ name: "Nick Young" }, { name: "D'Angelo Russell" }],
+        title: "{0}和{1}因录音门失去信任",
+        detail: "一段私人谈话录音流出后，{0}与{1}的关系迅速恶化。事件没有直接改变战术板，却让更衣室沟通、场上提醒和赛后复盘都变得格外紧张。",
+        impact: "录音门 · 更衣室信任下降"
+      },
+      {
+        id: "warriors-durant-thunder-westbrook",
+        penalty: .58,
+        players: [
+          { name: "Kevin Durant", versionIncludes: ["2016-17 Warriors"] },
+          { name: "Russell Westbrook", versionIncludes: ["2016-17 Triple Double"] }
+        ],
+        title: "{0}和{1}把旧日裂痕带进新阵容",
+        detail: "重新成为队友后，{0}与{1}仍没有立刻解决分开后的矛盾。两人都能靠个人能力完成任务，但关键回合的持球顺序与赛后沟通反复需要教练组介入。",
+        impact: "旧日矛盾 · 收官分工反复"
+      }
+    ];
+
+    const specialSeasonIncidentRules = {
+      offCourtDiscipline: { rate: .28, penalty: 1.12, eventId: "rs-exclusive-morant-suspension" },
+      lockerRoomDiscipline: { rate: .24, penalty: 1.36, eventId: "rs-exclusive-arenas-locker-room" },
+      technicalSuspension: { rate: .18, penalty: .66, eventId: null },
+      technicalVolatility: { rate: .16, penalty: .48, eventId: null },
+      disciplineSuspension: { rate: .21, penalty: .88, eventId: null },
+      practiceConflict: { rate: .14, penalty: .56, eventId: null },
+      unapprovedAbsence: { rate: .14, penalty: .62, eventId: null },
+      personalAvailability: { rate: .12, penalty: .52, eventId: null }
+    };
+
+    function bondCardMatches(card, condition) {
+      if (card.name !== condition.name) return false;
+      const versions = condition.versionIncludes || [];
+      return !versions.length || versions.some(fragment => card.version.includes(fragment));
+    }
+
+    function activeLineupBonds(list) {
+      return lineupBondRules.flatMap(rule => {
+        const matched = rule.players.map(condition => list.find(card => bondCardMatches(card, condition)));
+        return matched.every(Boolean) ? [{ ...rule, cards: matched }] : [];
+      });
+    }
+
+    function fillBondText(template, cards) {
+      return cards.reduce((text, card, index) => text.replaceAll(`{${index}}`, card.displayName), template);
+    }
+
+    function buildLineupBondStories(bonds) {
+      return bonds.map(bond => ({
+        tone: "negative",
+        title: fillBondText(bond.title, bond.cards),
+        detail: fillBondText(bond.detail, bond.cards),
+        impact: bond.impact,
+        eventId: `bond-${bond.id}`,
+        eventFamily: `lineup-bond-${bond.id}`,
+        eventPlayerKey: bond.cards[0].name,
+        eventPlayer: bond.cards[0].displayName,
+        eventSupport: bond.cards[1].displayName
+      }));
+    }
+
+    function cardSpecialRiskExposure(card) {
+      const specials = card.eventProfile?.specials || [];
+      return specials.reduce((highest, special) => Math.max(highest, Number(specialSeasonIncidentRules[special]?.penalty || 0)), 0);
+    }
+
+    function resolveSpecialSeasonIncident(list, seed, injuryVol) {
+      const candidates = list.flatMap(card => (card.eventProfile?.specials || []).flatMap(tag => {
+        const rule = specialSeasonIncidentRules[tag];
+        if (!rule) return [];
+        const roll = seededNoise(`${seed}|${card.eventProfile?.versionKey || card.id}|${tag}`);
+        const threshold = clamp(rule.rate + Number(injuryVol || 0) * .004, rule.rate, rule.rate + .04);
+        return roll < threshold ? [{ card, tag, roll, threshold, ...rule }] : [];
+      }));
+      if (!candidates.length) return null;
+      candidates.sort((left, right) => (left.roll / left.threshold) - (right.roll / right.threshold) || right.penalty - left.penalty);
+      return candidates[0];
     }
 
     function cardEventRisk(card) {
@@ -6216,6 +6335,12 @@
       "总决赛": "finals"
     };
 
+    const eventNarrativeExclusiveVersionIncludes = {
+      "po-exclusive-durant-achilles": ["2016-17 Warriors", "2020-21 Nets"],
+      "po-exclusive-kawhi-ankle": ["2016-17"],
+      "po-exclusive-draymond-suspension": ["2016-17"]
+    };
+
     const eventNarrativeRoleCache = new WeakMap();
 
     function eventNarrativeRoleData(card) {
@@ -6266,6 +6391,8 @@
       return list.filter(card => {
         if (exclusive.length && !exclusive.includes(card.name)) return false;
         if (!event.genericizable && !exclusive.includes(card.name)) return false;
+        const versionFragments = eventNarrativeExclusiveVersionIncludes[event.id] || [];
+        if (versionFragments.length && !versionFragments.some(fragment => card.version.includes(fragment))) return false;
         const { roles, traits } = eventNarrativeRoleData(card);
         if (!(event.eligibleRoles || []).some(role => role === "any" || roles.has(role))) return false;
         if ((event.requiredTraits || []).some(trait => !traits.has(trait))) return false;
@@ -6405,6 +6532,20 @@
       };
     }
 
+    function renderSpecialIncidentStory(list, state, seed) {
+      const incident = state.specialIncident;
+      if (!incident) return null;
+      const player = list.find(card => card.id === incident.cardId);
+      if (!player) return null;
+      const libraryEvent = incident.eventId
+        ? (eventStoryLibrary.events || []).find(event => event.id === incident.eventId)
+        : null;
+      if (libraryEvent) {
+        return renderNarrativeEvent({ event: libraryEvent, player }, { seed, list, era: state.era, state });
+      }
+      return specialSeasonStory(player, seed);
+    }
+
     function buildRegularSeasonLibraryStories(list, state) {
       if (!(eventStoryLibrary.events || []).length) return [];
       const seed = `${state.lineupSeed}|${state.era}|${state.injuryVol}|${state.coachChem}|library-v1`;
@@ -6429,8 +6570,16 @@
       const usedEventIds = new Set();
       const usedFamilies = new Set();
       const stories = [];
+      const incidentStory = renderSpecialIncidentStory(list, state, `${seed}|special-incident`);
+      if (incidentStory) {
+        stories.push(incidentStory);
+        if (incidentStory.eventId) usedEventIds.add(incidentStory.eventId);
+        if (incidentStory.eventFamily) usedFamilies.add(incidentStory.eventFamily);
+      }
 
       directionPlan.forEach((direction, index) => {
+        if (stories.length >= 3) return;
+        if (incidentStory && index === 0 && direction === "negative") return;
         const contexts = direction === "positive"
           ? ["overperform", "win", "any"]
           : direction === "negative"
@@ -6492,6 +6641,67 @@
       return stories.slice(0, 3);
     }
 
+    function selectPlayoffExclusiveNarrativeEvent({ list, seed, era, roundKey, contexts, opponentType }) {
+      const eligible = (eventStoryLibrary.events || []).flatMap(event => {
+        if (event.stage !== "playoffs" || event.genericizable || event.direction !== "negative") return [];
+        if (!(event.eras || []).some(item => item === "any" || item === era)) return [];
+        if (!(event.rounds || []).some(item => item === "any" || item === roundKey)) return [];
+        if (!(event.resultContexts || []).some(item => item === "any" || contexts.includes(item))) return [];
+        if (!(event.opponentTypes || []).some(item => item === "any" || item === opponentType)) return [];
+        const cardCandidates = eventNarrativeCardCandidates(event, list);
+        if (!cardCandidates.length) return [];
+        const appearanceRate = event.severity === "catastrophic" ? .26 : .38;
+        const roll = seededNoise(`${seed}|exclusive|${event.id}`);
+        return roll < appearanceRate ? [{ event, cardCandidates, roll, appearanceRate }] : [];
+      });
+      if (!eligible.length) return null;
+      eligible.sort((left, right) => (left.roll / left.appearanceRate) - (right.roll / right.appearanceRate));
+      const chosen = eligible[0];
+      const player = seededWeightedPick(
+        chosen.cardCandidates,
+        card => card.impact + card.usage * .35,
+        `${seed}|exclusive-player|${chosen.event.id}`
+      );
+      return { event: chosen.event, player };
+    }
+
+    function buildUpsetHighlightBeat(opponent, seed, roundName, teamWins, opponentWins) {
+      const scoreText = `${opponentWins}-${teamWins}`;
+      if (opponent.star === "达米安·利拉德") {
+        return {
+          label: "爆冷名场面",
+          text: `${roundName}终场前，达米安·利拉德把时间压到最后一秒，在距离三分线两步的位置迎着防守命中超远三分；${opponent.team}就此以 ${scoreText} 结束系列赛。`,
+          eventId: "upset-highlight-lillard-deep-three",
+          eventFamily: "upset-signature-moment"
+        };
+      }
+      if (opponent.star === "斯蒂芬·库里") {
+        return {
+          label: "爆冷名场面",
+          text: `${roundName}最后一分钟，斯蒂芬·库里借掩护后从中线附近突然拔起命中超远三分，随后又用一次夹击后的分球锁定胜局；${opponent.team}以 ${scoreText} 晋级。`,
+          eventId: "upset-highlight-curry-range",
+          eventFamily: "upset-signature-moment"
+        };
+      }
+      const moments = {
+        deepShooter: `${opponent.star}在终场前迎着换防命中一记超远三分，${opponent.team}以 ${scoreText} 带走系列赛。`,
+        movementShooter: `${opponent.star}从底线绕过双掩护，在终场前接球命中制胜投篮，${opponent.team}以 ${scoreText} 晋级。`,
+        pickAndRollCreator: `${opponent.star}在最后一攻点名挡拆，吸引两人后把球送到底角，${opponent.team}命中制胜三分并以 ${scoreText} 晋级。`,
+        rimCreator: `${opponent.star}在最后一攻突破第一道防线，顶着协防打成关键二加一，${opponent.team}以 ${scoreText} 完成爆冷。`,
+        midrangeCreator: `${opponent.star}在终场前用节奏晃开半步，命中高难度中距离，${opponent.team}以 ${scoreText} 结束系列赛。`,
+        twoWayWing: `${opponent.star}先在防守端完成抢断，随后反击命中制胜球，${opponent.team}以 ${scoreText} 晋级。`,
+        interiorHub: `${opponent.star}在最后一攻吸引夹击后送出背传，队友完成压哨终结，${opponent.team}以 ${scoreText} 晋级。`,
+        postScorer: `${opponent.star}在最后一攻抢到深位并完成强硬终结，${opponent.team}以 ${scoreText} 淘汰球队。`,
+        interiorPower: `${opponent.star}在终场前抢下关键前场篮板并补篮得手，${opponent.team}以 ${scoreText} 晋级。`
+      };
+      return {
+        label: "爆冷名场面",
+        text: moments[opponent.style] || `${opponent.star}在最后一攻完成制胜回合，${opponent.team}以 ${scoreText} 结束系列赛。`,
+        eventId: `upset-highlight-${opponent.style || "clutch"}`,
+        eventFamily: "upset-signature-moment"
+      };
+    }
+
     function buildPlayoffLibraryBeats({ list, era, roundName, roundIndex, probability, win, teamWins, opponentWins, opponent }) {
       if (!(eventStoryLibrary.events || []).length) return [];
       const lineupSeed = list.map(card => card.id).join("-");
@@ -6523,7 +6733,10 @@
       const beats = [];
 
       familyPlan.forEach((preferredFamilies, index) => {
-        const entry = selectNarrativeEvent({
+        const exclusiveEntry = !win && index === 2
+          ? selectPlayoffExclusiveNarrativeEvent({ list, seed, era, roundKey, contexts, opponentType })
+          : null;
+        const entry = exclusiveEntry || selectNarrativeEvent({
           stage: "playoffs",
           list,
           seed: `${seed}|${index}`,
@@ -6561,6 +6774,9 @@
           eventSupport: story.eventSupport
         });
       });
+      if (upsetLoss && beats.length >= 2) {
+        beats[1] = buildUpsetHighlightBeat(opponent, `${seed}|upset-highlight`, roundName, teamWins, opponentWins);
+      }
       return beats;
     }
 
@@ -6653,7 +6869,21 @@
         }
       };
       const story = stories[special];
-      return story ? { tone: "negative", ...story } : null;
+      return story ? {
+        tone: "negative",
+        ...story,
+        eventId: `rs-special-${special}`,
+        eventFamily: `exclusive-${special}`,
+        eventPlayerKey: card.name,
+        eventPlayer: card.displayName,
+        sourceIds: special === "offCourtDiscipline"
+          ? ["nba-morant-suspension"]
+          : special === "lockerRoomDiscipline"
+            ? ["nba-arenas-statement"]
+            : special === "technicalSuspension"
+              ? ["nba-draymond-suspension", "nba-playing-rules"]
+              : []
+      } : null;
     }
 
     function positiveProfilesFor(card) {
@@ -7018,6 +7248,19 @@
       };
     }
 
+    function finalizeSeasonTimeline(stories, closingStory) {
+      const unique = [];
+      const seen = new Set();
+      for (const story of [...stories, closingStory]) {
+        if (!story || seen.has(story.title)) continue;
+        seen.add(story.title);
+        unique.push(story);
+      }
+      if (unique.length <= 4) return unique;
+      const withoutClosing = unique.filter(story => story.title !== closingStory.title);
+      return [...withoutClosing.slice(0, 3), closingStory];
+    }
+
     function buildSeasonStories(list, state) {
       const storySeed = `${state.lineupSeed}|${state.era}|${state.injuryVol}|${state.coachChem}`;
       const primary = buildSeasonStory(list, state);
@@ -7026,23 +7269,17 @@
       const supportPool = list.filter(card => card.id !== top.id && card.id !== riskiest.id);
       const support = seededWeightedPick(supportPool.length ? supportPool : list, card => card.pass + card.def + card.impact, `${storySeed}|timeline-support`);
       const libraryStories = buildRegularSeasonLibraryStories(list, state);
+      const bondStories = buildLineupBondStories(state.lineupBonds || []);
+      const closingStory = seasonClosingStory(top, support, state, `${storySeed}|closing`);
 
       if (libraryStories.length >= 3) {
-        const expandedStories = [
+        return finalizeSeasonTimeline([
+          ...bondStories,
           ...libraryStories,
-          seasonClosingStory(top, support, state, `${storySeed}|closing`)
-        ];
-        const uniqueLibraryStories = [];
-        const seenLibraryTitles = new Set();
-        for (const story of expandedStories) {
-          if (!story || seenLibraryTitles.has(story.title)) continue;
-          seenLibraryTitles.add(story.title);
-          uniqueLibraryStories.push(story);
-        }
-        return uniqueLibraryStories.slice(0, 4);
+        ], closingStory);
       }
 
-      const stories = [primary];
+      const stories = [...bondStories, primary];
 
       if (primary.tone === "negative" || primary.tone === "critical") {
         const reboundStreak = seasonStreakLength(state.wins, `${storySeed}|rebound-streak`, "recovery");
@@ -7056,16 +7293,7 @@
         stories.push(seasonResponseStory(top, support, state, `${storySeed}|response`));
       }
 
-      stories.push(seasonClosingStory(top, support, state, `${storySeed}|closing`));
-
-      const unique = [];
-      const seen = new Set();
-      for (const story of stories) {
-        if (!story || seen.has(story.title)) continue;
-        seen.add(story.title);
-        unique.push(story);
-      }
-      return unique.slice(0, 4);
+      return finalizeSeasonTimeline(stories, closingStory);
     }
 
     const playoffStoryOpponents = {
