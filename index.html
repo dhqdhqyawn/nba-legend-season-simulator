@@ -6911,7 +6911,9 @@
         opponentTeam: concreteOpponent.team,
         opponentStar: concreteOpponent.star,
         round: roundName,
-        game: `G${2 + Math.floor(seededNoise(`${seed}|game`) * 5)}`,
+        game: roundName === "常规赛"
+          ? `G${2 + Math.floor(seededNoise(`${seed}|game`) * 5)}`
+          : playoffStoryGameLabel(roundName, teamWins, opponentWins, `${seed}|game`),
         seriesScore: `${teamWins}-${opponentWins}`,
         wins,
         losses: 82 - wins,
@@ -7737,42 +7739,70 @@
 
     const playoffStoryOpponents = {
       modern: [
-        { team: "掘金", star: "尼古拉·约基奇", style: "interiorHub" },
-        { team: "凯尔特人", star: "杰森·塔图姆", style: "twoWayWing" },
-        { team: "独行侠", star: "卢卡·东契奇", style: "pickAndRollCreator" },
-        { team: "雄鹿", star: "达米安·利拉德", style: "deepShooter" },
-        { team: "雷霆", star: "谢伊·吉尔杰斯-亚历山大", style: "rimCreator" },
-        { team: "尼克斯", star: "杰伦·布伦森", style: "midrangeCreator" },
-        { team: "森林狼", star: "安东尼·爱德华兹", style: "rimCreator" },
-        { team: "骑士", star: "多诺万·米切尔", style: "pickAndRollCreator" },
-        { team: "太阳", star: "德文·布克", style: "midrangeCreator" },
-        { team: "快船", star: "科怀·伦纳德", style: "twoWayWing" }
+        { team: "掘金", star: "尼古拉·约基奇", style: "interiorHub", conference: "west" },
+        { team: "凯尔特人", star: "杰森·塔图姆", style: "twoWayWing", conference: "east" },
+        { team: "独行侠", star: "卢卡·东契奇", style: "pickAndRollCreator", conference: "west" },
+        { team: "雄鹿", star: "达米安·利拉德", style: "deepShooter", conference: "east" },
+        { team: "雷霆", star: "谢伊·吉尔杰斯-亚历山大", style: "rimCreator", conference: "west" },
+        { team: "尼克斯", star: "杰伦·布伦森", style: "midrangeCreator", conference: "east" },
+        { team: "森林狼", star: "安东尼·爱德华兹", style: "rimCreator", conference: "west" },
+        { team: "骑士", star: "多诺万·米切尔", style: "pickAndRollCreator", conference: "east" },
+        { team: "太阳", star: "德文·布克", style: "midrangeCreator", conference: "west" },
+        { team: "快船", star: "科怀·伦纳德", style: "twoWayWing", conference: "west" }
       ],
       balanced: [
-        { team: "勇士", star: "斯蒂芬·库里", style: "deepShooter" },
-        { team: "湖人", star: "科比·布莱恩特", style: "twoWayScorer" },
-        { team: "马刺", star: "蒂姆·邓肯", style: "interiorHub" },
-        { team: "火箭", star: "哈基姆·奥拉朱旺", style: "postScorer" },
-        { team: "凯尔特人", star: "拉里·伯德", style: "wingCreator" },
-        { team: "开拓者", star: "达米安·利拉德", style: "deepShooter" },
-        { team: "热火", star: "德怀恩·韦德", style: "rimCreator" },
-        { team: "活塞", star: "昌西·比卢普斯", style: "pickAndRollCreator" },
-        { team: "独行侠", star: "德克·诺维茨基", style: "wingCreator" },
-        { team: "太阳", star: "史蒂夫·纳什", style: "pickAndRollCreator" }
+        { team: "勇士", star: "斯蒂芬·库里", style: "deepShooter", conference: "west" },
+        { team: "湖人", star: "科比·布莱恩特", style: "twoWayScorer", conference: "west" },
+        { team: "马刺", star: "蒂姆·邓肯", style: "interiorHub", conference: "west" },
+        { team: "火箭", star: "哈基姆·奥拉朱旺", style: "postScorer", conference: "west" },
+        { team: "凯尔特人", star: "拉里·伯德", style: "wingCreator", conference: "east" },
+        { team: "开拓者", star: "达米安·利拉德", style: "deepShooter", conference: "west" },
+        { team: "热火", star: "德怀恩·韦德", style: "rimCreator", conference: "east" },
+        { team: "活塞", star: "昌西·比卢普斯", style: "pickAndRollCreator", conference: "east" },
+        { team: "独行侠", star: "德克·诺维茨基", style: "wingCreator", conference: "west" },
+        { team: "太阳", star: "史蒂夫·纳什", style: "pickAndRollCreator", conference: "west" }
       ],
       physical: [
-        { team: "湖人", star: "沙奎尔·奥尼尔", style: "interiorPower" },
-        { team: "马刺", star: "蒂姆·邓肯", style: "interiorHub" },
-        { team: "活塞", star: "昌西·比卢普斯", style: "pickAndRollCreator" },
-        { team: "步行者", star: "雷吉·米勒", style: "movementShooter" },
-        { team: "公牛", star: "迈克尔·乔丹", style: "twoWayScorer" },
-        { team: "尼克斯", star: "帕特里克·尤因", style: "postScorer" },
-        { team: "爵士", star: "卡尔·马龙", style: "interiorPower" },
-        { team: "湖人", star: "科比·布莱恩特", style: "twoWayScorer" },
-        { team: "76人", star: "阿伦·艾弗森", style: "rimCreator" },
-        { team: "火箭", star: "特雷西·麦克格雷迪", style: "wingCreator" }
+        { team: "湖人", star: "沙奎尔·奥尼尔", style: "interiorPower", conference: "west" },
+        { team: "马刺", star: "蒂姆·邓肯", style: "interiorHub", conference: "west" },
+        { team: "活塞", star: "昌西·比卢普斯", style: "pickAndRollCreator", conference: "east" },
+        { team: "步行者", star: "雷吉·米勒", style: "movementShooter", conference: "east" },
+        { team: "公牛", star: "迈克尔·乔丹", style: "twoWayScorer", conference: "east" },
+        { team: "尼克斯", star: "帕特里克·尤因", style: "postScorer", conference: "east" },
+        { team: "爵士", star: "卡尔·马龙", style: "interiorPower", conference: "west" },
+        { team: "湖人", star: "科比·布莱恩特", style: "twoWayScorer", conference: "west" },
+        { team: "76人", star: "阿伦·艾弗森", style: "rimCreator", conference: "east" },
+        { team: "火箭", star: "特雷西·麦克格雷迪", style: "wingCreator", conference: "west" }
       ]
     };
+
+    const playoffOpponentRoundOffsets = {
+      "首轮": 0,
+      "分区半决赛": 1,
+      "分区决赛": 2,
+      "附加赛": 3,
+      "总决赛": 0
+    };
+
+    function playoffPathConference(list, era) {
+      const lineupSeed = list.map(card => card.id).join("-");
+      return seededNoise(`${lineupSeed}|${era}|playoff-conference`) < .5 ? "east" : "west";
+    }
+
+    function playoffOpponentForRound(list, era, roundName, roundIndex = 0, opponentStep = 0) {
+      const lineupSeed = list.map(card => card.id).join("-");
+      const opponentPool = playoffStoryOpponents[era] || playoffStoryOpponents.balanced;
+      const pathConference = playoffPathConference(list, era);
+      const opponentConference = roundName === "总决赛"
+        ? (pathConference === "east" ? "west" : "east")
+        : pathConference;
+      const conferencePool = opponentPool.filter(opponent => opponent.conference === opponentConference);
+      const eligiblePool = conferencePool.length ? conferencePool : opponentPool;
+      const opponentOffset = Math.floor(seededNoise(`${lineupSeed}|${era}|${opponentConference}|opponent-order`) * eligiblePool.length);
+      const roundOffset = (playoffOpponentRoundOffsets[roundName] ?? roundIndex) + opponentStep;
+      const opponent = eligiblePool[(opponentOffset + roundOffset) % eligiblePool.length];
+      return { ...opponent, pathConference };
+    }
 
     function opponentAttackBeat(opponent, storySeed) {
       const beats = {
@@ -7900,12 +7930,10 @@
       return `${card.displayName}在系列赛中段被迫退出原有轮换，${opponent.team}抓住了球队重新分工的窗口。`;
     }
 
-    function buildRoundStory({ list, era, roundName, roundIndex = 0, probability, win, teamWins, opponentWins }) {
+    function buildRoundStory({ list, era, roundName, roundIndex = 0, opponentStep = 0, probability, win, teamWins, opponentWins }) {
       const lineupSeed = list.map(card => card.id).join("-");
       const storySeed = `${lineupSeed}|${era}|${roundName}|${roundIndex}`;
-      const opponentPool = playoffStoryOpponents[era] || playoffStoryOpponents.balanced;
-      const opponentOffset = Math.floor(seededNoise(`${lineupSeed}|${era}|opponent-order`) * opponentPool.length);
-      const opponent = opponentPool[(opponentOffset + roundIndex) % opponentPool.length];
+      const opponent = playoffOpponentForRound(list, era, roundName, roundIndex, opponentStep);
       const opponentTeam = opponent.team;
       const opponentStar = opponent.star;
       const top = [...list].sort((a, b) => b.impact - a.impact)[0];
@@ -7930,6 +7958,8 @@
         return {
           opponentTeam,
           opponentStar,
+          opponentConference: opponent.conference,
+          pathConference: opponent.pathConference,
           upset,
           beats: libraryBeats,
           detail: libraryBeats.map(beat => beat.text).join("")
@@ -7993,10 +8023,17 @@
       return {
         opponentTeam,
         opponentStar,
+        opponentConference: opponent.conference,
+        pathConference: opponent.pathConference,
         upset,
         beats: storyBeats,
         detail: storyBeats.map(beat => beat.text).join("")
       };
+    }
+
+    function buildPlayoffPathRoundStory(options) {
+      const story = buildRoundStory(options);
+      return normalizePlayoffStoryGameReferences(story, options.roundName, options.teamWins, options.opponentWins);
     }
 
     function hydrateStoredStories(result, list) {
@@ -8022,11 +8059,12 @@
         const win = round.status === "win";
         const teamWins = parsedScore ? Number(parsedScore[1]) : (win ? 1 : 0);
         const opponentWins = parsedScore ? Number(parsedScore[2]) : (win ? 0 : 1);
-        const story = buildRoundStory({
+        const story = buildPlayoffPathRoundStory({
           list,
           era: result.era || el.era.value,
           roundName: round.name,
           roundIndex,
+          opponentStep: round.name === "附加赛" ? Math.max(0, (round.games?.length || 1) - 1) : 0,
           probability: Number(round.probability || .5),
           win,
           teamWins,
@@ -8035,15 +8073,18 @@
         round.bracketLabel = round.opponentLabel;
         round.opponentTeam = story.opponentTeam;
         round.opponentStar = story.opponentStar;
+        round.opponentConference = story.opponentConference;
+        round.pathConference = story.pathConference;
         round.opponentLabel = `${story.opponentTeam}（${story.opponentStar}）`;
         round.upset = story.upset;
         round.storyBeats = story.beats;
         round.storyDetail = story.detail;
         round.note = round.name === "附加赛"
-          ? `对阵 ${round.opponentLabel} · 单场定胜负`
+          ? playInPathNote(round.games, round.opponentLabel)
           : `对阵 ${round.opponentLabel}${round.name === "首轮" && round.bracketLabel ? ` · ${round.bracketLabel}` : ""}`;
       });
       result.narrativeArc = buildResultNarrativeArc(result, list);
+      syncNarrativeArcToPlayoff(result, result.narrativeArc);
     }
 
     function estimatedPlayoffSeed(wins) {
@@ -8089,6 +8130,111 @@
       return 0;
     }
 
+    function playoffRoundGameCount(roundName, teamWins, opponentWins) {
+      if (roundName === "附加赛") return 1;
+      const completedGames = Math.max(0, Number(teamWins) || 0) + Math.max(0, Number(opponentWins) || 0);
+      return clamp(Math.round(completedGames), 1, 7);
+    }
+
+    function playoffStoryGameLabel(roundName, teamWins, opponentWins, seed) {
+      const lastGame = playoffRoundGameCount(roundName, teamWins, opponentWins);
+      const firstGame = lastGame > 1 ? 2 : 1;
+      const gameSpan = lastGame - firstGame + 1;
+      const game = firstGame + Math.min(gameSpan - 1, Math.floor(seededNoise(seed) * gameSpan));
+      return `G${game}`;
+    }
+
+    function normalizePlayoffGameReferences(value, roundName, teamWins, opponentWins) {
+      const lastGame = playoffRoundGameCount(roundName, teamWins, opponentWins);
+      return String(value || "").replace(/G(\d+)/g, (_, game) => `G${clamp(Number(game), 1, lastGame)}`);
+    }
+
+    function normalizePlayoffStoryGameReferences(story, roundName, teamWins, opponentWins) {
+      const beats = (story.beats || []).map(beat => ({
+        ...beat,
+        label: normalizePlayoffGameReferences(beat.label, roundName, teamWins, opponentWins),
+        text: normalizePlayoffGameReferences(beat.text, roundName, teamWins, opponentWins)
+      }));
+      return {
+        ...story,
+        beats,
+        detail: beats.length
+          ? beats.map(beat => beat.text).join("")
+          : normalizePlayoffGameReferences(story.detail, roundName, teamWins, opponentWins)
+      };
+    }
+
+    function simulatePlayoffRound(roundName, gameProbability, roll) {
+      const winsNeeded = roundName === "附加赛" ? 1 : 4;
+      const probability = clamp(Number(gameProbability), 0, 1);
+      const games = [];
+      let teamWins = 0;
+      let opponentWins = 0;
+      while (teamWins < winsNeeded && opponentWins < winsNeeded) {
+        const game = games.length + 1;
+        const won = Number(roll(game)) < probability;
+        if (won) teamWins += 1;
+        else opponentWins += 1;
+        games.push({
+          number: game,
+          label: `G${game}`,
+          status: won ? "win" : "loss",
+          score: `${teamWins}-${opponentWins}`
+        });
+      }
+      return { teamWins, opponentWins, games };
+    }
+
+    function simulatePlayInPath(gameProbability, roll) {
+      const probability = clamp(Number(gameProbability), 0, 1);
+      const games = [];
+      const play = (number, stage) => {
+        const won = Number(roll(number)) < probability;
+        games.push({
+          number,
+          label: `附加赛第 ${number} 场`,
+          matchGame: "G1",
+          stage,
+          status: won ? "win" : "loss",
+          score: won ? "1-0" : "0-1"
+        });
+        return won;
+      };
+
+      if (play(1, "7/8 排位赛")) {
+        return {
+          qualified: true,
+          playoffSeed: 7,
+          games,
+          storyTeamWins: 1,
+          storyOpponentWins: 0,
+          pathProbability: probability
+        };
+      }
+
+      const qualified = play(2, "8号种子争夺战");
+      return {
+        qualified,
+        playoffSeed: qualified ? 8 : null,
+        games,
+        storyTeamWins: qualified ? 1 : 0,
+        storyOpponentWins: qualified ? 0 : 1,
+        pathProbability: (1 - probability) * (qualified ? probability : 1 - probability)
+      };
+    }
+
+    function playInPathNote(games, fallbackOpponent) {
+      const path = (games || []).map(game => {
+        const opponent = game.opponentTeam
+          ? `${game.opponentTeam}${game.opponentStar ? `（${game.opponentStar}）` : ""}`
+          : fallbackOpponent;
+        return `${game.stage || game.label}对阵 ${opponent} · ${game.status === "win" ? "胜" : "负"}`;
+      });
+      return path.length
+        ? `${path.join("；")} · 每场单场定胜负`
+        : `对阵 ${fallbackOpponent} · 单场定胜负`;
+    }
+
     function logit(probability) {
       const p = clamp(probability, .001, .999);
       return Math.log(p / (1 - p));
@@ -8103,6 +8249,10 @@
         else high = mid;
       }
       return (low + high) / 2;
+    }
+
+    function playoffDominancePower(healthyWins) {
+      return clamp((Number(healthyWins) - 63) * .5, 0, 4.5);
     }
 
     function weightedTop(values, weights) {
@@ -8166,11 +8316,17 @@
       const closerBonus = closerStrength * .55 + Math.max(0, creatorStrength - 1) * .30;
       const riskTax = r.turnoverRisk * .20 + Math.max(0, Number(r.usageLoad) - 4.25) * 1.2 + r.eraPenalty * profile.eraPenaltyTax;
       const rawPower = playoffOffense * .54 + playoffDefense * .42 + clamp(r.adv, 40, 110) * .04 + rotationTalentBonus + structureBonus + closerBonus - riskTax;
-      const power = 90 + (rawPower - 90) * .72;
+      const basePower = 90 + (rawPower - 90) * .72;
+      // Healthy structural dominance carries into every round without rewarding
+      // a lineup that reached its displayed win total through positive season noise.
+      const dominancePower = playoffDominancePower(r.healthyWins ?? r.wins);
+      const power = basePower + dominancePower;
       if (r.wins < 40) {
         return {
           seed: playoffSeed(r.wins),
           power: Math.round(power),
+          basePower: Number(basePower.toFixed(2)),
+          dominancePower: Number(dominancePower.toFixed(2)),
           offense: Math.round(playoffOffense),
           defense: Math.round(playoffDefense),
           titleOdds: 0,
@@ -8181,6 +8337,7 @@
 
       const isPlayIn = r.wins < 45;
       const seed = estimatedPlayoffSeed(r.wins);
+      const conference = playoffPathConference(list, r.era);
       const opponentSeed = 9 - seed;
       const firstRoundSeriesPrior = { 1: .93, 2: .91, 3: .82, 4: .56, 5: .44, 6: .18, 7: .09, 8: .07 };
       const expectedPowerBySeed = { 1: 92, 2: 89, 3: 87, 4: 85, 5: 84, 6: 82, 7: 80, 8: 78 };
@@ -8195,44 +8352,96 @@
       );
 
       const seedEdge = seed <= 2 ? 1.5 : seed <= 4 ? 1 : seed <= 6 ? .5 : 0;
+      const firstRoundGameProbability = bracketSeed => {
+        const baselineGameProbability = seriesToGameProbability(firstRoundSeriesPrior[bracketSeed]);
+        const powerResidual = (power - expectedPowerBySeed[bracketSeed]) / 12;
+        return clamp(logistic(logit(baselineGameProbability) + powerResidual), .12, .88);
+      };
       const gameProbabilities = roundPlan.map(round => {
-        if (round.kind === "seededFirstRound") {
-          const baselineGameProbability = seriesToGameProbability(firstRoundSeriesPrior[seed]);
-          const powerResidual = (power - expectedPowerBySeed[seed]) / 12;
-          return clamp(logistic(logit(baselineGameProbability) + powerResidual), .12, .88);
-        }
+        if (round.kind === "seededFirstRound") return firstRoundGameProbability(seed);
         return clamp(logistic((power - round.opponent + seedEdge) / 12), .12, .88);
       });
       const roundProbabilities = roundPlan.map((round, index) => round.name === "附加赛" ? gameProbabilities[index] : bestOfSevenProbability(gameProbabilities[index]));
-      const titleOdds = clamp(Math.round(roundProbabilities.reduce((product, probability) => product * probability, 1) * 100), 1, 99);
+      const titleProbability = isPlayIn
+        ? (() => {
+            const playInIndex = roundPlan.findIndex(round => round.kind === "playIn");
+            const playInGameProbability = gameProbabilities[playInIndex];
+            const laterRoundProbability = roundPlan.reduce((product, round, index) => (
+              ["playIn", "seededFirstRound"].includes(round.kind) ? product : product * roundProbabilities[index]
+            ), 1);
+            const firstTry = playInGameProbability * bestOfSevenProbability(firstRoundGameProbability(7));
+            const secondTry = (1 - playInGameProbability) * playInGameProbability * bestOfSevenProbability(firstRoundGameProbability(8));
+            return (firstTry + secondTry) * laterRoundProbability;
+          })()
+        : roundProbabilities.reduce((product, probability) => product * probability, 1);
+      const titleOdds = clamp(Math.round(titleProbability * 100), 1, 99);
 
       const rounds = [];
+      const lineupSeed = list.map(card => card.id).join("-");
       let alive = true;
+      let qualifiedSeed = isPlayIn ? null : seed;
       roundPlan.forEach((round, index) => {
         if (!alive) return;
-        const { name, opponentLabel } = round;
-        const probability = roundProbabilities[index];
-        const gameProbability = gameProbabilities[index];
-        let teamWins = 0;
-        let opponentWins = 0;
-        if (name === "附加赛") {
-          const roll = seededNoise(`${list.map(c => c.id).join("-")}|${r.era}|${name}|game-1|playoff-v4-seeded-bracket`);
-          if (roll < gameProbability) teamWins = 1;
-          else opponentWins = 1;
-        } else {
-          for (let game = 1; game <= 7 && teamWins < 4 && opponentWins < 4; game += 1) {
-            const roll = seededNoise(`${list.map(c => c.id).join("-")}|${r.era}|${name}|game-${game}|playoff-v4-seeded-bracket`);
-            if (roll < gameProbability) teamWins += 1;
-            else opponentWins += 1;
-          }
+        const { name } = round;
+        let opponentLabel = round.opponentLabel;
+        let probability = roundProbabilities[index];
+        let gameProbability = gameProbabilities[index];
+        if (round.kind === "seededFirstRound") {
+          const bracketSeed = qualifiedSeed || seed;
+          opponentLabel = `第 ${9 - bracketSeed} 种子`;
+          gameProbability = firstRoundGameProbability(bracketSeed);
+          probability = bestOfSevenProbability(gameProbability);
         }
-        const win = teamWins > opponentWins;
-        const games = name === "附加赛" ? (win ? "胜出" : "出局") : `${teamWins}-${opponentWins}`;
-        const story = buildRoundStory({
+
+        let teamWins;
+        let opponentWins;
+        let gameLog;
+        let win;
+        let roundResult;
+        let scoreProbability;
+        let opponentStep = 0;
+        if (round.kind === "playIn") {
+          const playInOutcome = simulatePlayInPath(
+            gameProbability,
+            game => seededNoise(`${lineupSeed}|${r.era}|${name}|game-${game}|playoff-v4-seeded-bracket`)
+          );
+          gameLog = playInOutcome.games.map((game, gameIndex) => {
+            const gameOpponent = playoffOpponentForRound(list, r.era, name, index, gameIndex);
+            return {
+              ...game,
+              opponentTeam: gameOpponent.team,
+              opponentStar: gameOpponent.star,
+              opponentConference: gameOpponent.conference
+            };
+          });
+          teamWins = playInOutcome.storyTeamWins;
+          opponentWins = playInOutcome.storyOpponentWins;
+          win = playInOutcome.qualified;
+          qualifiedSeed = playInOutcome.playoffSeed;
+          opponentStep = gameLog.length - 1;
+          probability = gameProbability + (1 - gameProbability) * gameProbability;
+          scoreProbability = playInOutcome.pathProbability;
+          roundResult = gameLog.length === 1
+            ? "1 场晋级 · 第 7 种子"
+            : win ? "2 场晋级 · 第 8 种子" : "2 场出局";
+          opponentLabel = gameLog.map(game => game.stage).join(" → ");
+        } else {
+          const outcome = simulatePlayoffRound(
+            name,
+            gameProbability,
+            game => seededNoise(`${lineupSeed}|${r.era}|${name}|game-${game}|playoff-v4-seeded-bracket`)
+          );
+          ({ teamWins, opponentWins, games: gameLog } = outcome);
+          win = teamWins > opponentWins;
+          roundResult = `${teamWins}-${opponentWins}`;
+          scoreProbability = seriesScoreProbability(gameProbability, teamWins, opponentWins);
+        }
+        const story = buildPlayoffPathRoundStory({
           list,
           era: r.era,
           roundName: name,
           roundIndex: index,
+          opponentStep,
           probability,
           win,
           teamWins,
@@ -8241,20 +8450,24 @@
         const concreteOpponent = `${story.opponentTeam}（${story.opponentStar}）`;
         rounds.push({
           name,
-          result: games,
+          result: roundResult,
           status: win ? "win" : "loss",
+          games: gameLog,
           opponentLabel: concreteOpponent,
           bracketLabel: opponentLabel,
+          qualifiedSeed: name === "附加赛" ? qualifiedSeed : undefined,
           opponentTeam: story.opponentTeam,
           opponentStar: story.opponentStar,
+          opponentConference: story.opponentConference,
+          pathConference: story.pathConference,
           upset: story.upset,
           storyBeats: story.beats,
           storyDetail: story.detail,
           probability: Number(probability.toFixed(4)),
           gameProbability: Number(gameProbability.toFixed(4)),
-          scoreProbability: name === "附加赛" ? Number((win ? gameProbability : 1 - gameProbability).toFixed(4)) : Number(seriesScoreProbability(gameProbability, teamWins, opponentWins).toFixed(4)),
+          scoreProbability: Number(scoreProbability.toFixed(4)),
           note: name === "附加赛"
-            ? `对阵 ${concreteOpponent} · 单场定胜负`
+            ? playInPathNote(gameLog, concreteOpponent)
             : `对阵 ${concreteOpponent}${name === "首轮" ? ` · ${opponentLabel}` : ""}`
         });
         alive = win;
@@ -8266,7 +8479,22 @@
       const note = champion
         ? "四轮全部晋级；球队在不同对手面前都找到了对应的赢球方式。"
         : `${exitRound}对阵 ${finalRound?.opponentLabel || "对手"} 止步；决定系列赛的回合已经写进比赛故事。`;
-      return { seed: playoffSeed(r.wins), power: Math.round(power), offense: Math.round(playoffOffense), defense: Math.round(playoffDefense), titleOdds, rounds, note };
+      const resolvedSeedLabel = isPlayIn
+        ? (qualifiedSeed ? `附加赛晋级 · 分区第 ${qualifiedSeed} 种子` : "附加赛出局")
+        : playoffSeed(r.wins);
+      return {
+        seed: resolvedSeedLabel,
+        qualifiedSeed,
+        conference,
+        power: Math.round(power),
+        basePower: Number(basePower.toFixed(2)),
+        dominancePower: Number(dominancePower.toFixed(2)),
+        offense: Math.round(playoffOffense),
+        defense: Math.round(playoffDefense),
+        titleOdds,
+        rounds,
+        note
+      };
     }
 
     const narrativeArcProtectedPairs = new Set([
@@ -8706,6 +8934,227 @@
       };
     }
 
+    const playoffShockRate = .08;
+    const playoffShockDisciplineTags = new Set([
+      "disciplineSuspension",
+      "technicalSuspension",
+      "technicalVolatility",
+      "lockerRoomDiscipline",
+      "offCourtDiscipline",
+      "practiceConflict",
+      "unapprovedAbsence"
+    ]);
+
+    function playoffShockTriggered(seed) {
+      return seededNoise(`${seed}|playoff-shock-gate-v2`) < playoffShockRate;
+    }
+
+    function playoffShockGameNumbers(round) {
+      const score = /^(\d+)-(\d+)$/.exec(round?.result || "");
+      const games = round?.name === "附加赛" ? 1 : Math.max(1, Number(score?.[1] || 0) + Number(score?.[2] || 0));
+      return {
+        games,
+        trigger: round?.name === "附加赛" ? 1 : Math.min(games, Math.max(2, Math.ceil(games * .55))),
+        finale: games
+      };
+    }
+
+    function playoffShockBeat(label, text, family, player) {
+      return {
+        label,
+        text,
+        eventId: `playoff-shock-${family}`,
+        eventFamily: `playoff-shock-${family}`,
+        eventPlayerId: player?.id,
+        eventPlayerKey: player?.name,
+        eventPlayer: player?.displayName
+      };
+    }
+
+    function playoffShockDisciplineText(card, gameLabel) {
+      const specials = card.eventProfile?.specials || [];
+      if (specials.includes("offCourtDiscipline")) {
+        return `${gameLabel}开赛前，联盟宣布${card.displayName}因场外持枪直播事件停赛余下系列赛；球队当天才把他的推进、突破和收官回合拆给其他四人。`;
+      }
+      if (specials.includes("lockerRoomDiscipline")) {
+        return `${gameLabel}赛前，${card.displayName}卷入更衣室持枪冲突并接受联盟调查，球队立即宣布内部停赛；原定后场轮换在不到六小时内全部重排。`;
+      }
+      if (specials.includes("practiceConflict")) {
+        return `${gameLabel}前的训练中，${card.displayName}与教练组的争执升级为肢体冲突，球队当晚宣布停赛两场；系列赛最关键的轮换位置突然空缺。`;
+      }
+      if (specials.includes("unapprovedAbsence")) {
+        return `${gameLabel}赛前集合时，${card.displayName}没有按时报到且无法出战，球队随后给予一场内部停赛；教练组直到热身结束才确认首发。`;
+      }
+      return `${gameLabel}第四节，${card.displayName}在死球后与对手发生冲突，被直接驱逐；联盟次日上午追加停赛一场，球队因此失去他的防守指挥和关键球任务。`;
+    }
+
+    function playoffShockInjuryText(card, gameLabel) {
+      const profile = card.eventProfile?.injury || "availability";
+      if (/knee/.test(profile)) return `${gameLabel}第二节，${card.displayName}落地后膝盖无法承重；核磁检查确认结构性损伤，医疗组当晚宣布他缺席余下系列赛。`;
+      if (/foot/.test(profile)) return `${gameLabel}赛后，${card.displayName}被发现足部应力性骨折；他没有参加下一次投篮训练，并被直接移出余下系列赛名单。`;
+      if (/ankle/.test(profile)) return `${gameLabel}第三节，${card.displayName}踩到防守人脚面遭遇高位脚踝扭伤；医疗组确认至少缺席两场，系列赛轮换当场缩短。`;
+      if (/hamstring|lowerBody/.test(profile)) return `${gameLabel}一次反击中，${card.displayName}突然捂住腿后侧退出比赛；检查结果为二级拉伤，球队宣布他缺席余下系列赛。`;
+      if (/back/.test(profile)) return `${gameLabel}热身时，${card.displayName}腰背痉挛到无法完成弯腰动作；封闭治疗无效后，他被列为余下系列赛无法出战。`;
+      return `${gameLabel}一次对抗落地后，${card.displayName}出现严重下肢伤势并被队友搀扶离场；医疗组当晚宣布他赛季报销。`;
+    }
+
+    function buildPlayoffShockArc(result, list, actors, context, seed, force = false) {
+      const round = context.lostRound;
+      if (!round || (!force && !playoffShockTriggered(seed))) return null;
+      const opponentTeam = round.opponentTeam || "对手";
+      const opponentStar = round.opponentStar || "对方核心";
+      const { trigger, finale } = playoffShockGameNumbers(round);
+      const triggerLabel = round.name === "附加赛" ? "附加赛" : `G${trigger}`;
+      const finaleLabel = round.name === "附加赛" ? "终场" : `G${finale}`;
+      const disciplineCards = list.filter(card => (card.eventProfile?.specials || []).some(tag => playoffShockDisciplineTags.has(tag)));
+      const disciplineCard = seededWeightedPick(disciplineCards, card => card.usage + card.impact, `${seed}|shock-discipline`) || null;
+      const injuryCard = actors.injuryCard;
+      const injuryRisk = Number(injuryCard.availability?.durabilityRisk || 0);
+      const pair = actors.rolePair;
+      const pairHeat = pair ? pair.volatility + pair.scoringOverlap / 28 : 0;
+      const candidates = [
+        { family: "medical-emergency", weight: .65 + injuryRisk * 3.4 },
+        { family: "locker-room-fight", weight: pair ? .65 + pairHeat * 1.8 : .05 },
+        { family: "coach-star-break", weight: .72 + Number(actors.top.risk?.roleVolatility || 0) * 2 },
+        { family: "leaked-audio", weight: .62 + Number(actors.support.risk?.roleVolatility || 0) * 1.8 },
+        { family: "opponent-miracle", weight: round.upset ? 1.45 : .85 }
+      ];
+      if (disciplineCard) candidates.push({ family: "discipline-suspension", weight: 2.4 });
+      const family = seededWeightedPick(candidates, item => item.weight, `${seed}|shock-family`).family;
+      const outcome = `${opponentTeam}最终以 ${round.result} 晋级；这次模拟把系列赛失利落在这起突发事件上。`;
+      let badge = "本局虚构剧情";
+      let headline;
+      let deck;
+      let chapters;
+      let beats;
+
+      if (family === "medical-emergency") {
+        const eventText = playoffShockInjuryText(injuryCard, triggerLabel);
+        const support = actors.support.id === injuryCard.id ? actors.top : actors.support;
+        badge = "本局伤病剧情";
+        headline = `${injuryCard.displayName}在${round.name}突然赛季报销`;
+        deck = `${triggerLabel}的伤退直接拿走一名核心，球队不是“状态不好”，而是必须在系列赛中途重写全部轮换。`;
+        chapters = [
+          narrativeArcChapter(round.name, `${injuryCard.displayName}前两场已承担最高负荷`, `${injuryCard.displayName}同时负责主攻与关键对位，教练组原计划在下一场减少他的出场时间。`, "neutral"),
+          narrativeArcChapter(triggerLabel, `${injuryCard.displayName}被直接搀扶离场`, eventText, "critical"),
+          narrativeArcChapter("伤病名单", `${support.displayName}临时接过两份工作`, `${support.displayName}增加持球与防守任务，但球队少了一个稳定轮换点，最后两场始终无法恢复原来的攻防顺序。`, "negative"),
+          narrativeArcChapter("系列赛结局", "核心缺阵后没有等来奇迹", outcome, "negative")
+        ];
+        beats = [
+          playoffShockBeat(`${triggerLabel} 伤退`, eventText, family, injuryCard),
+          playoffShockBeat("紧急轮换", `${support.displayName}被迫同时承担第二持球点和关键对位，原定五人轮换从这一刻失效。`, family, support),
+          playoffShockBeat("出局", outcome, family, injuryCard)
+        ];
+      } else if (family === "discipline-suspension") {
+        const eventText = playoffShockDisciplineText(disciplineCard, triggerLabel);
+        badge = "球员专属事件";
+        headline = `${disciplineCard.displayName}被停赛，球队在${round.name}突然少了一名主力`;
+        deck = "这里没有含糊的“更衣室波动”：驱逐、联盟调查或球队停赛直接造成缺阵，并明确改变后续比赛。";
+        chapters = [
+          narrativeArcChapter(`${triggerLabel}前`, "系列赛仍在原定计划内", `${disciplineCard.displayName}仍承担固定轮换与关键回合，球队没有准备替代方案。`, "neutral"),
+          narrativeArcChapter(triggerLabel, `${disciplineCard.displayName}被驱逐或停赛`, eventText, "critical"),
+          narrativeArcChapter("联盟决定", "处罚落地，轮换无法补齐", `${actors.support.displayName}临时增加出场时间，但球队在防守沟通和收官阶段都少了原定选择。`, "negative"),
+          narrativeArcChapter("系列赛结局", "一次处罚改变整轮比赛", outcome, "negative")
+        ];
+        beats = [
+          playoffShockBeat("处罚爆发", eventText, family, disciplineCard),
+          playoffShockBeat("追加停赛", `${disciplineCard.displayName}确认无法参加下一场，球队把他的任务拆给${actors.support.displayName}和${actors.defender.displayName}。`, family, disciplineCard),
+          playoffShockBeat("出局", outcome, family, disciplineCard)
+        ];
+      } else if (family === "locker-room-fight" && pair) {
+        const first = pair.first;
+        const second = pair.second;
+        const priorLabel = round.name === "附加赛" ? "赛前录像课" : `G${Math.max(1, trigger - 1)}赛后`;
+        headline = `${first.displayName}和${second.displayName}在录像复盘中发生肢体冲突`;
+        deck = "这不是“沟通出现问题”：两人在队友面前发生推搡，球队处罚其中一人，系列赛轮换随即改变。";
+        const fightText = `${priorLabel}，${first.displayName}与${second.displayName}因最后一攻责任争执，口角升级为推搡；工作人员将两人分开，球队取消第二天的联合训练。`;
+        chapters = [
+          narrativeArcChapter(priorLabel, "最后一攻引爆争执", fightText, "critical"),
+          narrativeArcChapter(triggerLabel, `${second.displayName}被内部停赛一场`, `球队公开宣布${second.displayName}因违反队规缺阵，${first.displayName}仍然首发；两人没有共同参加赛前热身。`, "critical"),
+          narrativeArcChapter("更衣室后续", "队友被迫选边，轮换被拆开", `${actors.defender.displayName}试图维持防守沟通，但教练组不再同时使用两人，原本最强阵容没有再次完整登场。`, "negative"),
+          narrativeArcChapter("系列赛结局", "冲突没有在出局前解决", outcome, "negative")
+        ];
+        beats = [
+          playoffShockBeat("肢体冲突", fightText, family, first),
+          playoffShockBeat("内部停赛", `${second.displayName}因违反队规缺阵 ${triggerLabel}，球队最强五人组没有再次完整登场。`, family, second),
+          playoffShockBeat("出局", outcome, family, first)
+        ];
+      } else if (family === "coach-star-break") {
+        const player = actors.top;
+        headline = `${player.displayName}被按在板凳席，赛后公开质疑教练决定`;
+        deck = "核心被弃用、发布会离席、下一场首发调整，三件事都会写清楚，并明确落到具体比赛。";
+        const benchText = `${triggerLabel}第四节还剩 7 分钟时，教练组换下${player.displayName}并没有再让他登场；球队随后被${opponentTeam}逆转。`;
+        chapters = [
+          narrativeArcChapter(triggerLabel, "核心在决胜阶段被弃用", benchText, "critical"),
+          narrativeArcChapter("赛后发布会", `${player.displayName}回答一个问题后离席`, `${player.displayName}明确表示自己不理解被换下的决定，随后提前离开发布会；球队连夜取消第二天的公开采访。`, "negative"),
+          narrativeArcChapter("下一场", "教练没有撤回决定", `${player.displayName}回到首发，但收官阶段仍由${actors.support.displayName}主控；球队连续两场在最后五分钟使用不同阵容。`, "negative"),
+          narrativeArcChapter("系列赛结局", "教练和核心都没有等到下一次调整", outcome, "negative")
+        ];
+        beats = [
+          playoffShockBeat("核心被弃用", benchText, family, player),
+          playoffShockBeat("发布会爆炸", `${player.displayName}公开质疑换人并提前离席，球队次日取消全部采访。`, family, player),
+          playoffShockBeat("出局", outcome, family, player)
+        ];
+      } else if (family === "leaked-audio") {
+        const player = actors.support;
+        headline = `${player.displayName}批评球队分工的内部录音在${round.name}期间流出`;
+        deck = "录音内容、球队处罚和轮换变化都会写清楚；这是一条本局虚构支线，不冒充真实历史。";
+        const leakText = `${triggerLabel}上午，一段球队内部录音被媒体公开，${player.displayName}在录音中直言自己“不会再替错误轮换背锅”；球队确认录音真实并罚款。`;
+        chapters = [
+          narrativeArcChapter(triggerLabel, "内部录音突然公开", leakText, "critical"),
+          narrativeArcChapter("球队处罚", `${player.displayName}被取消一场首发资格`, `球队没有停赛${player.displayName}，但取消他的首发并减少上场时间；${actors.top.displayName}因此提前承担全部主攻。`, "negative"),
+          narrativeArcChapter("媒体日", "每个球员都被追问录音内容", `${actors.defender.displayName}公开要求停止内耗，但球队准备比赛的时间被连续采访和临时会议切碎。`, "negative"),
+          narrativeArcChapter("系列赛结局", "处罚结束了，系列赛也结束了", outcome, "negative")
+        ];
+        beats = [
+          playoffShockBeat("录音泄露", leakText, family, player),
+          playoffShockBeat("取消首发", `${player.displayName}被罚款并取消一场首发资格，球队临时改掉固定轮换。`, family, player),
+          playoffShockBeat("出局", outcome, family, player)
+        ];
+      } else {
+        const highlight = buildUpsetHighlightBeat({
+          team: opponentTeam,
+          star: opponentStar,
+          style: round.opponentStyle || "deepShooter"
+        }, `${seed}|shock-miracle`, round.name, Number((round.result || "0-4").split("-")[0]), Number((round.result || "0-4").split("-")[1]));
+        headline = `${opponentStar}在${finaleLabel}命中超远制胜球，直接终结${round.name}`;
+        deck = "没有凭空制造内部矛盾：这次爆冷由一个清楚、可复述的终场名场面解释。";
+        chapters = [
+          narrativeArcChapter(round.name, "球队一度握有晋级主动权", `${actors.top.displayName}承担第一选择，球队把系列赛拖到最后一场的最后一分钟。`, "positive"),
+          narrativeArcChapter(finaleLabel, `${opponentStar}在最后一攻接管比赛`, highlight.text, "critical"),
+          narrativeArcChapter("录像回放", "制胜球确认有效", `裁判回看出手时间与脚下位置后维持原判，${opponentTeam}在主场开始庆祝晋级。`, "negative"),
+          narrativeArcChapter("系列赛结局", "一个回合决定最终比分", outcome, "negative")
+        ];
+        beats = [
+          playoffShockBeat("决胜时刻", `${finaleLabel}最后一分钟，双方仍只有一个回合的差距。`, family, actors.top),
+          playoffShockBeat("超远绝杀", highlight.text, family, null),
+          playoffShockBeat("回放确认", outcome, family, null)
+        ];
+      }
+
+      return {
+        id: `playoff-shock-${family}-${round.name}`,
+        family: `playoffShock:${family}`,
+        severity: context.severity === "normal" ? "major" : context.severity,
+        tone: "negative",
+        badge,
+        headline,
+        deck,
+        chapters,
+        playoffBeats: beats,
+        shock: true
+      };
+    }
+
+    function syncNarrativeArcToPlayoff(result, arc) {
+      if (!arc?.playoffBeats?.length) return;
+      const lostRound = [...(result.playoff?.rounds || [])].reverse().find(round => round.status === "loss" && round.name !== "常规赛结束");
+      if (!lostRound) return;
+      lostRound.storyBeats = arc.playoffBeats;
+      lostRound.storyDetail = arc.playoffBeats.map(beat => beat.text).join("");
+      lostRound.narrativeFamily = arc.family;
+    }
+
     function buildResultNarrativeArc(result, list) {
       if (!result || !list.length) return null;
       const seed = `${list.map(card => card.id).join("-")}|${result.era}|${result.wins}|story-arc-v1`;
@@ -8741,12 +9190,13 @@
         };
         return buildDisciplineArc(result, list, story, actors, context);
       }
+      const playoffShock = buildPlayoffShockArc(result, list, actors, context, seed);
+      if (playoffShock) return playoffShock;
       if (context.seasonGap >= 10 && result.wins <= 40) return buildInjuryArc(result, actors, context, seed, false);
       if (context.lostRound?.upset) {
-        if (playoffExclusive?.eventFamily === "exclusive-playoff-injury" || (injuryRisk >= .30 && upsetRoll < .30)) {
+        if (playoffExclusive?.eventFamily === "exclusive-playoff-injury") {
           return buildInjuryArc(result, actors, context, seed, true);
         }
-        if (rolePairReady && upsetRoll < .58) return buildRoleConflictArc(result, actors.rolePair, actors, context, seed);
         return buildOpponentIconicArc(result, actors, context);
       }
       if (context.champion) return buildChampionshipArc(result, actors, context);
@@ -9106,6 +9556,7 @@
       `).join("");
       const narrativeArc = r.narrativeArc || buildResultNarrativeArc(r, selectedCards());
       r.narrativeArc = narrativeArc;
+      syncNarrativeArcToPlayoff(r, narrativeArc);
       el.seasonResultArc.hidden = !narrativeArc;
       el.seasonResultArc.innerHTML = narrativeArc ? `
         <div class="season-arc-head">
@@ -9238,6 +9689,7 @@
       const r = calculateTeam(selectedCards());
       r.playoff = calculatePlayoffs(r, selectedCards());
       r.narrativeArc = buildResultNarrativeArc(r, selectedCards());
+      syncNarrativeArcToPlayoff(r, r.narrativeArc);
       lastResult = r;
       ratingsRevealed = true;
       el.tier.textContent = tier(r.wins);
