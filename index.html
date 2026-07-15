@@ -2946,7 +2946,8 @@
       "Avery Bradley": "埃弗里·布拉德利",
       "Matas Buzelis": "马塔斯·布泽利斯",
       "Donovan Clingan": "多诺万·克林根",
-      "Yves Missi": "伊夫·米西"
+      "Yves Missi": "伊夫·米西",
+      "Stephon Castle": "斯蒂芬·卡斯尔"
     };
 
     function localizedVersion(version) {
@@ -4390,7 +4391,8 @@
       ["Avery Bradley","2015-16 All-Defense Guard","Celtics","SG","pointStopper",78,66,91,59,78,68,56,80,61,66,15.197368421052632,0.538,13.2,0.09,0.2,1.4,["一防","后场领防"],{},{"endYear":2016,"games":76,"schedule":82,"rate":0.927,"previousRate":null,"nextRate":null,"windowRate":0.927,"durabilityRisk":0.099,"tier":"stable","source":"work/data-sources/seasons-stats-1950-2017.csv"},{"positive":"defensiveStop","negative":"offensiveConstraint","injury":"availability","injuryEvidence":"games-played-only","specials":[],"versionKey":"Avery Bradley|2015-16 All-Defense Guard"}],
       ["Matas Buzelis","2024-25 Rookie Two-Way Forward","Bulls","SF","twoWayWing",66,63,76,56,72,80,57,76,58,60,8.6,0.571,12.5,0.06,-2.5,-0.2,["新秀","双向前锋"],{},{"endYear":2025,"games":80,"schedule":82,"rate":0.976,"previousRate":null,"nextRate":null,"windowRate":0.976,"durabilityRisk":0.033,"tier":"stable","source":"work/data-sources/2025-players_per_game.csv + advanced.csv"},{"positive":"twoWayRun","negative":"workloadFatigue","injury":"availability","injuryEvidence":"games-played-only","specials":[],"versionKey":"Matas Buzelis|2024-25 Rookie Two-Way Forward"}],
       ["Donovan Clingan","2024-25 Rookie Rim Protector","Trail Blazers","C","defAnchor",77,63,90,54,43,80,91,52,53,66,6.5,0.574,17.4,0.144,-0.3,0.6,["新秀","护框","篮板"],{},{"endYear":2025,"games":67,"schedule":82,"rate":0.817,"previousRate":null,"nextRate":null,"windowRate":0.817,"durabilityRisk":0.247,"tier":"moderate","source":"work/data-sources/2025-players_per_game.csv + advanced.csv"},{"positive":"defensiveAnchor","negative":"foulTrouble","injury":"availability","injuryEvidence":"games-played-only","specials":[],"versionKey":"Donovan Clingan|2024-25 Rookie Rim Protector"}],
-      ["Yves Missi","2024-25 Rookie Vertical Big","Pelicans","C","verticalBig",69,63,79,53,56,86,89,51,56,60,9.1,0.572,15.4,0.089,-3,-0.5,["新秀","空接","篮板"],{},{"endYear":2025,"games":73,"schedule":82,"rate":0.89,"previousRate":null,"nextRate":null,"windowRate":0.89,"durabilityRisk":0.148,"tier":"stable","source":"work/data-sources/2025-players_per_game.csv + advanced.csv"},{"positive":"paintPressure","negative":"foulTrouble","injury":"availability","injuryEvidence":"games-played-only","specials":[],"versionKey":"Yves Missi|2024-25 Rookie Vertical Big"}]
+      ["Yves Missi","2024-25 Rookie Vertical Big","Pelicans","C","verticalBig",69,63,79,53,56,86,89,51,56,60,9.1,0.572,15.4,0.089,-3,-0.5,["新秀","空接","篮板"],{},{"endYear":2025,"games":73,"schedule":82,"rate":0.89,"previousRate":null,"nextRate":null,"windowRate":0.89,"durabilityRisk":0.148,"tier":"stable","source":"work/data-sources/2025-players_per_game.csv + advanced.csv"},{"positive":"paintPressure","negative":"foulTrouble","injury":"availability","injuryEvidence":"games-played-only","specials":[],"versionKey":"Yves Missi|2024-25 Rookie Vertical Big"}],
+      ["Stephon Castle","2024-25 Rookie of the Year","Spurs","SG","floorGeneral",74,72,84,82,60,84,69,63,78,73,14.7,0.522,13.7,0.025,-3.2,-0.6,["最佳新秀","持球后卫","后场领防"],{},{"endYear":2025,"games":81,"schedule":82,"rate":0.988,"previousRate":null,"nextRate":null,"windowRate":0.988,"durabilityRisk":0.016,"tier":"stable","source":"work/data-sources/2025-players_per_game.csv + advanced.csv"},{"positive":"playmakingRun","negative":"spacingConstraint","injury":"availability","injuryEvidence":"games-played-only","specials":[],"versionKey":"Stephon Castle|2024-25 Rookie of the Year"}]
     ];
 
     const archetypeUsage = {
@@ -4502,6 +4504,26 @@
         positions: ["PG", "SF", "PF"],
         evidence: "该版本承担猛龙主要推进与组织任务；纠正原始 SG 标签，按组织前锋定位开放 PG、SF 与 PF",
         source: "https://www.nba.com/player/1630567/scottie-barnes"
+      }],
+      ["Cooper Flagg|2025-26 Rookie of the Year", {
+        positions: ["PG", "SF", "PF"],
+        evidence: "独行侠让 6 英尺 9 英寸的弗拉格担任主要持球人并实际承担控卫职责；保留两个锋线位置并开放 PG",
+        source: "https://www.nba.com/mavs/news/dont-underestimate-kidds-role-in-flagg-winning-rookie-of-the-year"
+      }],
+      ["VJ Edgecombe|2025-26 Rookie Two-Way Guard", {
+        positions: ["PG", "SG"],
+        evidence: "NBA 官方将埃奇库姆列为 Guard；该季场均 4.2 次助攻并承担稳定持球处理，开放两个后场位置",
+        source: "https://www.nba.com/player/1642845/vj-edgecombe/bio"
+      }],
+      ["Dylan Harper|2025-26 Rookie Combo Guard", {
+        positions: ["PG", "SG"],
+        evidence: "马刺官方将哈珀列为后卫；他既可替代主控首发，也能与另一名控卫搭档，开放两个后场位置",
+        source: "https://www.nba.com/news/dylan-harper-exits-game-2"
+      }],
+      ["Stephon Castle|2024-25 Rookie of the Year", {
+        positions: ["PG", "SG"],
+        evidence: "马刺官方将卡斯尔列为后卫；其新秀季长期承担推进和组织任务，开放两个后场位置",
+        source: "https://www.nba.com/news/nba-fantasy-6-sleeper-picks-guards-in-2025-26"
       }],
       ["Jalen Williams|2024-25 Quality Starter", {
         positions: ["SG", "SF"],
@@ -5544,7 +5566,8 @@
         perimeterDefense: card.def * .70 + card.impact * .10 + card.pass * .06 + card.reb * .05 + card.finish * .04 + card.space * .05
           + (stopperRole ? 5 : 0) + (/领防|一防|二防/.test(tags) ? 3 : 0) - (playsSlot(card, 5) && !/换防/.test(tags) ? 10 : 0),
         switchDefense: card.def * .62 + card.impact * .10 + card.pass * .06 + card.reb * .08 + card.finish * .07 + card.space * .07
-          + multiPosition * 1.8 + (["connector", "twoWayWing", "pointStopper"].includes(card.archetype) ? 5 : 0)
+          + multiPosition * (.6 + softThreshold(card.def, 82, 5) * 1.2)
+          + (["connector", "twoWayWing", "pointStopper"].includes(card.archetype) ? 5 : 0)
           + (/换防/.test(tags) ? 5 : 0) - (playsSlot(card, 5) && card.slots.length === 1 && !/换防/.test(tags) ? 6 : 0),
         helpDefense: card.def * .61 + card.reb * .15 + card.impact * .13 + card.pass * .05 + card.finish * .06
           + (stopperRole ? 3 : 0) + (/协防|护框|盖帽|DPOY/.test(tags) ? 4 : 0),
@@ -5805,24 +5828,39 @@
       const rimProtection = role(center).rimProtection * .68 + role(pf).rimProtection * .12
         + role(pf).helpDefense * .11 + list.reduce((sum, card) => sum + role(card).helpDefense, 0) / list.length * .09;
       const pointOfAttack = perimeterDefense;
-      const switchability = list.reduce((sum, card) => sum + role(card).switchDefense, 0) / list.length * .58
+      // A real frontcourt-sized initiator at PG can take the hardest perimeter
+      // assignment and move one small guard onto a quieter matchup. Eligibility
+      // alone is not enough: actual defense, switching and help instincts gate it.
+      const largeInitiatorEligible = pg.slots.includes(1) && pg.slots.some(slot => slot >= 3);
+      const largeInitiatorDefense = largeInitiatorEligible
+        ? Math.min(1, softThreshold(role(pg).perimeterDefense, 80, 4)
+          * softThreshold(role(pg).switchDefense, 84, 4)
+          * softThreshold(pg.def, 82, 4) * 1.35)
+        : 0;
+      const baseSwitchability = list.reduce((sum, card) => sum + role(card).switchDefense, 0) / list.length * .58
         + weightedTop(list.map(card => role(card).switchDefense), [.55, .30, .15]) * .24
         + perimeterDefense * .10 + frontcourtDefense * .08;
+      const switchability = baseSwitchability + largeInitiatorDefense * 2.4;
       const defensiveRebound = pg.reb * .04 + sg.reb * .06 + sf.reb * .14 + pf.reb * .30 + center.reb * .46 + roleCount(frontcourt, c => c.reb >= 90) * 2.0 + (center.reb >= 94 ? 1.5 : 0);
       const centerMobility = role(center).switchDefense * .62 + role(center).perimeterDefense * .15 + role(center).helpDefense * .10 + center.impact * .08 + center.pass * .05;
       const powerForwardMobility = role(pf).switchDefense * .64 + role(pf).perimeterDefense * .16 + role(pf).helpDefense * .10 + pf.impact * .06 + pf.pass * .04;
       const slowBigRisk = (1 - softThreshold(centerMobility, 82, 6)) * 1.25 + (1 - softThreshold(powerForwardMobility, 80, 7)) * .55;
       const pnrCoverage = role(center).rimProtection * .29 + role(center).helpDefense * .10 + role(center).switchDefense * .15
         + role(pf).switchDefense * .10 + role(pf).helpDefense * .07 + pointOfAttack * .18 + switchability * .11 - slowBigRisk * 1.8;
-      const perimeterTargetRisk = perimeter.reduce((sum, card) => sum + Math.max(0, 75 - role(card).perimeterDefense) * (card.usage >= 80 ? .30 : .18), 0);
+      const perimeterRisk = card => Math.max(0, 75 - role(card).perimeterDefense) * (card.usage >= 80 ? .30 : .18);
+      const perimeterTargetRisk = perimeter.reduce((sum, card) => sum + perimeterRisk(card), 0);
+      const hideableGuardRisk = Math.max(0, ...[sg, sf]
+        .filter(card => (card.slots.includes(1) || card.slots.includes(2)) && !card.slots.some(slot => slot >= 4))
+        .map(perimeterRisk));
+      const matchupFlexRelief = Math.min(hideableGuardRisk * .62, largeInitiatorDefense * 1.6);
       const frontcourtTargetRisk = frontcourt.reduce((sum, card) => sum
         + Math.max(0, 74 - role(card).switchDefense) * .12
         + Math.max(0, 70 - role(card).perimeterDefense) * .05, 0);
-      const targetabilityRisk = perimeterTargetRisk + frontcourtTargetRisk + slowBigRisk;
+      const targetabilityRisk = Math.max(0, perimeterTargetRisk + frontcourtTargetRisk + slowBigRisk - matchupFlexRelief);
       const wingHelp = role(sf).helpDefense * .34 + role(pf).helpDefense * .30
         + Math.max(role(pg).helpDefense, role(sg).helpDefense, role(sf).helpDefense) * .20
         + list.reduce((sum, card) => sum + role(card).helpDefense, 0) / list.length * .16;
-      const sizeDisruption = avg(list, "reb") * .58 + avg(list, "def") * .42;
+      const sizeDisruption = avg(list, "reb") * .58 + avg(list, "def") * .42 + largeInitiatorDefense * 1.2;
       const defenseSchemes = {
         drop: rimProtection * .34 + pointOfAttack * .18 + pnrCoverage * .17 + defensiveRebound * .20 + wingHelp * .11 - targetabilityRisk * .18,
         switch: rimProtection * .13 + pointOfAttack * .24 + switchability * .31 + pnrCoverage * .16 + defensiveRebound * .11 + wingHelp * .05 - targetabilityRisk * .34,
@@ -6036,6 +6074,8 @@
         switchability: Math.round(switchability),
         pnrCoverage: Math.round(pnrCoverage),
         targetabilityRisk: Math.round(clamp(targetabilityRisk, 0, 30)),
+        largeInitiatorDefense: Number(largeInitiatorDefense.toFixed(2)),
+        matchupFlexRelief: Number(matchupFlexRelief.toFixed(2)),
         defensiveRebound: Math.round(defensiveRebound),
         turnoverRisk: Math.round(clamp(turnoverRisk, 0, 30)),
         eraPenalty: Math.round(eraPenalty),
@@ -7590,6 +7630,7 @@
       else notes.push("隐患：缺少真正护框点，外线一旦被过，篮下容易连续丢分。");
       if (r.pointOfAttack >= 88 && r.switchability >= 88) notes.push("外线防守质量不错，遇到挡拆和换防不容易被一路点名。");
       else if (r.pointOfAttack < 76) notes.push("隐患：第一道防线偏弱，遇到顶级后卫时需要更多协防。");
+      if ((r.matchupFlexRelief || 0) >= .4) notes.push("大体型持球人可以接管最难的外线对位，让一名小后卫避开对手的连续点名。");
       if (r.pnrCoverage < 72) notes.push("隐患：防挡拆一般。护框强不代表能一直防住外线持球人和中锋挡拆。");
       if (r.targetabilityRisk >= 8) notes.push("隐患：场上有容易被针对的防守点，强队会反复找这个位置打。");
       if (r.defensiveRebound < 76) notes.push("隐患：防守篮板不稳，容易送给对手二次进攻。");

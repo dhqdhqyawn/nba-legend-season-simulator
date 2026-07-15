@@ -32024,6 +32024,51 @@
       "version": "26",
       "match": "team",
       "queryName": "Wang Zhi Zhi"
+    },
+    "Stephon Castle|Spurs|2024-25 Rookie of the Year": {
+      "file": "assets/cards/2kdb-stephon-castle-san-antonio-spurs-2024-25-rookie-of-the-year-2662099.png",
+      "provider": "2kdb",
+      "source": "https://2kdb.net/player/2662099",
+      "relationId": 2662099,
+      "playerName": "Stephon Castle",
+      "rating": 100,
+      "team": "San Antonio Spurs",
+      "theme": "Bracket Busters Festival",
+      "collection": "Season 5",
+      "version": "26",
+      "match": "team",
+      "requestedTeam": null,
+      "queryName": "full-local-index"
+    },
+    "Stephon Castle|2024-25 Rookie of the Year": {
+      "file": "assets/cards/2kdb-stephon-castle-san-antonio-spurs-2024-25-rookie-of-the-year-2662099.png",
+      "provider": "2kdb",
+      "source": "https://2kdb.net/player/2662099",
+      "relationId": 2662099,
+      "playerName": "Stephon Castle",
+      "rating": 100,
+      "team": "San Antonio Spurs",
+      "theme": "Bracket Busters Festival",
+      "collection": "Season 5",
+      "version": "26",
+      "match": "team",
+      "requestedTeam": null,
+      "queryName": "full-local-index"
+    },
+    "Stephon Castle|Spurs": {
+      "file": "assets/cards/2kdb-stephon-castle-san-antonio-spurs-2024-25-rookie-of-the-year-2662099.png",
+      "provider": "2kdb",
+      "source": "https://2kdb.net/player/2662099",
+      "relationId": 2662099,
+      "playerName": "Stephon Castle",
+      "rating": 100,
+      "team": "San Antonio Spurs",
+      "theme": "Bracket Busters Festival",
+      "collection": "Season 5",
+      "version": "26",
+      "match": "team",
+      "requestedTeam": null,
+      "queryName": "full-local-index"
     }
   },
   "failures": [
