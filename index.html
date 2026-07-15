@@ -1565,6 +1565,102 @@
       font-weight: 800;
     }
 
+    .season-result-arc {
+      margin-top: 14px;
+      padding: 18px;
+      border-radius: 8px;
+      background: #25231f;
+      color: #fff;
+    }
+
+    .season-result-arc[hidden] { display: none; }
+
+    .season-arc-head {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: start;
+    }
+
+    .season-arc-kicker {
+      display: inline-flex;
+      min-height: 24px;
+      align-items: center;
+      padding: 0 8px;
+      border-radius: 5px;
+      background: var(--gold);
+      color: #17130d;
+      font-size: 10px;
+      font-weight: 1000;
+    }
+
+    .season-arc-head h3 {
+      margin: 10px 0 0;
+      max-width: 760px;
+      font-size: 21px;
+      line-height: 1.25;
+    }
+
+    .season-arc-head p {
+      margin: 8px 0 0;
+      max-width: 820px;
+      color: rgba(255,255,255,.68);
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    .season-arc-badge {
+      padding-top: 3px;
+      color: rgba(255,255,255,.55);
+      font-size: 10px;
+      font-weight: 900;
+      text-align: right;
+    }
+
+    .season-arc-chapters {
+      margin-top: 16px;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      border-top: 1px solid rgba(255,255,255,.13);
+    }
+
+    .season-arc-chapter {
+      min-width: 0;
+      padding: 14px 13px 2px;
+      border-left: 1px solid rgba(255,255,255,.13);
+    }
+
+    .season-arc-chapter:first-child { border-left: 0; padding-left: 0; }
+    .season-arc-chapter:last-child { padding-right: 0; }
+
+    .season-arc-chapter span,
+    .season-arc-chapter strong,
+    .season-arc-chapter p { display: block; }
+
+    .season-arc-chapter span {
+      color: var(--gold);
+      font-size: 9px;
+      font-weight: 1000;
+    }
+
+    .season-arc-chapter strong {
+      margin-top: 6px;
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .season-arc-chapter p {
+      margin: 6px 0 0;
+      color: rgba(255,255,255,.66);
+      font-size: 10px;
+      line-height: 1.5;
+    }
+
+    .season-arc-chapter.critical strong,
+    .season-arc-chapter.negative strong { color: #ffd1ca; }
+
+    .season-arc-chapter.positive strong { color: #bfe9d3; }
+
     .season-result-lineup {
       display: grid;
       grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -1967,6 +2063,18 @@
       .season-result-position { top: 7px; left: 7px; width: 25px; height: 20px; font-size: 8px; }
       .season-result-player b { font-size: 9px; }
       .season-result-player small { display: none; }
+      .season-result-arc { padding: 15px; }
+      .season-arc-head { grid-template-columns: 1fr; }
+      .season-arc-badge { text-align: left; }
+      .season-arc-chapters { grid-template-columns: 1fr; }
+      .season-arc-chapter,
+      .season-arc-chapter:first-child,
+      .season-arc-chapter:last-child {
+        padding: 12px 0;
+        border-left: 0;
+        border-top: 1px solid rgba(255,255,255,.11);
+      }
+      .season-arc-chapter:first-child { border-top: 0; }
       .season-result-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .season-timeline { grid-template-columns: 1fr; }
       .season-timeline-item { min-height: 0; }
@@ -2268,6 +2376,7 @@
             </div>
             <div class="season-result-lineup" id="seasonResultLineup"></div>
           </div>
+          <section class="season-result-arc" id="seasonResultArc" hidden></section>
           <section class="season-result-section">
             <div class="season-result-section-head">
               <h3>82 场赛季时间线</h3>
@@ -4991,6 +5100,7 @@
       seasonResultRecord: document.getElementById("seasonResultRecord"),
       seasonResultSummary: document.getElementById("seasonResultSummary"),
       seasonResultLineup: document.getElementById("seasonResultLineup"),
+      seasonResultArc: document.getElementById("seasonResultArc"),
       seasonResultTimeline: document.getElementById("seasonResultTimeline"),
       seasonResultTimelineMeta: document.getElementById("seasonResultTimelineMeta"),
       seasonResultMetrics: document.getElementById("seasonResultMetrics"),
@@ -7933,6 +8043,7 @@
           ? `对阵 ${round.opponentLabel} · 单场定胜负`
           : `对阵 ${round.opponentLabel}${round.name === "首轮" && round.bracketLabel ? ` · ${round.bracketLabel}` : ""}`;
       });
+      result.narrativeArc = buildResultNarrativeArc(result, list);
     }
 
     function estimatedPlayoffSeed(wins) {
@@ -8156,6 +8267,508 @@
         ? "四轮全部晋级；球队在不同对手面前都找到了对应的赢球方式。"
         : `${exitRound}对阵 ${finalRound?.opponentLabel || "对手"} 止步；决定系列赛的回合已经写进比赛故事。`;
       return { seed: playoffSeed(r.wins), power: Math.round(power), offense: Math.round(playoffOffense), defense: Math.round(playoffDefense), titleOdds, rounds, note };
+    }
+
+    const narrativeArcProtectedPairs = new Set([
+      "Chris Paul|James Harden",
+      "Klay Thompson|Stephen Curry",
+      "Kobe Bryant|Shaquille O'Neal"
+    ]);
+
+    function narrativeArcPairKey(first, second) {
+      return [first.name, second.name].sort().join("|");
+    }
+
+    function narrativeArcChapter(stage, title, text, tone = "neutral") {
+      return { stage, title, text, tone };
+    }
+
+    function narrativeArcOutcome(result) {
+      const rounds = (result.playoff?.rounds || []).filter(round => round.name !== "常规赛结束");
+      const finalRound = rounds[rounds.length - 1];
+      const champion = rounds.some(round => round.name === "总决赛" && round.status === "win");
+      if (champion) return `球队以 ${result.wins}-${result.losses} 结束常规赛，随后连过四轮夺冠。`;
+      if (finalRound) return `球队以 ${result.wins}-${result.losses} 进入季后赛，最终在${finalRound.name}以 ${finalRound.result} 止步于${finalRound.opponentTeam || "对手"}。`;
+      return `球队最终只拿到 ${result.wins} 胜，没有进入季后赛。`;
+    }
+
+    function narrativeArcActors(list, seed) {
+      const top = seededWeightedPick(list, card => card.impact * 1.2 + card.usage, `${seed}|top`);
+      const support = seededWeightedPick(list.filter(card => card.id !== top.id), card => card.impact + card.pass * .5 + card.def * .35, `${seed}|support`) || top;
+      const defender = seededWeightedPick(list, card => card.def + deriveRoleProfile(card).rimProtection * .35 + deriveRoleProfile(card).perimeterDefense * .25, `${seed}|defender`) || top;
+      const injuryCard = seededWeightedPick(
+        list,
+        card => (card.usage + card.impact) * (.25 + Number(card.availability?.durabilityRisk || 0) * 2.8),
+        `${seed}|injury`
+      ) || top;
+      const pairs = [];
+      for (let firstIndex = 0; firstIndex < list.length; firstIndex += 1) {
+        for (let secondIndex = firstIndex + 1; secondIndex < list.length; secondIndex += 1) {
+          const first = list[firstIndex];
+          const second = list[secondIndex];
+          if (narrativeArcProtectedPairs.has(narrativeArcPairKey(first, second))) continue;
+          const volatility = Number(first.risk?.roleVolatility || 0) + Number(second.risk?.roleVolatility || 0);
+          const decision = Number(first.risk?.decisionMaking || 0) + Number(second.risk?.decisionMaking || 0);
+          const scoringOverlap = Math.max(0, first.usage + second.usage - 166);
+          const score = first.usage + second.usage + volatility * 46 + decision * 22 + scoringOverlap * 1.7;
+          pairs.push({ first, second, score, volatility, scoringOverlap });
+        }
+      }
+      pairs.sort((left, right) => right.score - left.score);
+      return { top, support, defender, injuryCard, rolePair: pairs[0] || null };
+    }
+
+    function narrativeArcSeverity(result) {
+      const seasonGap = Math.max(0, Number(result.healthyWins || result.wins) - Number(result.wins || 0));
+      const lostRound = [...(result.playoff?.rounds || [])].reverse().find(round => round.status === "loss" && round.name !== "常规赛结束");
+      if ((seasonGap >= 12 && result.wins <= 38) || Number(lostRound?.probability || 0) >= .82) return "catastrophic";
+      if (seasonGap >= 7 || Number(lostRound?.probability || 0) >= .65 || lostRound?.name === "总决赛") return "major";
+      if (seasonGap >= 3 || lostRound) return "notable";
+      return "normal";
+    }
+
+    function narrativeArcResultContext(result) {
+      const rounds = (result.playoff?.rounds || []).filter(round => round.name !== "常规赛结束");
+      const lostRound = [...rounds].reverse().find(round => round.status === "loss");
+      return {
+        rounds,
+        lostRound,
+        champion: rounds.some(round => round.name === "总决赛" && round.status === "win"),
+        seasonGap: Math.max(0, Number(result.healthyWins || result.wins) - Number(result.wins || 0)),
+        severity: narrativeArcSeverity(result)
+      };
+    }
+
+    function narrativeArcRoundBeat(round, index, fallback) {
+      return round?.storyBeats?.[index]?.text || fallback;
+    }
+
+    function buildDocumentedConflictArc(result, list, bond, actors, context, seed) {
+      const [first, second] = bond.cards;
+      const lostRound = context.lostRound;
+      const playoffChapter = lostRound
+        ? narrativeArcChapter(
+            lostRound.name,
+            "沟通裂缝进入关键回合",
+            `${first.displayName}与${second.displayName}在收官顺序上再次出现迟疑，${lostRound.opponentTeam}连续逼出仓促处理，系列赛最终停在 ${lostRound.result}。`,
+            "negative"
+          )
+        : narrativeArcChapter(
+            "冲刺阶段",
+            "天赋暂时压过了更衣室裂痕",
+            `${actors.top.displayName}接管最重要的回合，${first.displayName}与${second.displayName}也暂时接受了清晰分工，球队没有让冲突继续吞掉比赛。`,
+            "positive"
+          );
+      return {
+        id: `documented-conflict-${bond.id}`,
+        family: "documentedConflict",
+        severity: context.severity,
+        tone: context.champion ? "mixed" : "negative",
+        badge: "真实关系背景衍生",
+        headline: `${first.displayName}和${second.displayName}的旧账贯穿了整个赛季`,
+        deck: `这套阵容的难题不在战术板，而在两名核心能否重新建立信任；一次暂停、一次角色调整，都可能重新翻出旧账。`,
+        chapters: [
+          narrativeArcChapter("训练营", "旧账进入同一间更衣室", fillBondText(bond.detail, bond.cards), "negative"),
+          narrativeArcChapter("赛季中段", "一次角色调整把矛盾推到台前", `教练组重新安排${first.displayName}与${second.displayName}的持球、对位和收官顺序，两人没有公开失控，但场上提醒与暂停沟通明显变少。`, "negative"),
+          playoffChapter,
+          narrativeArcChapter("赛季结局", context.champion ? "矛盾没有消失，冠军先到来了" : "天赋没能完全覆盖关系成本", narrativeArcOutcome(result), context.champion ? "positive" : "negative")
+        ]
+      };
+    }
+
+    function buildDisciplineArc(result, list, story, actors, context) {
+      const player = list.find(card => card.id === story.eventPlayerId)
+        || list.find(card => card.displayName === story.eventPlayer)
+        || actors.injuryCard;
+      const support = list.find(card => card.displayName === story.eventSupport) || actors.support;
+      const lostRound = context.lostRound;
+      return {
+        id: `discipline-${story.eventId || player.id}`,
+        family: "disciplineSuspension",
+        severity: context.severity === "normal" ? "notable" : context.severity,
+        tone: "negative",
+        badge: "球员专属事件",
+        headline: `${player.displayName}的纪律事件迫使球队重写赛季计划`,
+        deck: "一个人的纪律问题很快变成全队的轮换问题，原本稳定的持球、防守和收官顺序被迫一起改变。",
+        chapters: [
+          narrativeArcChapter("事件爆发", story.title, story.detail, story.tone || "negative"),
+          narrativeArcChapter("紧急应对", `${support.displayName}接过空出的任务`, `${support.displayName}临时增加持球和防守责任，${actors.top.displayName}的出场负荷也被迫提高；原本稳定的五人分工从这里开始松动。`, "negative"),
+          lostRound
+            ? narrativeArcChapter(lostRound.name, "短轮换终于被对手抓住", narrativeArcRoundBeat(lostRound, 0, `${lostRound.opponentTeam}反复攻击临时轮换的衔接段，球队没有足够时间修补缺口。`), "negative")
+            : narrativeArcChapter("赛季后段", "球队把风波压回篮球本身", `${actors.top.displayName}稳定了公开沟通，${support.displayName}也适应新角色，球队终于结束频繁变阵。`, "positive"),
+          narrativeArcChapter("赛季结局", context.champion ? "风波之后仍然夺冠" : "代价写进最终排名", narrativeArcOutcome(result), context.champion ? "positive" : "negative")
+        ]
+      };
+    }
+
+    function buildInjuryArc(result, actors, context, seed, playoffOnly = false) {
+      const player = actors.injuryCard;
+      const support = actors.support.id === player.id ? actors.top : actors.support;
+      const lostRound = context.lostRound;
+      const [ordinaryDiagnosis, body] = injuryTextFor(player);
+      const majorDiagnoses = /knee/.test(player.eventProfile?.injury || "")
+        ? ["膝韧带重伤", "半月板重伤"]
+        : /foot|ankle/.test(player.eventProfile?.injury || "")
+          ? ["足部应力性骨折", "脚踝韧带重伤"]
+          : /hamstring|lowerBody/.test(player.eventProfile?.injury || "")
+            ? ["腿后侧肌腱重伤", "下肢肌腱重伤"]
+            : ["下肢重伤", "长期伤停"];
+      const diagnosis = context.severity === "catastrophic" ? seededPick(majorDiagnoses, `${seed}|diagnosis`) : ordinaryDiagnosis;
+      const missed = context.severity === "catastrophic"
+        ? 42 + Math.floor(seededNoise(`${seed}|missed`) * 25)
+        : context.severity === "major"
+          ? 18 + Math.floor(seededNoise(`${seed}|missed`) * 17)
+          : 5 + Math.floor(seededNoise(`${seed}|missed`) * 9);
+      const injuryStage = playoffOnly && lostRound ? `${lostRound.name} G${2 + Math.floor(seededNoise(`${seed}|game`) * 4)}` : "赛季中段";
+      const injuryDetail = playoffOnly && lostRound
+        ? `${player.displayName}在一次落地或对抗后出现${body}问题，随后移动和出场时间都受到限制；球队在系列赛中途失去原定的主攻或防守支点。`
+        : `${player.displayName}出现${body}问题并缺阵 ${missed} 场，医疗组没有让他带伤硬撑，原定轮换却因此被彻底打散。`;
+      return {
+        id: `injury-${playoffOnly ? "playoff" : "season"}-${player.id}`,
+        family: playoffOnly ? "playoffInjury" : "seasonEndingInjury",
+        severity: context.severity,
+        tone: "negative",
+        badge: "本局伤病剧情",
+        headline: `${player.displayName}的${diagnosis}改变了这支球队的赛季`,
+        deck: "高负荷赛季最怕核心突然离场；缺少的不只是得分，还有原本围绕他建立的整套任务顺序。",
+        chapters: [
+          narrativeArcChapter("负荷预警", `${player.displayName}的身体开始发出信号`, `${player.displayName}连续承担高强度回合，教练组原本计划降低负荷，但密集赛程与阵容需求让轮休窗口越来越少。`, "neutral"),
+          narrativeArcChapter(injuryStage, `${diagnosis}让计划突然中断`, injuryDetail, "critical"),
+          narrativeArcChapter("应急方案", `${support.displayName}被迫同时补两份工作`, `${support.displayName}接过第二持球点和关键对位，${actors.top.displayName}则承担更多收官；短期止血成功，整套轮换却失去原先的余量。`, "negative"),
+          narrativeArcChapter("赛季结局", context.champion ? "残阵把故事写成了逆袭" : "伤停成为无法绕开的转折", narrativeArcOutcome(result), context.champion ? "positive" : "negative")
+        ]
+      };
+    }
+
+    function buildRoleConflictArc(result, pair, actors, context, seed) {
+      const first = pair.first;
+      const second = pair.second;
+      const lostRound = context.lostRound;
+      const conflictVariants = [
+        `${first.displayName}希望继续掌控收官回合，${second.displayName}则认为自己在连续错位出现时没有得到球；一次暂停里的争论把原本隐性的分工问题公开化。`,
+        `${first.displayName}和${second.displayName}都能单独解决回合，但两人在最后五分钟连续站到同一侧；赛后录像会里，关于谁先发动、谁负责二次处理的争论持续了很久。`,
+        `教练组要求${first.displayName}减少提前单打，同时让${second.displayName}增加无球回合；两人都接受战术本身，却对关键球次序没有形成同一答案。`
+      ];
+      const resolution = context.champion
+        ? `${first.displayName}保留第一选择，${second.displayName}主动接过第二次处理和错位惩罚，两人把角色争议变成了清楚的先后顺序。`
+        : lostRound
+          ? `${lostRound.opponentTeam}在${lostRound.name}不断逼两人交换角色，关键回合的迟疑最终变成 ${lostRound.result} 的出局比分。`
+          : `${actors.support.displayName}尝试连接两名得分手，但球队直到收官阶段仍频繁更换最后五分钟的持球顺序。`;
+      return {
+        id: `simulated-role-conflict-${first.id}-${second.id}`,
+        family: "simulatedRoleConflict",
+        severity: context.severity,
+        tone: context.champion ? "mixed" : "negative",
+        badge: "本局虚构剧情",
+        headline: `${first.displayName}和${second.displayName}的关键球次序成了整季暗线`,
+        deck: "这不是对两名真实球员关系的历史断言，而是依据本局双高球权结构生成的角色冲突。",
+        chapters: [
+          narrativeArcChapter("训练营", "两名主攻手先谈谁来结束回合", `${first.displayName}与${second.displayName}都愿意分享球，但教练组必须先规定夹击前后的触球顺序，避免五个人在关键时刻临场猜测。`, "neutral"),
+          narrativeArcChapter("矛盾爆发", "一次暂停把分工问题推到台前", seededPick(conflictVariants, `${seed}|conflict`), "negative"),
+          narrativeArcChapter(lostRound?.name || "赛季后段", context.champion ? "分工终于固定下来" : "调解没有完全解决迟疑", resolution, context.champion ? "positive" : "negative"),
+          narrativeArcChapter("赛季结局", context.champion ? "两把刀找到了先后顺序" : "球星产量还在，协同成本也写进结果", narrativeArcOutcome(result), context.champion ? "positive" : "negative")
+        ]
+      };
+    }
+
+    function buildOpponentIconicArc(result, actors, context) {
+      const round = context.lostRound;
+      const opponentTeam = round?.opponentTeam || "对手";
+      const opponentStar = round?.opponentStar || "对方核心";
+      return {
+        id: `opponent-iconic-${round?.name || "season"}`,
+        family: "opponentIconic",
+        severity: context.severity,
+        tone: "negative",
+        badge: "本局名场面",
+        headline: `${opponentStar}把${round?.name || "关键战"}变成了${opponentTeam}的名场面`,
+        deck: `球队带着更好的常规赛排名进入系列赛，${opponentTeam}却把一处细小裂缝连续打了六场。`,
+        chapters: [
+          narrativeArcChapter("常规赛", `${actors.top.displayName}先把球队带到高位`, `${actors.top.displayName}承担第一进攻选择，${actors.defender.displayName}守住最难对位，球队以 ${result.wins}-${result.losses} 取得系列赛主动权。`, "positive"),
+          narrativeArcChapter(`${round?.name || "关键战"}前半段`, `${opponentTeam}找到第一处裂缝`, narrativeArcRoundBeat(round, 0, `${opponentTeam}通过换防和夹击切断${actors.top.displayName}与队友的连接。`), "negative"),
+          narrativeArcChapter("名场面", `${opponentStar}完成决定系列赛的回合`, narrativeArcRoundBeat(round, 1, `${opponentStar}在最后一分钟命中高难度投篮，把比赛从胶着直接推向结局。`), "critical"),
+          narrativeArcChapter("系列赛结局", `${round?.result || "失利"}不是整季实力的否定`, `${narrativeArcRoundBeat(round, 2, `${opponentTeam}守住最后一场并完成晋级。`)} ${narrativeArcOutcome(result)}`, "negative")
+        ]
+      };
+    }
+
+    function buildCoachingCrisisArc(result, actors, context, seed) {
+      const lostRound = context.lostRound;
+      const volatile = seededPick([actors.top, actors.support, actors.injuryCard], `${seed}|volatile`);
+      return {
+        id: `coaching-crisis-${volatile.id}`,
+        family: "coachingCrisis",
+        severity: context.severity,
+        tone: "negative",
+        badge: "本局虚构剧情",
+        headline: `反复变阵让${volatile.displayName}和教练组失去了共同答案`,
+        deck: "本局为虚构教练组剧情：问题不是没人能打，而是首发、衔接和收官始终没有固定答案。",
+        chapters: [
+          narrativeArcChapter("开季", "首发很好看，收官阵容却没有定下来", `${actors.top.displayName}负责主攻，${actors.defender.displayName}负责防守兜底，但第五个收官位置连续更换，球队每场最后五分钟都在重新确认任务。`, "neutral"),
+          narrativeArcChapter("赛季中段", `${volatile.displayName}在闭门会议里要求明确角色`, `${volatile.displayName}没有要求离队，但希望固定持球和上场时段；教练组随后连续尝试两套方案，短暂反弹后又因为对位变化重新调整。`, "negative"),
+          narrativeArcChapter(lostRound?.name || "冲刺阶段", lostRound ? "短轮换没有经受住系列赛重复针对" : "交易流言让每次调整都变得更敏感", lostRound ? narrativeArcRoundBeat(lostRound, 0, `${lostRound.opponentTeam}重复攻击球队最不稳定的衔接段。`) : `${actors.support.displayName}被卷入补强流言，交易最终没有发生，轮换却直到最后两周才重新稳定。`, "negative"),
+          narrativeArcChapter("赛季结局", "问题不是没人能打，而是没有固定赢法", narrativeArcOutcome(result), "negative")
+        ]
+      };
+    }
+
+    function buildTradeRumorArc(result, list, actors, context, seed) {
+      const candidate = seededWeightedPick(
+        list,
+        card => Number(card.risk?.roleVolatility || 0) * 120 + card.usage * .45 + card.impact * .25,
+        `${seed}|rumor-player`
+      ) || actors.support;
+      const partner = list.filter(card => card.id !== candidate.id).sort((left, right) => right.impact - left.impact)[0] || actors.top;
+      const lostRound = context.lostRound;
+      return {
+        id: `trade-rumor-${candidate.id}`,
+        family: "tradeRumorSpiral",
+        severity: context.severity,
+        tone: "negative",
+        badge: "本局虚构剧情",
+        headline: `${candidate.displayName}的交易流言从手机推送一路跟进了更衣室`,
+        deck: "交易最终没有发生，但每天变化的首发与收官任务，足以让一支球队失去原本的默契。",
+        chapters: [
+          narrativeArcChapter("流言出现", `${candidate.displayName}第一次被写进补强方案`, `一段连败后，关于${candidate.displayName}的交易讨论突然升温；他照常出战，队友却开始猜测下一场还会不会使用同一套轮换。`, "neutral"),
+          narrativeArcChapter("更衣室", `${partner.displayName}主动把话题拉回比赛`, `${partner.displayName}在球队会议里要求停止讨论名单变化，但教练组随后又调整了${candidate.displayName}的上场时段，公开表态与实际安排出现落差。`, "negative"),
+          lostRound
+            ? narrativeArcChapter(lostRound.name, "没有完成的交易留下了未完成的分工", `${lostRound.opponentTeam}连续攻击轮换交界处，${candidate.displayName}与替补阵容的配合仍像赛季中段那样生疏。`, "negative")
+            : narrativeArcChapter("截止日后", "人留下了，角色却没有立刻回来", `${candidate.displayName}最终留队，但直到赛季最后两周才重新得到固定任务，球队错过了最需要稳定的赛程。`, "negative"),
+          narrativeArcChapter("赛季结局", "流言没有换走球员，却换走了连续性", narrativeArcOutcome(result), "negative")
+        ]
+      };
+    }
+
+    function buildMediaPressureArc(result, actors, context, seed) {
+      const player = seededPick([actors.top, actors.support], `${seed}|media-player`);
+      const other = player.id === actors.top.id ? actors.support : actors.top;
+      const lostRound = context.lostRound;
+      const headline = seededPick([
+        `${player.displayName}的关键球争议占据了整段客场之旅`,
+        `${player.displayName}的一次赛后回答，把球队推上了头条`,
+        `连败之后，所有问题都被递到了${player.displayName}面前`
+      ], `${seed}|media-headline`);
+      return {
+        id: `media-pressure-${player.id}`,
+        family: "mediaPressure",
+        severity: context.severity,
+        tone: "negative",
+        badge: "本局虚构剧情",
+        headline,
+        deck: "没有禁赛，也没有交易，但公开质疑会放大每次失误，让原本普通的角色问题变成整队压力。",
+        chapters: [
+          narrativeArcChapter("导火索", "一场失利后的提问没有结束", `${player.displayName}在赛后被连续追问最后一攻，第二天的节目又把问题延伸到球权分配；一次普通失利从这里变成持续话题。`, "neutral"),
+          narrativeArcChapter("客场之旅", `${other.displayName}替队友挡下话筒`, `${other.displayName}公开强调球队内部没有分裂，但接下来的三场比赛里，两人都在关键回合显得过分谨慎，反而错过熟悉的进攻节奏。`, "negative"),
+          lostRound
+            ? narrativeArcChapter(lostRound.name, "每个关键回合都像一次公开审判", `${lostRound.opponentTeam}让${player.displayName}反复做最难的决定，系列赛里的迟疑很快被放大成新的争论。`, "negative")
+            : narrativeArcChapter("赛季后段", "球队开了一次只属于球员的会议", `${player.displayName}与${other.displayName}重新确认收官顺序，表现开始回升，但前一段连败留下的排名缺口已经很难追回。`, "positive"),
+          narrativeArcChapter("赛季结局", "他们平息了话题，没有完全追回赛季", narrativeArcOutcome(result), "negative")
+        ]
+      };
+    }
+
+    function buildDefensiveBreakdownArc(result, list, actors, context, seed) {
+      const target = [...list].sort((left, right) => {
+        const leftProfile = deriveRoleProfile(left);
+        const rightProfile = deriveRoleProfile(right);
+        const leftRisk = Math.min(leftProfile.perimeterDefense, leftProfile.switchDefense, leftProfile.pickAndRollDefense) - Number(left.risk?.defensiveDiscipline || 0) * 18;
+        const rightRisk = Math.min(rightProfile.perimeterDefense, rightProfile.switchDefense, rightProfile.pickAndRollDefense) - Number(right.risk?.defensiveDiscipline || 0) * 18;
+        return leftRisk - rightRisk;
+      })[0] || actors.support;
+      const lostRound = context.lostRound;
+      return {
+        id: `defensive-breakdown-${target.id}`,
+        family: "defensiveBreakdown",
+        severity: context.severity,
+        tone: "negative",
+        badge: "赛季主线",
+        headline: `对手不再猜了：每晚都把${target.displayName}拉进同一种进攻`,
+        deck: "真正击穿防守的不是一次点名，而是联盟连续复制同一答案后，球队仍没有稳定的保护方案。",
+        chapters: [
+          narrativeArcChapter("球探报告", "第一支球队把弱点写成了公开答案", `对手连续让${target.displayName}参与高位挡拆，再把弱侧射手放到最难协防的位置；从第二周开始，几乎每支球队都复制这套起手式。`, "negative"),
+          narrativeArcChapter("录像会议", `${actors.defender.displayName}要求全队统一轮转口令`, `${actors.defender.displayName}试图提前指挥夹击和换防，${target.displayName}也减少了自由协防，但每次变阵都会把压力转移到另一个角落。`, "neutral"),
+          lostRound
+            ? narrativeArcChapter(lostRound.name, `${lostRound.opponentTeam}把常规赛答案重复到出局`, narrativeArcRoundBeat(lostRound, 0, `${lostRound.opponentTeam}没有增加复杂战术，只是持续把最弱环节拖进每一次关键挡拆。`), "critical")
+            : narrativeArcChapter("冲刺阶段", "防守终于稳定，排名已经来不及修复", `${target.displayName}接受更明确的任务，球队也减少不必要的夹击，但修正发生在赛季太晚的位置。`, "positive"),
+          narrativeArcChapter("赛季结局", "问题不是单次失误，而是没有第二套覆盖方案", narrativeArcOutcome(result), "negative")
+        ]
+      };
+    }
+
+    function buildOffensiveDroughtArc(result, list, actors, context, seed) {
+      const scorer = [...list].sort((left, right) => right.usage - left.usage || right.off - left.off)[0] || actors.top;
+      const organizer = [...list].filter(card => card.id !== scorer.id).sort((left, right) => right.pass - left.pass)[0] || actors.support;
+      const lostRound = context.lostRound;
+      return {
+        id: `offensive-drought-${scorer.id}`,
+        family: "offensiveDrought",
+        severity: context.severity,
+        tone: "negative",
+        badge: "赛季主线",
+        headline: `${scorer.displayName}连续被夹击，整支球队却一直等不到第二个答案`,
+        deck: "当第一选择失去舒服区域，真正决定进攻的不是他能否继续硬投，而是谁能接住夹击后的下一拍。",
+        chapters: [
+          narrativeArcChapter("连败开始", `${scorer.displayName}每晚都先看见两名防守人`, `对手从第一节就收缩${scorer.displayName}的突破和低位，宁愿把球送到其他人手里；球队连续几场都没有及时完成第二次传导。`, "negative"),
+          narrativeArcChapter("进攻会议", `${organizer.displayName}接管夹击后的第一传`, `${organizer.displayName}开始站到更靠近强侧的位置，进攻短暂恢复流动，但阵容里的终结和投射并没有同时回暖。`, "neutral"),
+          lostRound
+            ? narrativeArcChapter(lostRound.name, `${lostRound.opponentTeam}再次关掉第一选择`, narrativeArcRoundBeat(lostRound, 0, `${lostRound.opponentTeam}用同样的夹击迫使球队依赖最不稳定的出手。`), "critical")
+            : narrativeArcChapter("赛季后段", "球队找到简化版进攻，追分窗口已经缩小", `${scorer.displayName}减少停球，${organizer.displayName}增加快速转移，球队终于止住连败，却没能完全追回前半季。`, "positive"),
+          narrativeArcChapter("赛季结局", "第一选择仍然强，第二套解法来得太晚", narrativeArcOutcome(result), "negative")
+        ]
+      };
+    }
+
+    function buildPlayersMeetingArc(result, actors, context, seed) {
+      const lostRound = context.lostRound;
+      const meetingTitles = [
+        `${actors.top.displayName}关掉录像，先让每个人把话说完`,
+        `${actors.support.displayName}发起了一次没有教练的球员会议`,
+        `七连客结束后，更衣室的门关了四十分钟`
+      ];
+      return {
+        id: `players-meeting-${actors.top.id}-${actors.support.id}`,
+        family: "playersOnlyMeeting",
+        severity: context.severity,
+        tone: "mixed",
+        badge: "本局虚构剧情",
+        headline: seededPick(meetingTitles, `${seed}|meeting-headline`),
+        deck: "没有爆炸性丑闻，只有一支输球球队终于停止礼貌，把真正不满的角色和责任摆到桌面上。",
+        chapters: [
+          narrativeArcChapter("会议之前", "每个人都在完成自己的数据，没有人在完成同一场比赛", `${actors.top.displayName}继续承担主攻，${actors.support.displayName}也维持产量，但防守提醒、回合顺序和失误后的责任开始互相脱节。`, "negative"),
+          narrativeArcChapter("闭门会议", "球员先谈责任，再谈战术", `${actors.top.displayName}要求固定关键球顺序，${actors.support.displayName}则要求所有人先把回防和弱侧沟通做好；会议没有争吵升级，却第一次把问题说透。`, "neutral"),
+          lostRound
+            ? narrativeArcChapter(lostRound.name, "反弹把球队带进季后赛，旧问题仍被重复攻击", `${lostRound.opponentTeam}连续逼球队做第三、第四选择，会议后建立的简单分工不足以覆盖整轮系列赛。`, "negative")
+            : narrativeArcChapter("赛季后段", "改变终于出现，但时间已经不够", `${actors.defender.displayName}统一了防守口令，进攻也只保留最熟悉的起手式；球队打出一段反弹，却仍然停在季后赛门外。`, "positive"),
+          narrativeArcChapter("赛季结局", "他们解决了沉默，没有抹掉前面的失利", narrativeArcOutcome(result), result.wins >= 40 ? "neutral" : "negative")
+        ]
+      };
+    }
+
+    function buildChampionshipArc(result, actors, context) {
+      const rounds = context.rounds;
+      const hardest = [...rounds].sort((left, right) => {
+        const leftGames = String(left.result || "").split("-").reduce((sum, value) => sum + Number(value || 0), 0);
+        const rightGames = String(right.result || "").split("-").reduce((sum, value) => sum + Number(value || 0), 0);
+        return rightGames - leftGames;
+      })[0] || rounds[0];
+      const final = rounds.find(round => round.name === "总决赛") || rounds[rounds.length - 1];
+      return {
+        id: "championship-rally",
+        family: "championshipRally",
+        severity: "notable",
+        tone: "positive",
+        badge: "冠军主线",
+        headline: `${actors.top.displayName}定上限，${actors.support.displayName}把冠军路接完整`,
+        deck: "冠军故事不会只写第一核心，而会把常规赛身份、最艰难系列赛和最终收官串成一条线。",
+        chapters: [
+          narrativeArcChapter("常规赛", "球队先建立可重复的赢法", `${actors.top.displayName}承担第一选择，${actors.support.displayName}处理夹击后的第二拍，${actors.defender.displayName}让防守不必每晚换方案；球队拿到 ${result.wins} 胜。`, "positive"),
+          narrativeArcChapter(hardest?.name || "季后赛", `${hardest?.opponentTeam || "对手"}逼出了最困难的一轮`, narrativeArcRoundBeat(hardest, 0, `${hardest?.opponentTeam || "对手"}率先改变对位，球队必须在系列赛中途重写进攻顺序。`), "neutral"),
+          narrativeArcChapter("破局", `${actors.support.displayName}成为第二个答案`, narrativeArcRoundBeat(hardest, 1, `${actors.support.displayName}接管第二次处理和关键对位，让${actors.top.displayName}不用独自解决每个回合。`), "positive"),
+          narrativeArcChapter("总决赛", `${actors.top.displayName}完成最后收官`, `${narrativeArcRoundBeat(final, 2, `球队在收官战守住防守篮板，并通过最熟悉的两套进攻结束系列赛。`)} ${narrativeArcOutcome(result)}`, "positive")
+        ]
+      };
+    }
+
+    function buildIdentityArc(result, actors, context, seed) {
+      const defensive = result.defense >= result.offense + 6;
+      const offensive = result.offense >= result.defense + 6;
+      const lostRound = context.lostRound;
+      const family = defensive ? "defensiveIdentity" : offensive ? "offensiveBreakthrough" : "chemistryRally";
+      const headline = defensive
+        ? `${actors.defender.displayName}把五个人拧成了一支防守球队`
+        : offensive
+          ? `${actors.top.displayName}发动进攻，整套阵容终于跑起来了`
+          : `${actors.top.displayName}和${actors.support.displayName}用清晰分工熬过漫长赛季`;
+      const identity = defensive
+        ? `${actors.defender.displayName}负责指挥第一道协防，${actors.support.displayName}接管外线最难对位，球队用篮板和回防把比赛拖进自己的节奏。`
+        : offensive
+          ? `${actors.top.displayName}先制造夹击，${actors.support.displayName}负责第二次处理，其余球员的投射、空切和顺下因此都得到更干净的机会。`
+          : `${actors.top.displayName}保留第一选择，${actors.support.displayName}接过衔接段，五名球员终于不再争抢同一种回合。`;
+      const adversity = seededPick(result.seasonStories || [], `${seed}|identity-story`);
+      return {
+        id: `${family}-${actors.top.id}`,
+        family,
+        severity: context.severity,
+        tone: result.wins >= 45 ? "positive" : "mixed",
+        badge: "赛季主线",
+        headline,
+        deck: defensive ? "这支球队从防守责任开始建立身份，再把同一种强度带进漫长赛季。" : offensive ? "持球顺序一旦清楚，空间、空切和第二次处理就会一起运转。" : "五个人不必完成相同任务，清楚的先后顺序本身就是球队实力。",
+        chapters: [
+          narrativeArcChapter("开季定位", defensive ? "先确定防守责任" : offensive ? "先确定球权顺序" : "先确定每个人的固定任务", identity, "positive"),
+          adversity
+            ? narrativeArcChapter("赛季转折", adversity.title, adversity.detail, adversity.tone || "neutral")
+            : narrativeArcChapter("赛季转折", "第一轮调整开始见效", `${actors.support.displayName}承担更多连接任务，球队不再为每个对手更换整套打法。`, "neutral"),
+          lostRound
+            ? narrativeArcChapter(lostRound.name, `${lostRound.opponentTeam}找到这套体系的边界`, narrativeArcRoundBeat(lostRound, 0, `${lostRound.opponentTeam}连续重复同一种针对，球队没能及时给出第二套答案。`), "negative")
+            : narrativeArcChapter("冲刺阶段", "稳定分工带来最后一波上升", `${actors.top.displayName}和${actors.support.displayName}减少无效回合，球队在最后两周守住了自己的排名。`, "positive"),
+          narrativeArcChapter("赛季结局", result.wins >= 45 ? "身份清楚，所以结果可以重复" : "方向找到了，但代价来得太早", narrativeArcOutcome(result), result.wins >= 45 ? "positive" : "negative")
+        ]
+      };
+    }
+
+    function buildResultNarrativeArc(result, list) {
+      if (!result || !list.length) return null;
+      const seed = `${list.map(card => card.id).join("-")}|${result.era}|${result.wins}|story-arc-v1`;
+      const context = narrativeArcResultContext(result);
+      const actors = narrativeArcActors(list, seed);
+      const bond = activeLineupBonds(list).sort((left, right) => right.penalty - left.penalty)[0];
+      const seasonExclusive = (result.seasonStories || []).find(story =>
+        /^rs-exclusive-/.test(story.eventId || "")
+        || ["exclusive-discipline", "exclusive-major-injury", "exclusive-availability"].includes(story.eventFamily)
+      );
+      const playoffExclusive = context.lostRound?.storyBeats?.find(beat => /^exclusive-playoff-/.test(beat.eventFamily || ""));
+      const rolePairReady = actors.rolePair
+        && actors.rolePair.first.usage + actors.rolePair.second.usage >= 166
+        && (actors.rolePair.volatility >= .18 || actors.rolePair.scoringOverlap >= 8);
+      const injuryRisk = Number(actors.injuryCard.availability?.durabilityRisk || 0);
+      const upsetRoll = seededNoise(`${seed}|upset-family`);
+      const collapseRoll = seededNoise(`${seed}|collapse-family`);
+      const roleVolatility = list.reduce((sum, card) => sum + Number(card.risk?.roleVolatility || 0), 0);
+
+      if (bond) return buildDocumentedConflictArc(result, list, bond, actors, context, seed);
+      if (seasonExclusive && /discipline|suspension|availability/.test(`${seasonExclusive.eventId}|${seasonExclusive.eventFamily}`)) {
+        return buildDisciplineArc(result, list, seasonExclusive, actors, context);
+      }
+      if (playoffExclusive?.eventFamily === "exclusive-playoff-suspension") {
+        const story = {
+          title: playoffExclusive.label,
+          detail: playoffExclusive.text,
+          eventId: playoffExclusive.eventId,
+          eventPlayerId: playoffExclusive.eventPlayerId,
+          eventPlayer: playoffExclusive.eventPlayer,
+          eventSupport: playoffExclusive.eventSupport,
+          tone: "negative"
+        };
+        return buildDisciplineArc(result, list, story, actors, context);
+      }
+      if (context.seasonGap >= 10 && result.wins <= 40) return buildInjuryArc(result, actors, context, seed, false);
+      if (context.lostRound?.upset) {
+        if (playoffExclusive?.eventFamily === "exclusive-playoff-injury" || (injuryRisk >= .30 && upsetRoll < .30)) {
+          return buildInjuryArc(result, actors, context, seed, true);
+        }
+        if (rolePairReady && upsetRoll < .58) return buildRoleConflictArc(result, actors.rolePair, actors, context, seed);
+        return buildOpponentIconicArc(result, actors, context);
+      }
+      if (context.champion) return buildChampionshipArc(result, actors, context);
+      if (context.seasonGap >= 6) {
+        if (injuryRisk >= .24 && collapseRoll < .20) return buildInjuryArc(result, actors, context, seed, false);
+        if (rolePairReady && collapseRoll < .38) return buildRoleConflictArc(result, actors.rolePair, actors, context, seed);
+        if (roleVolatility >= .35 && collapseRoll < .55) return buildTradeRumorArc(result, list, actors, context, seed);
+        if (result.defense <= 76 || result.defense + 5 < result.offense) return buildDefensiveBreakdownArc(result, list, actors, context, seed);
+        if (result.offense <= 76 || result.offense + 5 < result.defense) return buildOffensiveDroughtArc(result, list, actors, context, seed);
+        if (collapseRoll < .72) return buildMediaPressureArc(result, actors, context, seed);
+        if (collapseRoll < .88) return buildPlayersMeetingArc(result, actors, context, seed);
+        return buildCoachingCrisisArc(result, actors, context, seed);
+      }
+      if (result.wins < 38) {
+        if (result.defense + 5 < result.offense) return buildDefensiveBreakdownArc(result, list, actors, context, seed);
+        if (result.offense + 5 < result.defense) return buildOffensiveDroughtArc(result, list, actors, context, seed);
+        return collapseRoll < .5 ? buildPlayersMeetingArc(result, actors, context, seed) : buildMediaPressureArc(result, actors, context, seed);
+      }
+      if (rolePairReady && Number(result.riskPenalty || 0) >= .7 && seededNoise(`${seed}|role-family`) < .42) {
+        return buildRoleConflictArc(result, actors.rolePair, actors, context, seed);
+      }
+      return buildIdentityArc(result, actors, context, seed);
     }
 
     function buildAnalysis(r) {
@@ -8491,6 +9104,28 @@
           <small>${card.displayVersion}</small>
         </div>
       `).join("");
+      const narrativeArc = r.narrativeArc || buildResultNarrativeArc(r, selectedCards());
+      r.narrativeArc = narrativeArc;
+      el.seasonResultArc.hidden = !narrativeArc;
+      el.seasonResultArc.innerHTML = narrativeArc ? `
+        <div class="season-arc-head">
+          <div>
+            <span class="season-arc-kicker">本季头条</span>
+            <h3>${narrativeArc.headline}</h3>
+            <p>${narrativeArc.deck}</p>
+          </div>
+          <span class="season-arc-badge">${narrativeArc.badge}</span>
+        </div>
+        <div class="season-arc-chapters">
+          ${narrativeArc.chapters.map(chapter => `
+            <article class="season-arc-chapter ${chapter.tone || "neutral"}">
+              <span>${chapter.stage}</span>
+              <strong>${chapter.title}</strong>
+              <p>${chapter.text}</p>
+            </article>
+          `).join("")}
+        </div>
+      ` : "";
       el.seasonResultMetrics.innerHTML = [
         [r.offense, "进攻火力"],
         [r.defense, "防守质量"],
@@ -8602,6 +9237,7 @@
       if (selectedCount() !== 5) return;
       const r = calculateTeam(selectedCards());
       r.playoff = calculatePlayoffs(r, selectedCards());
+      r.narrativeArc = buildResultNarrativeArc(r, selectedCards());
       lastResult = r;
       ratingsRevealed = true;
       el.tier.textContent = tier(r.wins);
