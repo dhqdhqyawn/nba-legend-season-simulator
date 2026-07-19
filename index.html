@@ -2598,7 +2598,7 @@
       <button class="btn" id="p0OnboardingStart" type="button">开始组队</button>
     </div>
   </section>
-  <div class="p0-build-meta" id="p0BuildMeta" aria-label="当前版本">版本 beta-2026.07.19.1 · 937 张卡 · 25 张候选包</div>
+  <div class="p0-build-meta" id="p0BuildMeta" aria-label="当前版本">版本 beta-2026.07.19.2 · 937 张卡 · 25 张候选包</div>
 
 
   <button class="mobile-simulate" id="simulateBtnFloating" type="button">模拟整个赛季</button>
@@ -6041,6 +6041,12 @@
       "Joel Embiid"
 ]);
 
+    const relationshipSpotlightRate = .08;
+    const relationshipSpotlightPairs = Object.freeze([
+      Object.freeze({ names: Object.freeze(["Jordan Poole", "Draymond Green"]), weight: 1 }),
+      Object.freeze({ names: Object.freeze(["Bam Adebayo", "Tyler Herro"]), weight: 1 })
+    ]);
+
     function identityRarityWeight(identityCards) {
       const peakOvr = Math.max(...identityCards.map(card => card.ovr));
       if (peakOvr >= 97) return .265;
@@ -6101,6 +6107,23 @@
       }
 
       const identityEntries = [...identities.entries()];
+
+      // A small share of packs exposes a complete relationship pair so that
+      // player-specific storylines are discoverable. The separate event gate
+      // still decides whether that relationship becomes part of the season.
+      if (random() < relationshipSpotlightRate) {
+        const eligiblePairs = relationshipSpotlightPairs.filter(pair =>
+          pair.names.every(name => identities.has(name))
+        );
+        const spotlightPair = weightedChoice(eligiblePairs, pair => pair.weight, random);
+        spotlightPair?.names.forEach(name => {
+          const identityCards = identities.get(name);
+          const preferredVersions = identityCards.filter(card => preferredIds.has(card.id));
+          const versionPool = preferredVersions.length ? preferredVersions : identityCards;
+          selectedNames.add(name);
+          pack.push(weightedChoice(versionPool, cardVersionRarityWeight, random));
+        });
+      }
 
       function bestVersionFor(cardsForIdentity, deficits, preferPool = true) {
         const candidates = cardsForIdentity.map(card => {
@@ -15345,7 +15368,7 @@ function renderV6Timeline(timeline = []) {
 
 
     /* PRODUCT_P0_PATCH_V1: behavior */
-    const p0ProductMeta = Object.freeze({ version: "beta-2026.07.19.1", builtAt: "2026-07-19T04:00:00Z" });
+    const p0ProductMeta = Object.freeze({ version: "beta-2026.07.19.2", builtAt: "2026-07-19T08:30:00Z" });
     document.documentElement.dataset.productVersion = p0ProductMeta.version;
     document.documentElement.dataset.productBuiltAt = p0ProductMeta.builtAt;
 
