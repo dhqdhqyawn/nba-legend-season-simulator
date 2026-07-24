@@ -1,0 +1,459 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#071a3d">
+  <title>费城王朝特别篇</title>
+  <meta name="description" content="NBA 巨星常规赛战绩模拟器：詹姆斯加盟费城特别篇。">
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #f7f4ea;
+      --muted: #b8c3d8;
+      --blue: #0b2f6b;
+      --blue-bright: #2d68c4;
+      --red: #e33c45;
+      --gold: #f1c75b;
+      --line: rgba(255,255,255,.15);
+      --panel: rgba(8, 21, 48, .88);
+    }
+    * { box-sizing: border-box; }
+    html { background: #050b17; scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      min-width: 320px;
+      color: var(--ink);
+      background:
+        linear-gradient(rgba(8, 28, 67, .9), rgba(5, 11, 23, .98)),
+        radial-gradient(circle at 15% 5%, #255bb0 0 13%, transparent 35%),
+        #050b17;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+        "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      letter-spacing: 0;
+    }
+    button { font: inherit; }
+    .shell { width: min(1120px, 100%); margin: 0 auto; overflow: hidden; }
+    .hero {
+      min-height: min(720px, 100svh);
+      padding: max(22px, env(safe-area-inset-top)) 20px 42px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+      border-bottom: 1px solid var(--line);
+    }
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: auto -18% -18% 34%;
+      height: 54%;
+      background: linear-gradient(135deg, transparent 12%, rgba(227,60,69,.2));
+      transform: skewY(-7deg);
+      pointer-events: none;
+    }
+    .topline, .hero-copy, .pack { position: relative; z-index: 1; }
+    .topline {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      font-weight: 800;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+    }
+    .brand-mark {
+      width: 34px;
+      aspect-ratio: 1;
+      display: grid;
+      place-items: center;
+      background: var(--red);
+      clip-path: polygon(0 0,100% 0,100% 72%,72% 100%,0 100%);
+      font-weight: 950;
+    }
+    .fiction {
+      padding: 7px 10px;
+      border: 1px solid rgba(241,199,91,.5);
+      color: var(--gold);
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .kicker {
+      margin: 42px 0 12px;
+      color: var(--gold);
+      font-weight: 900;
+      font-size: clamp(13px, 2vw, 16px);
+      text-transform: uppercase;
+    }
+    h1 {
+      margin: 0;
+      max-width: 880px;
+      font-size: clamp(46px, 10vw, 104px);
+      line-height: .94;
+      font-weight: 950;
+    }
+    .lede {
+      max-width: 650px;
+      margin: 20px 0 0;
+      color: var(--muted);
+      font-size: clamp(16px, 2.6vw, 22px);
+      line-height: 1.65;
+      font-weight: 650;
+    }
+    .pack {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 36px;
+    }
+    .card {
+      min-width: 0;
+      background: rgba(3, 10, 24, .7);
+      border: 1px solid var(--line);
+      padding: 7px;
+    }
+    .card img {
+      width: 100%;
+      aspect-ratio: .74;
+      display: block;
+      object-fit: contain;
+      object-position: center bottom;
+      background: linear-gradient(145deg, #194c91, #08152e 64%);
+    }
+    .card-meta { padding: 8px 2px 2px; }
+    .card-pos { color: var(--gold); font-size: 11px; font-weight: 900; }
+    .card-name {
+      margin-top: 3px;
+      font-size: clamp(11px, 1.9vw, 16px);
+      font-weight: 900;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .card-version {
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.25;
+      min-height: 25px;
+    }
+    .reveal {
+      width: 100%;
+      min-height: 58px;
+      margin-top: 20px;
+      border: 0;
+      background: var(--ink);
+      color: #071a3d;
+      font-weight: 950;
+      cursor: pointer;
+    }
+    .reveal:active { transform: translateY(1px); }
+    .season { display: none; }
+    .season.is-visible { display: block; animation: rise .5s ease both; }
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .scoreboard {
+      padding: 54px 20px;
+      display: grid;
+      grid-template-columns: minmax(0, .8fr) minmax(300px, 1.2fr);
+      gap: 28px;
+      align-items: end;
+      background: #f4f1e9;
+      color: #071122;
+    }
+    .record { font-size: clamp(76px, 15vw, 158px); line-height: .8; font-weight: 950; }
+    .record-label {
+      margin-top: 18px;
+      font-weight: 900;
+      color: #a3202b;
+      font-size: 14px;
+    }
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      border: 1px solid #c7c1b4;
+    }
+    .metric { padding: 18px; border: 1px solid #c7c1b4; }
+    .metric strong { display: block; font-size: 30px; }
+    .metric span { color: #625f59; font-size: 12px; font-weight: 800; }
+    .timeline { padding: 54px 20px; background: #f5f1e8; color: #071122; }
+    .timeline .section-tag { color: var(--red); }
+    .timeline-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .timeline-node {
+      min-height: 210px;
+      padding: 18px;
+      border: 1px solid #c7c1b4;
+      background: #fffdf8;
+    }
+    .timeline-node small { color: #72706b; font-weight: 900; }
+    .timeline-node b { display: block; margin: 10px 0; color: var(--red); font-size: 30px; }
+    .timeline-node h3 { margin: 0 0 10px; font-size: 18px; line-height: 1.25; }
+    .timeline-node p { margin: 0; color: #5f5b54; font-size: 13px; line-height: 1.6; }
+    .path { padding: 54px 20px; }
+    .section-tag { color: var(--gold); font-weight: 900; font-size: 13px; }
+    h2 { margin: 8px 0 26px; font-size: clamp(34px, 6vw, 64px); line-height: 1; }
+    .rounds {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .round {
+      min-height: 190px;
+      padding: 18px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+    }
+    .round small { color: var(--muted); font-weight: 800; }
+    .round b { display: block; margin: 10px 0; font-size: 34px; color: var(--gold); }
+    .round p { margin: 0; color: var(--muted); line-height: 1.55; font-size: 13px; }
+    .round .opponent {
+      margin: 0 0 10px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid rgba(255,255,255,.12);
+      color: var(--paper);
+      font-weight: 750;
+    }
+    .finals {
+      padding: 54px 20px;
+      color: #071122;
+      background: var(--gold);
+    }
+    .finals .section-tag { color: #8e1520; }
+    .play {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      border-top: 2px solid #071122;
+      border-bottom: 2px solid #071122;
+    }
+    .play-step { padding: 24px 18px; border-right: 1px solid rgba(7,17,34,.3); }
+    .play-step:last-child { border-right: 0; }
+    .play-step span { display: block; font-size: 12px; font-weight: 900; color: #8e1520; }
+    .play-step strong { display: block; margin-top: 8px; font-size: clamp(19px, 3vw, 30px); line-height: 1.2; }
+    .call {
+      margin: 28px 0 0;
+      font-size: clamp(24px, 4vw, 48px);
+      line-height: 1.3;
+      font-weight: 950;
+    }
+    .epilogue {
+      padding: 70px 20px max(72px, env(safe-area-inset-bottom));
+      background: #050b17;
+    }
+    .headline {
+      margin: 0;
+      max-width: 980px;
+      font-family: Georgia, "Songti SC", serif;
+      font-size: clamp(34px, 6vw, 70px);
+      line-height: 1.12;
+      font-weight: 900;
+    }
+    .story {
+      max-width: 760px;
+      margin-top: 34px;
+      padding-left: 20px;
+      border-left: 4px solid var(--red);
+      color: #d9dfeb;
+      font-family: Georgia, "Songti SC", serif;
+      font-size: clamp(17px, 2.7vw, 24px);
+      line-height: 1.85;
+    }
+    .story p { margin: 0 0 1.2em; }
+    .quote {
+      color: var(--gold);
+      font-size: 1.35em;
+      font-weight: 900;
+    }
+    .trophies {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      max-width: 760px;
+      margin-top: 32px;
+    }
+    .trophy {
+      padding: 18px;
+      border: 1px solid var(--line);
+      background: #0b1830;
+    }
+    .trophy strong { font-size: 28px; color: var(--gold); }
+    .trophy span { display: block; margin-top: 5px; color: var(--muted); font-size: 12px; }
+    .disclaimer {
+      margin: 32px 0 0;
+      color: #7f8ba1;
+      font-size: 11px;
+      line-height: 1.6;
+    }
+    @media (max-width: 720px) {
+      .hero { min-height: auto; }
+      .pack { grid-template-columns: repeat(5, 34vw); overflow-x: auto; margin-right: -20px; padding-right: 20px; scrollbar-width: none; }
+      .pack::-webkit-scrollbar { display: none; }
+      .scoreboard { grid-template-columns: 1fr; }
+      .rounds { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .timeline-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .play { grid-template-columns: 1fr; }
+      .play-step { border-right: 0; border-bottom: 1px solid rgba(7,17,34,.3); }
+      .play-step:last-child { border-bottom: 0; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="hero">
+      <div>
+        <div class="topline">
+          <div class="brand"><span class="brand-mark">82</span>NBA 巨星赛季模拟器</div>
+          <div class="fiction">架空热点特别篇</div>
+        </div>
+        <div class="hero-copy">
+          <p class="kicker">Breaking Scenario · Philadelphia</p>
+          <h1>勒布朗，<br>空降费城。</h1>
+          <p class="lede">马克西、VJ、杰伦·布朗、勒布朗·詹姆斯与乔尔·恩比德组成五人首发。这个卡包没有重抽，也没有平行结局：它只负责见证王朝的第一冠。</p>
+        </div>
+      </div>
+
+      <div>
+        <div class="pack" aria-label="费城王朝五张时刻卡">
+          <article class="card">
+            <img src="assets/cards/2kdb-tyrese-maxey-76ers-2023-24-sixers-burst-2662704.png" alt="泰瑞斯·马克西球星卡">
+            <div class="card-meta"><div class="card-pos">PG</div><div class="card-name">泰瑞斯·马克西</div><div class="card-version">费城爆发版</div></div>
+          </article>
+          <article class="card">
+            <img src="assets/cards/2kdb-vj-edgecombe-76ers-2025-26-rookie-two-way-guard-2662783.png" alt="VJ·埃奇库姆球星卡">
+            <div class="card-meta"><div class="card-pos">SG</div><div class="card-name">VJ·埃奇库姆</div><div class="card-version">双向新星版</div></div>
+          </article>
+          <article class="card">
+            <img src="assets/cards/2kdb-jaylen-brown-celtics-2023-24-finals-mvp-2662530.png" alt="杰伦·布朗球星卡">
+            <div class="card-meta"><div class="card-pos">SF / SG</div><div class="card-name">杰伦·布朗</div><div class="card-version">FMVP 双向锋线</div></div>
+          </article>
+          <article class="card">
+            <img src="assets/cards/2kdb-lebron-james-lakers-2019-20-lakers-point-forward-2662332.png" alt="勒布朗·詹姆斯球星卡">
+            <div class="card-meta"><div class="card-pos">PF / SF</div><div class="card-name">勒布朗·詹姆斯</div><div class="card-version">湖人组织前锋版</div></div>
+          </article>
+          <article class="card">
+            <img src="assets/cards/2kdb-joel-embiid-76ers-2022-23-mvp-process-2662030.png" alt="乔尔·恩比德球星卡">
+            <div class="card-meta"><div class="card-pos">C</div><div class="card-name">乔尔·恩比德</div><div class="card-version">现役费城核心版</div></div>
+          </article>
+        </div>
+        <button class="reveal" id="reveal" type="button">模拟这支费城队</button>
+      </div>
+    </section>
+
+    <div class="season" id="season">
+      <section class="scoreboard">
+        <div>
+          <div class="record">58–24</div>
+          <div class="record-label">东部前列 · 后程20连胜 · 最终夺冠</div>
+        </div>
+        <div class="metrics">
+          <div class="metric"><strong>92</strong><span>进攻火力</span></div>
+          <div class="metric"><strong>89</strong><span>防守质量</span></div>
+          <div class="metric"><strong>91</strong><span>阵容兼容</span></div>
+          <div class="metric"><strong>98</strong><span>季后赛上限</span></div>
+        </div>
+      </section>
+
+      <section class="timeline">
+        <div class="section-tag">82场常规赛 · 四个节点</div>
+        <h2>先在磨合里跌倒，再把赛季打成王朝序章</h2>
+        <div class="timeline-grid">
+          <article class="timeline-node">
+            <small>节点一 · 第1–16场</small><b>7–9</b>
+            <h3>恩比德因伤休战，新阵容进入磨合期</h3>
+            <p>詹姆斯一边接管半场组织，一边指导马克西阅读夹击、帮助VJ适应轮换强度。费城不断试错，开局暂时跌到五成胜率以下。</p>
+          </article>
+          <article class="timeline-node">
+            <small>节点二 · 第17–38场</small><b>14–8</b>
+            <h3>詹姆斯先把新阵容带上正轨</h3>
+            <p>布朗承担最难的侧翼对位，VJ从防守和转换切入。五人的职责逐渐固定，费城开始追上东部第一集团。</p>
+          </article>
+          <article class="timeline-node">
+            <small>节点三 · 第39–62场</small><b>17–7</b>
+            <h3>恩比德在詹姆斯引导下强势回归</h3>
+            <p>詹姆斯主动交还更多低位回合，同时保留自己发起挡拆的权限。恩比德重新接管禁区，费城完成从强队到争冠队的跃迁。</p>
+          </article>
+          <article class="timeline-node">
+            <small>节点四 · 第63–82场</small><b>20–0</b>
+            <h3>全胜冲进季后赛</h3>
+            <p>最后二十场，费城没有再输球。马克西拉开第一道防线，詹姆斯与恩比德负责收官，球队以联盟第一结束常规赛。</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="path">
+        <div class="section-tag">2026–27 PLAYOFF RUN</div>
+        <h2>费城一路杀进六月</h2>
+        <div class="rounds">
+          <article class="round">
+            <small>首轮 · 对阵骑士</small><b>4–0</b>
+            <p class="opponent">詹姆斯·哈登 / 多诺万·米切尔 / 马克斯·斯特鲁斯 / 埃文·莫布里 / 贾勒特·阿伦</p>
+            <p>詹姆斯接管推进，恩比德封死禁区。费城没有给系列赛留下悬念。</p>
+          </article>
+          <article class="round">
+            <small>分区半决赛 · 对阵尼克斯</small><b>4–1</b>
+            <p class="opponent">杰伦·布伦森 / 约什·哈特 / 米卡尔·布里奇斯 / OG·阿奴诺比 / 卡尔-安东尼·唐斯</p>
+            <p>马克西连续惩罚夹击，VJ用领防和转换速度压垮纽约后场。</p>
+          </article>
+          <article class="round">
+            <small>东部决赛 · 对阵猛龙</small><b>4–2</b>
+            <p class="opponent">伊曼纽尔·奎克利 / RJ·巴雷特 / 科怀·伦纳德 / 斯科蒂·巴恩斯 / 科林·默里-博伊尔斯</p>
+            <p>杰伦·布朗接下最难的侧翼对位，詹姆斯在G6送出决定比赛的第十二次助攻。詹姆斯与恩比德复仇成功。</p>
+          </article>
+          <article class="round">
+            <small>总决赛 · 对阵掘金</small><b>4–2</b>
+            <p class="opponent">贾马尔·穆雷 / 克里斯蒂安·布劳恩 / 佩顿·沃特森 / 卡梅伦·约翰逊 / 尼古拉·约基奇</p>
+            <p>系列赛回到费城。最后一攻之前双方仍然战平，詹姆斯最终复仇成功。</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="finals">
+        <div class="section-tag">总决赛 · G6 · 最后 4.8 秒</div>
+        <h2>一记抢断，一次长传，一座冠军。</h2>
+        <div class="play">
+          <div class="play-step"><span>第一拍</span><strong>杰伦·布朗完成抢断</strong></div>
+          <div class="play-step"><span>第二拍</span><strong>恩比德把球送向前场</strong></div>
+          <div class="play-step"><span>终场</span><strong>詹姆斯迎着哨声扣篮绝杀</strong></div>
+        </div>
+        <p class="call">费城76人拿下总冠军，但他们的冠军征程还没有结束。大庆典仍在继续。</p>
+      </section>
+
+      <section class="epilogue">
+        <div class="section-tag">本季头条</div>
+        <div class="story">
+          <p>恩比德因伤错过赛季开局，费城在磨合中一度跌到五成胜率以下。詹姆斯指导马克西和VJ成长，随后迎回强势复出的恩比德；球队用一波20连胜结束常规赛，再连续跨过骑士、尼克斯、猛龙和掘金，靠总决赛G6的压哨扣篮捧起王朝第一冠。</p>
+          <p>五年后，当勒布朗·詹姆斯和恩比德坐在座无虚席的费城十万人大球场正中央，捧着五座总冠军奖杯、五座FMVP奖杯和大家一起欢度庆典时，谁能想到这一切，都归功于遥远印第安纳街头，拄着拐杖沿街乞讨的老朽凯里·欧文。</p>
+          <p>如果不是当年他一心想当老大执意出走，也就不会诞生如今这恐怖的费城王朝。</p>
+          <p>马克西也在另一个詹姆斯的指导下持续进化：从当年跟着哈登学习节奏，到如今在勒布朗身边接过王朝的下一棒，费城的后场火种从未熄灭。</p>
+          <p>街边居民屋内的电视持续直播庆典，镜头里詹姆斯笑着指向恩比德怀里两座FMVP奖杯，打趣说道：</p>
+          <p class="quote">“你还比我少一个哟。”</p>
+        </div>
+        <div class="trophies">
+          <div class="trophy"><strong>5×</strong><span>费城王朝总冠军</span></div>
+          <div class="trophy"><strong>3 + 2</strong><span>詹姆斯与恩比德 FMVP</span></div>
+        </div>
+        <p class="disclaimer">本页面为热点架空模拟与球迷娱乐创作，不是新闻报道；人物情节及未来赛果均属虚构。</p>
+      </section>
+    </div>
+  </main>
+  <script>
+    const button = document.getElementById("reveal");
+    const season = document.getElementById("season");
+    button.addEventListener("click", () => {
+      season.classList.add("is-visible");
+      button.textContent = "王朝第一季已揭晓";
+      button.disabled = true;
+      window.setTimeout(() => season.scrollIntoView({ behavior: "smooth", block: "start" }), 120);
+    });
+  </script>
+</body>
+</html>
