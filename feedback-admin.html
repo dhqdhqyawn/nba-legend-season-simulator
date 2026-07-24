@@ -1,0 +1,930 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self'; img-src 'self' blob:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'self'">
+  <title>NBA82 反馈后台</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --page: #f3f5f4;
+      --surface: #ffffff;
+      --surface-soft: #f8faf9;
+      --text: #202522;
+      --muted: #66706a;
+      --line: #d9dfdb;
+      --line-strong: #b9c3bd;
+      --accent: #176b50;
+      --accent-hover: #105840;
+      --danger: #a23830;
+      --warning: #8a5a00;
+      --info: #345995;
+      --radius: 6px;
+      --shadow: 0 12px 32px rgba(32, 37, 34, 0.12);
+      font-family: Inter, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      background: var(--page);
+      color: var(--text);
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
+    }
+
+    button,
+    input,
+    select {
+      min-height: 38px;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: var(--text);
+    }
+
+    input,
+    select {
+      width: 100%;
+      padding: 8px 10px;
+    }
+
+    button {
+      padding: 7px 13px;
+      cursor: pointer;
+      font-weight: 650;
+    }
+
+    button:hover:not(:disabled) {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    button:focus-visible,
+    input:focus-visible,
+    select:focus-visible {
+      outline: 3px solid rgba(23, 107, 80, 0.2);
+      outline-offset: 1px;
+    }
+
+    button:disabled {
+      cursor: wait;
+      opacity: 0.55;
+    }
+
+    .primary {
+      border-color: var(--accent);
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .primary:hover:not(:disabled) {
+      background: var(--accent-hover);
+      color: #fff;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.96);
+    }
+
+    .topbar-inner {
+      width: min(1180px, calc(100% - 32px));
+      min-height: 58px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .brand {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 780;
+      letter-spacing: 0;
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    main {
+      width: min(1180px, calc(100% - 32px));
+      margin: 24px auto 48px;
+    }
+
+    .auth-panel {
+      width: min(480px, 100%);
+      margin: 12vh auto 0;
+      padding: 24px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+
+    .auth-panel h2 {
+      margin: 0 0 18px;
+      font-size: 18px;
+      letter-spacing: 0;
+    }
+
+    .auth-form {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+    }
+
+    .field-label {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 650;
+    }
+
+    .auth-field {
+      grid-column: 1 / -1;
+    }
+
+    .message {
+      min-height: 22px;
+      margin: 12px 0 0;
+      color: var(--muted);
+    }
+
+    .message.error {
+      color: var(--danger);
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: minmax(220px, 1fr) 180px auto;
+      gap: 10px;
+      align-items: end;
+      padding: 0 0 18px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .control-field {
+      min-width: 0;
+    }
+
+    .results-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      min-height: 48px;
+      color: var(--muted);
+    }
+
+    .feedback-list {
+      border-top: 1px solid var(--line);
+      background: var(--surface);
+    }
+
+    .feedback-item {
+      padding: 20px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .feedback-item:target {
+      background: #f4fbf7;
+    }
+
+    .item-heading {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .item-heading h2 {
+      min-width: 0;
+      margin: 0;
+      overflow-wrap: anywhere;
+      font-size: 17px;
+      line-height: 1.4;
+      letter-spacing: 0;
+    }
+
+    .item-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px 14px;
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .status {
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      min-height: 26px;
+      padding: 3px 8px;
+      border: 1px solid currentColor;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .status.accepted {
+      color: var(--accent);
+      background: #eef8f3;
+    }
+
+    .status.failed {
+      color: var(--danger);
+      background: #fff4f2;
+    }
+
+    .status.pending {
+      color: var(--info);
+      background: #f1f5ff;
+    }
+
+    .status.not_configured {
+      color: var(--warning);
+      background: #fff8e8;
+    }
+
+    .content {
+      margin: 18px 0;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      font-size: 14px;
+    }
+
+    .lineup-block {
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface-soft);
+    }
+
+    .lineup-header,
+    .image-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .section-label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .lineup-code {
+      display: block;
+      max-height: 98px;
+      overflow: auto;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      color: #35403a;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+    }
+
+    .small-button {
+      min-height: 30px;
+      padding: 4px 9px;
+      font-size: 12px;
+    }
+
+    .images {
+      margin-top: 14px;
+    }
+
+    .image-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .image-button {
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .email-detail {
+      margin: 12px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .empty {
+      margin: 0;
+      padding: 54px 20px;
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .load-more-row {
+      display: flex;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    dialog {
+      width: min(960px, calc(100vw - 32px));
+      max-height: calc(100vh - 32px);
+      padding: 0;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+
+    dialog::backdrop {
+      background: rgba(18, 22, 20, 0.72);
+    }
+
+    .dialog-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .dialog-title {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-weight: 700;
+    }
+
+    .dialog-body {
+      display: grid;
+      place-items: center;
+      max-height: calc(100vh - 100px);
+      overflow: auto;
+      padding: 14px;
+      background: #202522;
+    }
+
+    .dialog-body img {
+      display: block;
+      max-width: 100%;
+      max-height: calc(100vh - 130px);
+      object-fit: contain;
+    }
+
+    [hidden] {
+      display: none !important;
+    }
+
+    @media (max-width: 720px) {
+      .topbar-inner,
+      main {
+        width: min(100% - 20px, 1180px);
+      }
+
+      .topbar-inner {
+        align-items: flex-start;
+        padding: 10px 0;
+      }
+
+      .top-actions {
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+
+      main {
+        margin-top: 16px;
+      }
+
+      .controls {
+        grid-template-columns: 1fr;
+      }
+
+      .controls button {
+        width: 100%;
+      }
+
+      .feedback-item {
+        padding: 16px 12px;
+      }
+
+      .item-heading {
+        display: grid;
+      }
+
+      .status {
+        justify-self: start;
+      }
+
+      .auth-form {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <h1 class="brand">NBA82 反馈后台</h1>
+      <div class="top-actions" id="topActions" hidden>
+        <button id="refreshButton" type="button">刷新</button>
+        <button id="logoutButton" type="button">退出</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="auth-panel" id="authPanel" aria-labelledby="authTitle">
+      <h2 id="authTitle">管理员验证</h2>
+      <form class="auth-form" id="authForm">
+        <div class="auth-field">
+          <label class="field-label" for="adminKey">管理员密钥</label>
+          <input id="adminKey" name="adminKey" type="password" autocomplete="current-password" required>
+        </div>
+        <button class="primary" id="loginButton" type="submit">进入后台</button>
+      </form>
+      <p class="message" id="authMessage" role="status" aria-live="polite"></p>
+    </section>
+
+    <section id="adminApp" hidden>
+      <div class="controls">
+        <div class="control-field">
+          <label class="field-label" for="searchInput">搜索</label>
+          <input id="searchInput" type="search" placeholder="标题、内容或阵容码">
+        </div>
+        <div class="control-field">
+          <label class="field-label" for="statusFilter">通知状态</label>
+          <select id="statusFilter">
+            <option value="">全部状态</option>
+            <option value="accepted">Webhook 已接受</option>
+            <option value="failed">通知失败</option>
+            <option value="not_configured">未配置</option>
+            <option value="pending">处理中</option>
+          </select>
+        </div>
+        <button id="clearFiltersButton" type="button">清除筛选</button>
+      </div>
+
+      <div class="results-meta">
+        <span id="resultsCount">0 条反馈</span>
+        <span id="listMessage" role="status" aria-live="polite"></span>
+      </div>
+
+      <div class="feedback-list" id="feedbackList"></div>
+      <div class="load-more-row" id="loadMoreRow" hidden>
+        <button id="loadMoreButton" type="button">加载更多</button>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="imageDialog">
+    <div class="dialog-bar">
+      <span class="dialog-title" id="dialogTitle"></span>
+      <button class="small-button" id="closeDialogButton" type="button">关闭</button>
+    </div>
+    <div class="dialog-body">
+      <img id="dialogImage" alt="">
+    </div>
+  </dialog>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const SESSION_KEY = "nba82.feedbackAdminKey";
+      const state = {
+        key: sessionStorage.getItem(SESSION_KEY) || "",
+        items: [],
+        nextCursor: null,
+        hasMore: false,
+        loading: false,
+        imageUrl: null
+      };
+
+      const elements = {
+        authPanel: document.getElementById("authPanel"),
+        authForm: document.getElementById("authForm"),
+        adminKey: document.getElementById("adminKey"),
+        loginButton: document.getElementById("loginButton"),
+        authMessage: document.getElementById("authMessage"),
+        adminApp: document.getElementById("adminApp"),
+        topActions: document.getElementById("topActions"),
+        refreshButton: document.getElementById("refreshButton"),
+        logoutButton: document.getElementById("logoutButton"),
+        searchInput: document.getElementById("searchInput"),
+        statusFilter: document.getElementById("statusFilter"),
+        clearFiltersButton: document.getElementById("clearFiltersButton"),
+        resultsCount: document.getElementById("resultsCount"),
+        listMessage: document.getElementById("listMessage"),
+        feedbackList: document.getElementById("feedbackList"),
+        loadMoreRow: document.getElementById("loadMoreRow"),
+        loadMoreButton: document.getElementById("loadMoreButton"),
+        imageDialog: document.getElementById("imageDialog"),
+        dialogTitle: document.getElementById("dialogTitle"),
+        dialogImage: document.getElementById("dialogImage"),
+        closeDialogButton: document.getElementById("closeDialogButton")
+      };
+
+      function setAuthMessage(message, isError = false) {
+        elements.authMessage.textContent = message;
+        elements.authMessage.classList.toggle("error", isError);
+      }
+
+      function setListMessage(message, isError = false) {
+        elements.listMessage.textContent = message;
+        elements.listMessage.style.color = isError ? "var(--danger)" : "";
+      }
+
+      function setAuthenticated(authenticated) {
+        elements.authPanel.hidden = authenticated;
+        elements.adminApp.hidden = !authenticated;
+        elements.topActions.hidden = !authenticated;
+      }
+
+      async function apiFetch(path, options = {}) {
+        const headers = new Headers(options.headers || {});
+        headers.set("Authorization", `Bearer ${state.key}`);
+        headers.set("Accept", "application/json");
+        return fetch(path, {
+          ...options,
+          headers,
+          credentials: "same-origin"
+        });
+      }
+
+      async function readApiError(response) {
+        try {
+          const payload = await response.json();
+          return payload?.error?.message || `请求失败（${response.status}）`;
+        } catch (_) {
+          return `请求失败（${response.status}）`;
+        }
+      }
+
+      function statusInfo(status) {
+        const values = {
+          accepted: {
+            label: "Webhook 已接受",
+            detail: "Webhook 返回成功；邮件送达未验证。"
+          },
+          failed: {
+            label: "通知失败",
+            detail: "反馈已入库，通知调用失败。"
+          },
+          not_configured: {
+            label: "未配置通知",
+            detail: "反馈已入库，未尝试发信。"
+          },
+          pending: {
+            label: "通知处理中",
+            detail: "通知结果尚未写回。"
+          }
+        };
+        return values[status] || {
+          label: "未知状态",
+          detail: "通知状态无法识别。"
+        };
+      }
+
+      function formatDate(value) {
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return value || "";
+        return new Intl.DateTimeFormat("zh-CN", {
+          dateStyle: "medium",
+          timeStyle: "medium",
+          hour12: false
+        }).format(date);
+      }
+
+      function formatBytes(value) {
+        const bytes = Number(value) || 0;
+        if (bytes < 1000) return `${bytes} B`;
+        return `${(bytes / 1000).toFixed(bytes >= 100000 ? 0 : 1)} KB`;
+      }
+
+      function makeElement(tagName, className, text) {
+        const element = document.createElement(tagName);
+        if (className) element.className = className;
+        if (text !== undefined) element.textContent = text;
+        return element;
+      }
+
+      async function copyText(text, button) {
+        const original = button.textContent;
+        try {
+          await navigator.clipboard.writeText(text);
+          button.textContent = "已复制";
+        } catch (_) {
+          const input = document.createElement("textarea");
+          input.value = text;
+          input.setAttribute("readonly", "");
+          input.style.position = "fixed";
+          input.style.opacity = "0";
+          document.body.appendChild(input);
+          input.select();
+          document.execCommand("copy");
+          input.remove();
+          button.textContent = "已复制";
+        }
+        setTimeout(() => {
+          button.textContent = original;
+        }, 1200);
+      }
+
+      async function openImage(image) {
+        setListMessage("正在读取图片...");
+        try {
+          const response = await apiFetch(`/api/feedback/image/${encodeURIComponent(image.id)}`);
+          if (!response.ok) {
+            throw new Error(await readApiError(response));
+          }
+          const blob = await response.blob();
+          if (!blob.type.startsWith("image/")) {
+            throw new Error("服务器返回的不是图片。");
+          }
+          if (state.imageUrl) URL.revokeObjectURL(state.imageUrl);
+          state.imageUrl = URL.createObjectURL(blob);
+          elements.dialogTitle.textContent = image.fileName;
+          elements.dialogImage.alt = image.fileName;
+          elements.dialogImage.src = state.imageUrl;
+          elements.imageDialog.showModal();
+          setListMessage("");
+        } catch (error) {
+          setListMessage(error.message || "图片读取失败。", true);
+        }
+      }
+
+      function closeImage() {
+        elements.imageDialog.close();
+        elements.dialogImage.removeAttribute("src");
+        if (state.imageUrl) {
+          URL.revokeObjectURL(state.imageUrl);
+          state.imageUrl = null;
+        }
+      }
+
+      function createFeedbackItem(item) {
+        const article = makeElement("article", "feedback-item");
+        article.id = `feedback-${item.id}`;
+        const typeLabels = {
+          feedback: "意见反馈",
+          bug: "问题反馈",
+          feature: "功能建议",
+        };
+
+        const heading = makeElement("div", "item-heading");
+        const headingText = makeElement("div");
+        headingText.appendChild(makeElement("h2", "", item.title || "无主题"));
+
+        const meta = makeElement("div", "item-meta");
+        meta.appendChild(makeElement("span", "", typeLabels[item.feedbackType] || typeLabels.feedback));
+        if (item.contactName) meta.appendChild(makeElement("span", "", `称呼 ${item.contactName}`));
+        meta.appendChild(makeElement("span", "", formatDate(item.createdAt)));
+        meta.appendChild(makeElement("span", "", `ID ${item.id}`));
+        meta.appendChild(makeElement("span", "", `${item.imageCount} 张图片`));
+        headingText.appendChild(meta);
+
+        const notification = statusInfo(item.emailStatus);
+        const status = makeElement("span", `status ${item.emailStatus}`, notification.label);
+        heading.append(headingText, status);
+        article.appendChild(heading);
+
+        article.appendChild(makeElement("div", "content", item.content || "未填写内容"));
+
+        if (item.contactEmail) {
+          const contact = makeElement("div", "lineup-block");
+          const contactHeader = makeElement("div", "lineup-header");
+          contactHeader.appendChild(makeElement("span", "section-label", "联系邮箱"));
+          const copyEmailButton = makeElement("button", "small-button", "复制");
+          copyEmailButton.type = "button";
+          copyEmailButton.addEventListener("click", () => copyText(item.contactEmail, copyEmailButton));
+          contactHeader.appendChild(copyEmailButton);
+          contact.appendChild(contactHeader);
+          contact.appendChild(makeElement("code", "lineup-code", item.contactEmail));
+          article.appendChild(contact);
+        }
+
+        if (item.pageUrl) {
+          const page = makeElement("div", "lineup-block");
+          const pageHeader = makeElement("div", "lineup-header");
+          pageHeader.appendChild(makeElement("span", "section-label", "页面链接"));
+          const openPageLink = makeElement("a", "small-button", "打开");
+          openPageLink.href = item.pageUrl;
+          openPageLink.target = "_blank";
+          openPageLink.rel = "noopener noreferrer";
+          pageHeader.appendChild(openPageLink);
+          page.appendChild(pageHeader);
+          page.appendChild(makeElement("code", "lineup-code", item.pageUrl));
+          article.appendChild(page);
+        }
+
+        if (item.lineupCode) {
+          const lineup = makeElement("div", "lineup-block");
+          const lineupHeader = makeElement("div", "lineup-header");
+          lineupHeader.appendChild(makeElement("span", "section-label", "阵容码"));
+          const copyButton = makeElement("button", "small-button", "复制");
+          copyButton.type = "button";
+          copyButton.addEventListener("click", () => copyText(item.lineupCode, copyButton));
+          lineupHeader.appendChild(copyButton);
+          lineup.appendChild(lineupHeader);
+          lineup.appendChild(makeElement("code", "lineup-code", item.lineupCode));
+          article.appendChild(lineup);
+        }
+
+        if (Array.isArray(item.images) && item.images.length > 0) {
+          const images = makeElement("div", "images");
+          const imageHeader = makeElement("div", "image-header");
+          imageHeader.appendChild(makeElement("span", "section-label", "反馈图片"));
+          images.appendChild(imageHeader);
+          const actions = makeElement("div", "image-actions");
+          item.images.forEach((image) => {
+            const button = makeElement(
+              "button",
+              "small-button image-button",
+              `${image.fileName} · ${formatBytes(image.byteSize)}`
+            );
+            button.type = "button";
+            button.title = `查看 ${image.fileName}`;
+            button.addEventListener("click", () => openImage(image));
+            actions.appendChild(button);
+          });
+          images.appendChild(actions);
+          article.appendChild(images);
+        }
+
+        const emailDetail = makeElement("p", "email-detail", notification.detail);
+        if (item.emailError) {
+          emailDetail.textContent += ` 错误码：${item.emailError}`;
+        }
+        article.appendChild(emailDetail);
+        return article;
+      }
+
+      function filteredItems() {
+        const query = elements.searchInput.value.trim().toLocaleLowerCase("zh-CN");
+        const status = elements.statusFilter.value;
+        return state.items.filter((item) => {
+          if (status && item.emailStatus !== status) return false;
+          if (!query) return true;
+          return [
+            item.feedbackType,
+            item.contactName,
+            item.title,
+            item.contactEmail,
+            item.content,
+            item.pageUrl,
+            item.lineupCode,
+            item.id,
+          ]
+            .some((value) => String(value || "").toLocaleLowerCase("zh-CN").includes(query));
+        });
+      }
+
+      function render() {
+        const items = filteredItems();
+        elements.feedbackList.replaceChildren();
+
+        if (items.length === 0) {
+          elements.feedbackList.appendChild(
+            makeElement("p", "empty", state.items.length === 0 ? "暂无反馈" : "没有匹配的反馈")
+          );
+        } else {
+          const fragment = document.createDocumentFragment();
+          items.forEach((item) => fragment.appendChild(createFeedbackItem(item)));
+          elements.feedbackList.appendChild(fragment);
+        }
+
+        elements.resultsCount.textContent = `${items.length} 条反馈`;
+        elements.loadMoreRow.hidden = !state.hasMore;
+        elements.loadMoreButton.disabled = state.loading;
+      }
+
+      async function loadFeedback(reset = false) {
+        if (state.loading) return;
+        state.loading = true;
+        elements.refreshButton.disabled = true;
+        elements.loadMoreButton.disabled = true;
+        setListMessage("正在读取...");
+
+        if (reset) {
+          state.items = [];
+          state.nextCursor = null;
+          state.hasMore = false;
+          render();
+        }
+
+        const query = new URLSearchParams({ limit: "30" });
+        if (state.nextCursor) query.set("cursor", state.nextCursor);
+
+        try {
+          const response = await apiFetch(`/api/feedback/list?${query.toString()}`);
+          if (response.status === 401) {
+            logout("管理员密钥无效。");
+            return;
+          }
+          if (!response.ok) {
+            throw new Error(await readApiError(response));
+          }
+          const payload = await response.json();
+          state.items = reset ? payload.items : state.items.concat(payload.items);
+          state.nextCursor = payload.nextCursor;
+          state.hasMore = Boolean(payload.hasMore);
+          setAuthenticated(true);
+          setListMessage("");
+          render();
+        } catch (error) {
+          const message = error.message || "反馈读取失败。";
+          setListMessage(message, true);
+          if (elements.adminApp.hidden) {
+            setAuthMessage(message, true);
+          }
+          if (reset && state.items.length === 0) render();
+        } finally {
+          state.loading = false;
+          elements.refreshButton.disabled = false;
+          elements.loadMoreButton.disabled = false;
+        }
+      }
+
+      function logout(message = "") {
+        state.key = "";
+        state.items = [];
+        state.nextCursor = null;
+        state.hasMore = false;
+        sessionStorage.removeItem(SESSION_KEY);
+        elements.adminKey.value = "";
+        setAuthenticated(false);
+        setAuthMessage(message, Boolean(message));
+        elements.adminKey.focus();
+      }
+
+      elements.authForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const key = elements.adminKey.value.trim();
+        if (!key) return;
+        state.key = key;
+        sessionStorage.setItem(SESSION_KEY, key);
+        elements.loginButton.disabled = true;
+        setAuthMessage("正在验证...");
+        await loadFeedback(true);
+        elements.loginButton.disabled = false;
+        if (state.key) setAuthMessage("");
+      });
+
+      elements.refreshButton.addEventListener("click", () => loadFeedback(true));
+      elements.logoutButton.addEventListener("click", () => logout());
+      elements.loadMoreButton.addEventListener("click", () => loadFeedback(false));
+      elements.searchInput.addEventListener("input", render);
+      elements.statusFilter.addEventListener("change", render);
+      elements.clearFiltersButton.addEventListener("click", () => {
+        elements.searchInput.value = "";
+        elements.statusFilter.value = "";
+        render();
+      });
+      elements.closeDialogButton.addEventListener("click", closeImage);
+      elements.imageDialog.addEventListener("click", (event) => {
+        if (event.target === elements.imageDialog) closeImage();
+      });
+      elements.imageDialog.addEventListener("cancel", (event) => {
+        event.preventDefault();
+        closeImage();
+      });
+
+      if (state.key) {
+        setAuthenticated(true);
+        loadFeedback(true);
+      } else {
+        setAuthenticated(false);
+        elements.adminKey.focus();
+      }
+    })();
+  </script>
+</body>
+</html>

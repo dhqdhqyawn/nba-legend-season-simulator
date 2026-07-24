@@ -1,0 +1,14 @@
+name = "nba-legend-season-simulator"
+compatibility_date = "2026-07-17"
+pages_build_output_dir = "."
+
+[vars]
+FEEDBACK_EMAIL_TO = "3572280879@qq.com"
+FEEDBACK_RATE_LIMIT_MAX = "5"
+FEEDBACK_RATE_LIMIT_WINDOW_SECONDS = "600"
+EMAIL_WEBHOOK_TIMEOUT_MS = "5000"
+
+[[d1_databases]]
+binding = "FEEDBACK_DB"
+database_name = "nba82-h5-beta-feedback"
+database_id = "fe514265-9693-4830-acb1-cb4d5ad1b29d"
