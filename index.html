@@ -2710,7 +2710,55 @@
       .feedback-actions .btn { flex: 1; }
     }
 
-  </style>
+  
+.lineup-import-dialog {
+  width: min(520px, calc(100vw - 32px));
+  border: 0;
+  border-radius: 20px;
+  padding: 0;
+  color: #191714;
+  background: #fffdf8;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.34);
+}
+
+.lineup-import-dialog::backdrop {
+  background: rgba(20, 18, 16, 0.68);
+  backdrop-filter: blur(4px);
+}
+
+.lineup-import-form {
+  display: grid;
+  gap: 14px;
+  padding: 24px;
+}
+
+.lineup-import-form h2 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.lineup-import-form label {
+  font-weight: 900;
+}
+
+.lineup-import-form textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  border: 1px solid #b9b2a8;
+  border-radius: 12px;
+  padding: 12px;
+  color: #191714;
+  background: #ffffff;
+  font: 600 14px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.lineup-import-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+</style>
 </head>
 <body>
   <main class="app">
@@ -2898,8 +2946,6 @@
       <button class="btn" id="p0OnboardingStart" type="button">开始组队</button>
     </div>
   </section>
-  <div class="p0-build-meta" id="p0BuildMeta" aria-label="当前版本">版本 beta-2026.07.22-candidate · 946 张卡 · 25 张候选包</div>
-
   <section class="feedback-modal" id="feedbackModal" role="dialog" aria-modal="true" aria-labelledby="feedbackTitle" hidden>
     <button class="feedback-modal-backdrop" id="feedbackBackdrop" type="button" aria-label="关闭反馈"></button>
     <div class="feedback-dialog">
@@ -18355,6 +18401,13 @@ function renderV6Timeline(timeline = []) {
       if (options.persist !== false) localStorage.setItem("nba82Locale", publicBetaLocale);
       if (options.rerender !== false) render();
       else applyPublicBetaLocale();
+      if (lastResult && ratingsRevealed) {
+        el.tier.textContent = tier(lastResult.wins);
+        el.summary.textContent = teamResultSummary(lastResult);
+        el.analysis.innerHTML = buildConcreteReasons(lastResult)
+          .map(reason => `<li><b>${reason.title}</b><br>${reason.detail}</li>`)
+          .join("");
+      }
       if (lastResult && el.seasonModal.classList.contains("is-open")) {
         renderResultModal(lastResult);
       }
@@ -18607,6 +18660,878 @@ function renderV6Timeline(timeline = []) {
 
     openPack();
     loadCardArtManifest();
-  </script>
+  
+
+
+    // RESULT_LOCALIZATION_VIEW_MODEL_BEGIN
+    const localizedOpponentNameEntries = Object.entries(nameZh)
+      .filter(([, chineseName]) => chineseName)
+      .sort((left, right) => right[1].length - left[1].length);
+
+    function cloneResultPresentationValue(value) {
+      if (typeof structuredClone === "function") return structuredClone(value);
+      return JSON.parse(JSON.stringify(value));
+    }
+
+    function localizedCardPresentation(card, locale) {
+      if (!card || typeof card !== "object") return card;
+      const chinese = publicBetaChineseLabels.get(card.id);
+      card.displayName = locale === "en"
+        ? String(card.name || card.displayName || "")
+        : String(chinese?.displayName || nameZh[card.name] || card.displayName || card.name || "");
+      card.displayVersion = locale === "en"
+        ? String(card.version || card.displayVersion || "")
+        : String(chinese?.displayVersion || localizedVersion(String(card.version || card.displayVersion || "")));
+      return card;
+    }
+
+    function localizeCardsInPresentationTree(value, locale, seen = new WeakSet()) {
+      if (!value || typeof value !== "object" || seen.has(value)) return value;
+      seen.add(value);
+      if (typeof value.name === "string" && typeof value.version === "string") {
+        localizedCardPresentation(value, locale);
+      }
+      if (Array.isArray(value)) {
+        value.forEach(item => localizeCardsInPresentationTree(item, locale, seen));
+      } else {
+        Object.values(value).forEach(item => localizeCardsInPresentationTree(item, locale, seen));
+      }
+      return value;
+    }
+
+    function localizeKnownPlayerNames(value, locale = publicBetaLocale) {
+      let localized = String(value || "");
+      for (const [englishName, chineseName] of localizedOpponentNameEntries) {
+        localized = localized.replaceAll(
+          locale === "en" ? chineseName : englishName,
+          locale === "en" ? englishName : chineseName
+        );
+      }
+      return localized;
+    }
+
+    function localizeStoredPlayoffStoryNames(result, locale = publicBetaLocale) {
+      for (const round of result.playoff?.rounds || []) {
+        for (const key of ["opponentStar", "opponentLabel", "storyDetail", "note"]) {
+          if (round[key]) round[key] = localizeKnownPlayerNames(round[key], locale);
+        }
+        for (const beat of round.storyBeats || []) {
+          if (beat.label) beat.label = localizeKnownPlayerNames(beat.label, locale);
+          if (beat.text) beat.text = localizeKnownPlayerNames(beat.text, locale);
+        }
+      }
+    }
+
+    function buildLocalizedResultViewModel(result, lineup, locale = publicBetaLocale) {
+      const viewResult = cloneResultPresentationValue(result);
+      const viewLineup = cloneResultPresentationValue(lineup || []);
+      localizeCardsInPresentationTree(viewResult, locale);
+      localizeCardsInPresentationTree(viewLineup, locale);
+      hydrateStoredStories(viewResult, viewLineup);
+      localizeCardsInPresentationTree(viewResult, locale);
+      localizeStoredPlayoffStoryNames(viewResult, locale);
+      return { result: viewResult, lineup: viewLineup, locale };
+    }
+    // RESULT_LOCALIZATION_VIEW_MODEL_END
+
+    function localizedOpponentLabel(label) {
+      if (!isEnglishLocale()) return label;
+      let localized = String(label || "Opponent")
+        .replace(/^东部第\s*(\d+)\s*种子队/, "East No. $1 seed")
+        .replace(/^西部第\s*(\d+)\s*种子队/, "West No. $1 seed")
+        .replace(/^分区第\s*(\d+)\s*种子/, "Conference No. $1 seed")
+        .replace(/^第\s*(\d+)\s*种子队/, "No. $1 seed")
+        .replace(/乐透区\/附加赛外/g, "Lottery / outside the play-in")
+        .replace(/附加赛外/g, "Outside the play-in")
+        .replace(/（/g, " (")
+        .replace(/）/g, ")");
+      for (const [englishName, chineseName] of localizedOpponentNameEntries) {
+        localized = localized.replaceAll(chineseName, englishName);
+      }
+      return localized;
+    }
+
+    function setPublicBetaLocale(locale, options = {}) {
+      publicBetaLocale = locale === "en" ? "en" : "zh";
+      cards.forEach(card => {
+        if (!publicBetaChineseLabels.has(card.id)) {
+          publicBetaChineseLabels.set(card.id, {
+            displayName: card.displayName,
+            displayVersion: card.displayVersion
+          });
+        }
+        const chinese = publicBetaChineseLabels.get(card.id);
+        card.displayName = publicBetaLocale === "en" ? card.name : chinese.displayName;
+        card.displayVersion = publicBetaLocale === "en" ? card.version : chinese.displayVersion;
+      });
+      if (options.persist !== false) localStorage.setItem("nba82Locale", publicBetaLocale);
+      if (options.rerender !== false) render();
+      else applyPublicBetaLocale();
+      if (lastResult && ratingsRevealed) refreshLocalizedResultViews();
+    }
+
+    function openResultModal(r) {
+      const viewModel = buildLocalizedResultViewModel(r, selectedCards(), publicBetaLocale);
+      renderResultModal(viewModel.result);
+      setResultModalTab("overview");
+      resultModalReturnFocus = document.activeElement;
+      el.seasonModal.classList.add("is-open");
+      el.seasonModal.setAttribute("aria-hidden", "false");
+      document.body.classList.add("result-modal-open");
+      el.seasonModalClose.focus();
+    }
+
+    function refreshLocalizedResultViews() {
+      // Static option labels are translated at the end of the first render.
+      // Render once more so summaries derived from those labels use the new
+      // locale. This does not open a pack or run the simulation.
+      render();
+      if (!lastResult || !ratingsRevealed) return;
+      const viewModel = buildLocalizedResultViewModel(lastResult, selectedCards(), publicBetaLocale);
+      const result = viewModel.result;
+      el.tier.textContent = tier(result.wins);
+      el.record.textContent = `${result.wins} - ${result.losses}`;
+      el.summary.textContent = teamResultSummary(result);
+      el.analysis.innerHTML = buildConcreteReasons(result)
+        .map(reason => `<li><b>${reason.title}</b><br>${reason.detail}</li>`)
+        .join("");
+      renderDetailMetrics(result);
+      renderPlayoffs(result.playoff);
+      renderPlayerSeason(result);
+      if (el.seasonModal.classList.contains("is-open")) {
+        renderResultModal(result);
+      }
+    }
+
+
+    // H5_STATE_CONTROLLER_FACTORY_BEGIN
+    function cloneH5StateValue(value) {
+      if (typeof structuredClone === "function") return structuredClone(value);
+      return JSON.parse(JSON.stringify(value));
+    }
+
+    function createH5StateController(adapter) {
+      function validate(state = adapter.read()) {
+        if (!state || !["zh", "en"].includes(state.locale)) {
+          throw new Error("Invalid H5 locale state");
+        }
+        if (!Array.isArray(state.selected) || state.selected.length !== 5) {
+          throw new Error("H5 selected state must contain five slots");
+        }
+        if (state.ratingsRevealed) {
+          if (!state.result) throw new Error("Revealed ratings require a simulation result");
+          if (state.selected.filter(Boolean).length !== 5) {
+            throw new Error("A completed simulation requires five selected cards");
+          }
+        }
+        return state;
+      }
+
+      function snapshot() {
+        return cloneH5StateValue(validate());
+      }
+
+      function commitLocale(locale) {
+        if (!["zh", "en"].includes(locale)) throw new Error(`Unsupported locale: ${locale}`);
+        adapter.writeLocale(locale);
+        validate();
+        return locale;
+      }
+
+      function commitCompletedResult(result) {
+        const state = adapter.read();
+        if (!result || state.selected.filter(Boolean).length !== 5) {
+          throw new Error("Cannot commit a simulation result before the starting five is complete");
+        }
+        adapter.writeSimulation({ result, ratingsRevealed: true });
+        validate();
+        return result;
+      }
+
+      function clearSimulationResult() {
+        adapter.writeSimulation({ result: null, ratingsRevealed: false });
+        validate();
+      }
+
+      function commitNewPack(pack) {
+        if (!Array.isArray(pack) || !pack.length) throw new Error("A new pack must contain cards");
+        if (new Set(pack.map(card => card.id)).size !== pack.length) {
+          throw new Error("A new pack cannot contain duplicate card ids");
+        }
+        if (new Set(pack.map(card => card.name)).size !== pack.length) {
+          throw new Error("A new pack cannot contain duplicate player identities");
+        }
+        adapter.writePackLineup({
+          draft: [...pack],
+          selected: Array(5).fill(null),
+          result: null,
+          ratingsRevealed: false,
+          activeSlot: 0,
+          hasActivatedSlot: false,
+          previewCardId: pack[0]?.id ?? null,
+          cardPreviewOpen: false
+        });
+        validate();
+        return pack;
+      }
+
+      function toggleLineupCard(card, slotIndex) {
+        const state = validate();
+        if (!card || !Number.isInteger(slotIndex) || slotIndex < 0 || slotIndex > 4) {
+          throw new Error("Invalid lineup-card transition");
+        }
+        const existingIndex = state.selected.findIndex(item => item && item.id === card.id);
+        if (existingIndex < 0 && state.selected.some(item => item && item.name === card.name)) {
+          return { changed: false, reason: "duplicate-player" };
+        }
+        if (existingIndex < 0 && !card.slots?.includes(slotIndex + 1)) {
+          return { changed: false, reason: "ineligible-position" };
+        }
+        const nextSelected = [...state.selected];
+        let nextActiveSlot = slotIndex;
+        let transition = "added";
+        if (existingIndex >= 0) {
+          nextSelected[existingIndex] = null;
+          nextActiveSlot = existingIndex;
+          transition = "removed";
+        } else {
+          nextSelected[slotIndex] = card;
+          const nextEmpty = nextSelected.findIndex((item, index) => !item && index !== slotIndex);
+          if (nextEmpty >= 0) nextActiveSlot = nextEmpty;
+        }
+        adapter.writeLineup({
+          selected: nextSelected,
+          result: null,
+          ratingsRevealed: false,
+          activeSlot: nextActiveSlot,
+          hasActivatedSlot: true,
+          previewCardId: existingIndex >= 0 ? state.previewCardId : card.id
+        });
+        validate();
+        return { changed: true, transition, activeSlot: nextActiveSlot };
+      }
+
+      function removeLineupCard(cardId) {
+        const state = validate();
+        const index = state.selected.findIndex(card => card && card.id === cardId);
+        if (index < 0) return { changed: false, reason: "not-selected" };
+        const nextSelected = [...state.selected];
+        nextSelected[index] = null;
+        adapter.writeLineup({
+          selected: nextSelected,
+          result: null,
+          ratingsRevealed: false,
+          activeSlot: index,
+          hasActivatedSlot: true,
+          previewCardId: state.previewCardId
+        });
+        validate();
+        return { changed: true, transition: "removed", activeSlot: index };
+      }
+
+      function activateLineupSlot(slotIndex) {
+        const state = validate();
+        if (!Number.isInteger(slotIndex) || slotIndex < 0 || slotIndex > 4) {
+          throw new Error("Invalid lineup slot");
+        }
+        const previousActiveSlot = state.activeSlot;
+        adapter.writeLineup({
+          selected: state.selected,
+          result: state.result,
+          ratingsRevealed: state.ratingsRevealed,
+          activeSlot: slotIndex,
+          hasActivatedSlot: true,
+          previewCardId: state.previewCardId,
+          cardPreviewOpen: state.cardPreviewOpen
+        });
+        validate();
+        return { changed: previousActiveSlot !== slotIndex, activeSlot: slotIndex };
+      }
+
+      function clearLineup() {
+        const state = validate();
+        const hadLineupOrResult = state.selected.some(Boolean)
+          || Boolean(state.result)
+          || state.ratingsRevealed;
+        adapter.writeLineup({
+          selected: Array(5).fill(null),
+          result: null,
+          ratingsRevealed: false,
+          activeSlot: 0,
+          hasActivatedSlot: false,
+          previewCardId: state.previewCardId,
+          cardPreviewOpen: false
+        });
+        validate();
+        return { changed: hadLineupOrResult, activeSlot: 0 };
+      }
+
+      function commitRestoredState(next) {
+        if (!next || !Array.isArray(next.draft) || !next.draft.length) {
+          throw new Error("Restored state requires a non-empty pack");
+        }
+        if (new Set(next.draft.map(card => card.id)).size !== next.draft.length
+          || new Set(next.draft.map(card => card.name)).size !== next.draft.length) {
+          throw new Error("Restored pack contains duplicate identities");
+        }
+        if (!Array.isArray(next.selected) || next.selected.length !== 5) {
+          throw new Error("Restored lineup must contain five slots");
+        }
+        const selectedCards = next.selected.filter(Boolean);
+        if (new Set(selectedCards.map(card => card.id)).size !== selectedCards.length
+          || new Set(selectedCards.map(card => card.name)).size !== selectedCards.length) {
+          throw new Error("Restored lineup contains duplicate identities");
+        }
+        next.selected.forEach((card, index) => {
+          if (card && !card.slots?.includes(index + 1)) {
+            throw new Error("Restored lineup contains an ineligible position");
+          }
+        });
+        const draftIds = new Set(next.draft.map(card => card.id));
+        if (selectedCards.some(card => !draftIds.has(card.id))) {
+          throw new Error("Restored lineup card is missing from its pack");
+        }
+        if (!Number.isInteger(next.activeSlot) || next.activeSlot < 0 || next.activeSlot > 4) {
+          throw new Error("Restored state contains an invalid active slot");
+        }
+        if (next.ratingsRevealed && (!next.result || selectedCards.length !== 5)) {
+          throw new Error("Restored revealed result is incomplete");
+        }
+        adapter.writePackLineup({
+          draft: [...next.draft],
+          selected: [...next.selected],
+          result: next.result ?? null,
+          ratingsRevealed: Boolean(next.ratingsRevealed),
+          activeSlot: next.activeSlot,
+          hasActivatedSlot: Boolean(next.hasActivatedSlot),
+          previewCardId: next.previewCardId ?? next.draft[0]?.id ?? null,
+          cardPreviewOpen: Boolean(next.cardPreviewOpen)
+        });
+        return snapshot();
+      }
+
+      return Object.freeze({
+        validate,
+        snapshot,
+        commitLocale,
+        commitCompletedResult,
+        clearSimulationResult,
+        commitNewPack,
+        toggleLineupCard,
+        removeLineupCard,
+        activateLineupSlot,
+        clearLineup,
+        commitRestoredState
+      });
+    }
+    // H5_STATE_CONTROLLER_FACTORY_END
+
+    var h5AppStateController = createH5StateController({
+      read: () => ({
+        locale: publicBetaLocale,
+        draft,
+        selected,
+        result: lastResult,
+        ratingsRevealed,
+        activeSlot,
+        hasActivatedSlot,
+        previewCardId,
+        cardPreviewOpen
+      }),
+      writeLocale(locale) {
+        publicBetaLocale = locale;
+      },
+      writeSimulation(next) {
+        lastResult = next.result;
+        ratingsRevealed = next.ratingsRevealed;
+      },
+      writePackLineup(next) {
+        draft = next.draft;
+        selected = next.selected;
+        lastResult = next.result;
+        ratingsRevealed = next.ratingsRevealed;
+        activeSlot = next.activeSlot;
+        hasActivatedSlot = next.hasActivatedSlot;
+        previewCardId = next.previewCardId;
+        cardPreviewOpen = next.cardPreviewOpen;
+      },
+      writeLineup(next) {
+        selected = next.selected;
+        lastResult = next.result;
+        ratingsRevealed = next.ratingsRevealed;
+        activeSlot = next.activeSlot;
+        hasActivatedSlot = next.hasActivatedSlot;
+        previewCardId = next.previewCardId;
+        if (typeof next.cardPreviewOpen === "boolean") cardPreviewOpen = next.cardPreviewOpen;
+      }
+    });
+
+    function setPublicBetaLocale(locale, options = {}) {
+      const nextLocale = locale === "en" ? "en" : "zh";
+      if (h5AppStateController) h5AppStateController.commitLocale(nextLocale);
+      else publicBetaLocale = nextLocale;
+      cards.forEach(card => {
+        if (!publicBetaChineseLabels.has(card.id)) {
+          publicBetaChineseLabels.set(card.id, {
+            displayName: card.displayName,
+            displayVersion: card.displayVersion
+          });
+        }
+        const chinese = publicBetaChineseLabels.get(card.id);
+        card.displayName = publicBetaLocale === "en" ? card.name : chinese.displayName;
+        card.displayVersion = publicBetaLocale === "en" ? card.version : chinese.displayVersion;
+      });
+      if (options.persist !== false) localStorage.setItem("nba82Locale", publicBetaLocale);
+      if (options.rerender !== false) render();
+      else applyPublicBetaLocale();
+      if (lastResult && ratingsRevealed) refreshLocalizedResultViews();
+    }
+
+    function simulate({ present = true } = {}) {
+      if (selectedCount() !== 5) return;
+      const lineup = selectedCards();
+      const result = calculateTeam(lineup);
+      result.playoff = calculateHiddenPlayoffLeagueV34(result, lineup);
+      result.eventV5 = buildEventV5ForResult(result, lineup);
+      if (result.eventV5.regular.length) result.seasonStories = result.eventV5.regular;
+      // Event V6 still owns the regular-season timeline, but its generic
+      // playoff explanation must not overwrite the round-specific composer.
+      hydrateStoredStories(result, lineup);
+      h5AppStateController.commitCompletedResult(result);
+      el.tier.textContent = tier(result.wins);
+      el.record.textContent = `${result.wins} - ${result.losses}`;
+      el.summary.textContent = teamResultSummary(result);
+      el.offMetric.textContent = result.offense;
+      el.defMetric.textContent = result.defense;
+      el.fitMetric.textContent = result.fit;
+      el.advMetric.textContent = result.adv;
+      renderDetailMetrics(result);
+      renderPlayoffs(result.playoff);
+      renderPlayerSeason(result);
+      el.analysis.innerHTML = buildConcreteReasons(result)
+        .map(reason => `<li><b>${reason.title}</b><br>${reason.detail}</li>`)
+        .join("");
+      render();
+      if (present) openResultModal(result);
+    }
+
+
+    function openPack({ focusCandidates = false } = {}) {
+      if (el.actionMenu) el.actionMenu.open = false;
+      const nextPack = buildPack(filteredPool());
+      if (h5AppStateController) {
+        h5AppStateController.commitNewPack(nextPack);
+      } else {
+        // Bootstrap executes before appended phase-two controllers initialize.
+        selected = Array(5).fill(null);
+        lastResult = null;
+        ratingsRevealed = false;
+        cardPreviewOpen = false;
+        draft = nextPack;
+        previewCardId = draft[0]?.id ?? null;
+        activeSlot = 0;
+        hasActivatedSlot = false;
+      }
+      document.body.classList.remove("card-preview-open");
+      el.posFilter.value = "1";
+      render();
+      resetResult();
+      if (focusCandidates) {
+        requestAnimationFrame(() => el.draftHead.scrollIntoView({ behavior: "smooth", block: "start" }));
+      }
+    }
+
+    function toggleCard(id) {
+      const card = cards.find(candidate => candidate.id === id);
+      if (!card) return;
+      const transition = h5AppStateController.toggleLineupCard(card, activeSlot);
+      if (!transition.changed) return;
+      el.posFilter.value = String(activeSlot + 1);
+      render();
+      resetResult();
+    }
+
+    function removeCard(id) {
+      const transition = h5AppStateController.removeLineupCard(id);
+      if (!transition.changed) return;
+      el.posFilter.value = String(activeSlot + 1);
+      render();
+      resetResult();
+      requestAnimationFrame(() => el.draftHead.scrollIntoView({ behavior: "smooth", block: "start" }));
+    }
+
+    function commitActiveLineupSlot(slotIndex, { focusCandidates = true } = {}) {
+      h5AppStateController.activateLineupSlot(slotIndex);
+      el.posFilter.value = String(activeSlot + 1);
+      render();
+      if (focusCandidates) {
+        requestAnimationFrame(() => el.draftHead.scrollIntoView({ behavior: "smooth", block: "start" }));
+      }
+    }
+
+    renderLineup = function renderControlledLineup() {
+      const rows = [];
+      for (let i = 0; i < 5; i++) {
+        const c = selected[i];
+        const emptySlotLabel = publicBetaLocale === "en" ? slotCodes[i] : slotLabels[i];
+        const emptySlotHint = publicBetaLocale === "en"
+          ? `Activate this slot, then choose a card eligible at ${slotCodes[i]}`
+          : `点击激活，再选择能打 ${slotCodes[i]} 的卡`;
+        rows.push(`
+          <div class="slot ${activeSlot === i ? "active" : ""}">
+            <div class="slot-num">${i + 1}</div>
+            <button class="slot-main" data-slot="${i}">
+              <div class="slot-name">${c ? localizedPlayerName(c) : emptySlotLabel}</div>
+              <div class="slot-version">${c ? localizedPlayerVersion(c) : emptySlotHint}</div>
+            </button>
+            ${c ? `<button class="x" data-remove="${c.id}">×</button>` : ""}
+          </div>
+        `);
+      }
+      el.lineup.innerHTML = rows.join("");
+      el.lineup.querySelectorAll("[data-slot]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          commitActiveLineupSlot(Number(btn.dataset.slot));
+        });
+      });
+      el.lineup.querySelectorAll("[data-remove]").forEach(btn => {
+        btn.addEventListener("click", () => removeCard(Number(btn.dataset.remove)));
+      });
+    };
+
+    function clearControlledLineup() {
+      closeResultModal();
+      if (el.actionMenu) el.actionMenu.open = false;
+      document.body.classList.remove("card-preview-open");
+      h5AppStateController.clearLineup();
+      el.posFilter.value = "1";
+      render();
+      resetResult();
+    }
+
+    const uncontrolledClearButton = el.clearBtn;
+    const controlledClearButton = uncontrolledClearButton.cloneNode(true);
+    uncontrolledClearButton.replaceWith(controlledClearButton);
+    el.clearBtn = controlledClearButton;
+    controlledClearButton.addEventListener("click", clearControlledLineup);
+
+    function handleControlledFlowAction() {
+      if (selectedCount() === 5) {
+        if (lastResult && ratingsRevealed) openResultModal(lastResult);
+        else simulate();
+        return;
+      }
+      commitActiveLineupSlot(activeSlot);
+    }
+
+    const uncontrolledFlowActionButton = el.flowActionBtn;
+    const controlledFlowActionButton = uncontrolledFlowActionButton.cloneNode(true);
+    uncontrolledFlowActionButton.replaceWith(controlledFlowActionButton);
+    el.flowActionBtn = controlledFlowActionButton;
+    controlledFlowActionButton.addEventListener("click", handleControlledFlowAction);
+
+    render();
+
+    // H5_PERSISTENCE_NORMALIZER_BEGIN
+    function normalizeH5PersistenceData(data, allCards) {
+      if (!data || typeof data !== "object" || !Array.isArray(data.draftIds)
+        || !Array.isArray(data.selectedIds)) {
+        throw new Error("Invalid H5 save payload");
+      }
+      const byId = new Map(allCards.map(card => [card.id, card]));
+      const resolveIds = (ids, label, allowNull = false) => ids.map(id => {
+        if (allowNull && id == null) return null;
+        const card = byId.get(id);
+        if (!card) throw new Error(`${label} contains an unknown card`);
+        return card;
+      });
+      const draft = resolveIds(data.draftIds, "Saved pack");
+      if (!draft.length) throw new Error("Saved pack is empty");
+      const selectedIds = data.selectedIds.slice(0, 5);
+      while (selectedIds.length < 5) selectedIds.push(null);
+      const selected = resolveIds(selectedIds, "Saved lineup", true);
+      let result = data.result ?? null;
+      let ratingsRevealed = Boolean(data.ratingsRevealed);
+      const complete = selected.filter(Boolean).length === 5;
+      let activeSlot = Math.max(0, Math.min(4, Number.isFinite(Number(data.activeSlot))
+        ? Math.trunc(Number(data.activeSlot))
+        : 0));
+      if (!complete) {
+        result = null;
+        ratingsRevealed = false;
+        const firstEmpty = selected.findIndex(card => !card);
+        if (firstEmpty >= 0) activeSlot = firstEmpty;
+      } else if (ratingsRevealed !== Boolean(result)) {
+        throw new Error("Saved result and reveal state disagree");
+      }
+      const allowedEras = new Set(["modern", "balanced", "physical"]);
+      const allowedPools = new Set(["all", "stars", "guards", "wings"]);
+      const allowedFilters = new Set(["all", "1", "2", "3", "4", "5"]);
+      const settings = {
+        era: allowedEras.has(data.settings?.era) ? data.settings.era : "modern",
+        pool: allowedPools.has(data.settings?.pool) ? data.settings.pool : "all",
+        posFilter: allowedFilters.has(data.settings?.posFilter) ? data.settings.posFilter : "all",
+        injury: String(Math.max(0, Math.min(12, Number(data.settings?.injury ?? 5) || 0))),
+        chem: String(Math.max(-8, Math.min(8, Number(data.settings?.chem ?? 0) || 0)))
+      };
+      return {
+        state: {
+          draft,
+          selected,
+          result,
+          ratingsRevealed,
+          activeSlot,
+          hasActivatedSlot: Boolean(data.hasActivatedSlot) || selected.some(Boolean),
+          previewCardId: byId.has(data.previewCardId) ? data.previewCardId : draft[0].id,
+          cardPreviewOpen: false
+        },
+        settings
+      };
+    }
+    // H5_PERSISTENCE_NORMALIZER_END
+
+    // H5_LINEUP_IMPORT_NORMALIZER_BEGIN
+    function normalizeH5LineupImportPayload(payload, allCards, candidatePool, shuffleCards) {
+      if (!payload || payload.v !== 1 || !Array.isArray(payload.cards)
+        || payload.cards.length !== 5) {
+        throw new Error("Invalid lineup-code payload");
+      }
+      const byId = new Map(allCards.map(card => [card.id, card]));
+      const imported = payload.cards.map(id => {
+        const card = byId.get(id);
+        if (!card) throw new Error("Lineup code contains an unknown card");
+        return card;
+      });
+      imported.forEach((card, index) => {
+        if (!card.slots?.includes(index + 1)) {
+          throw new Error("Lineup code contains an ineligible position");
+        }
+      });
+      if (new Set(imported.map(card => card.id)).size !== imported.length
+        || new Set(imported.map(card => card.name)).size !== imported.length) {
+        throw new Error("Lineup code contains duplicate identities");
+      }
+      const usedIds = new Set(imported.map(card => card.id));
+      const usedNames = new Set(imported.map(card => card.name));
+      const supplemental = [];
+      for (const card of shuffleCards(candidatePool.filter(card => !usedIds.has(card.id)))) {
+        if (usedNames.has(card.name)) continue;
+        supplemental.push(card);
+        usedNames.add(card.name);
+        if (supplemental.length >= 15) break;
+      }
+      if (supplemental.length < 15) throw new Error("Lineup code cannot build a complete candidate pack");
+      return {
+        state: {
+          draft: [...imported, ...supplemental],
+          selected: imported,
+          result: null,
+          ratingsRevealed: false,
+          activeSlot: 0,
+          hasActivatedSlot: true,
+          previewCardId: imported[0].id,
+          cardPreviewOpen: false
+        },
+        settings: {
+          era: ["modern", "balanced", "physical"].includes(payload.era)
+            ? payload.era
+            : "modern",
+          injury: String(Math.max(0, Math.min(12, Number(payload.injury ?? 5) || 0))),
+          chem: String(Math.max(-8, Math.min(8, Number(payload.chemistry ?? 0) || 0)))
+        }
+      };
+    }
+    // H5_LINEUP_IMPORT_NORMALIZER_END
+
+    function currentControlledSaveData() {
+      const state = h5AppStateController.snapshot();
+      return {
+        draftIds: state.draft.map(card => card.id),
+        selectedIds: state.selected.map(card => card?.id ?? null),
+        activeSlot: state.activeSlot,
+        hasActivatedSlot: state.hasActivatedSlot,
+        previewCardId: state.previewCardId,
+        ratingsRevealed: state.ratingsRevealed,
+        settings: {
+          era: el.era.value,
+          pool: el.pool.value,
+          posFilter: el.posFilter.value,
+          injury: el.injury.value,
+          chem: el.chem.value
+        },
+        result: state.result
+      };
+    }
+
+    function saveGameControlled() {
+      localStorage.setItem("nbaMomentPackSave", JSON.stringify(currentControlledSaveData()));
+      if (el.actionMenu) el.actionMenu.open = false;
+      el.poolInfo.textContent = isEnglishLocale()
+        ? "Saved in this browser"
+        : "已存档到本机浏览器";
+    }
+
+    function applyRestoredSettings(settings) {
+      el.era.value = settings.era;
+      el.pool.value = settings.pool;
+      el.posFilter.value = settings.posFilter;
+      el.injury.value = settings.injury;
+      el.chem.value = settings.chem;
+      el.injuryValue.textContent = el.injury.value;
+      el.chemValue.textContent = el.chem.value;
+    }
+
+    function renderRestoredGameState() {
+      render();
+      if (lastResult && ratingsRevealed) {
+        el.tier.textContent = tier(lastResult.wins);
+        el.record.textContent = `${lastResult.wins} - ${lastResult.losses}`;
+        el.summary.textContent = teamResultSummary(lastResult);
+        el.offMetric.textContent = lastResult.offense;
+        el.defMetric.textContent = lastResult.defense;
+        el.fitMetric.textContent = lastResult.fit;
+        el.advMetric.textContent = lastResult.adv;
+        renderDetailMetrics(lastResult);
+        renderPlayoffs(lastResult.playoff);
+        renderPlayerSeason(lastResult);
+        el.analysis.innerHTML = buildConcreteReasons(lastResult)
+          .map(reason => `<li><b>${reason.title}</b><br>${reason.detail}</li>`)
+          .join("");
+      } else {
+        resetResult();
+      }
+    }
+
+    function loadGameControlled() {
+      if (el.actionMenu) el.actionMenu.open = false;
+      const raw = localStorage.getItem("nbaMomentPackSave");
+      if (!raw) {
+        el.poolInfo.textContent = isEnglishLocale() ? "No saved game yet" : "还没有存档";
+        return;
+      }
+      try {
+        const normalized = normalizeH5PersistenceData(JSON.parse(raw), cards);
+        applyRestoredSettings(normalized.settings);
+        const restoredLineup = normalized.state.selected.filter(Boolean);
+        if (normalized.state.result && normalized.state.ratingsRevealed) {
+          if (normalized.state.result.playoff?.integration?.contractVersion
+            !== HIDDEN_PLAYOFF_V34_CONTRACT) {
+            normalized.state.result.playoff = calculateHiddenPlayoffLeagueV34(
+              normalized.state.result,
+              restoredLineup
+            );
+          }
+          hydrateStoredStories(normalized.state.result, restoredLineup);
+        }
+        h5AppStateController.commitRestoredState(normalized.state);
+        document.body.classList.remove("card-preview-open");
+        renderRestoredGameState();
+      } catch (_) {
+        el.poolInfo.textContent = isEnglishLocale()
+          ? "Saved game is invalid and was not loaded"
+          : "存档损坏，未读取";
+      }
+    }
+
+    function requestLineupCodeInput() {
+      let dialog = document.getElementById("lineupImportDialog");
+      if (!dialog) {
+        dialog = document.createElement("dialog");
+        dialog.id = "lineupImportDialog";
+        dialog.className = "lineup-import-dialog";
+        dialog.innerHTML = `
+          <form method="dialog" class="lineup-import-form">
+            <h2 data-lineup-import-title>导入阵容码</h2>
+            <label for="lineupImportInput" data-lineup-import-label>NBA82 阵容码</label>
+            <textarea id="lineupImportInput" rows="5" autocomplete="off" spellcheck="false"></textarea>
+            <div class="lineup-import-actions">
+              <button type="button" class="btn secondary" data-lineup-import-cancel>取消</button>
+              <button type="submit" class="btn primary" data-lineup-import-submit>导入</button>
+            </div>
+          </form>
+        `;
+        document.body.appendChild(dialog);
+      }
+      const english = isEnglishLocale();
+      dialog.querySelector("[data-lineup-import-title]").textContent = english
+        ? "Import lineup code"
+        : "导入阵容码";
+      dialog.querySelector("[data-lineup-import-label]").textContent = english
+        ? "NBA82 lineup code"
+        : "NBA82 阵容码";
+      dialog.querySelector("[data-lineup-import-cancel]").textContent = english ? "Cancel" : "取消";
+      dialog.querySelector("[data-lineup-import-submit]").textContent = english ? "Import" : "导入";
+      const input = dialog.querySelector("#lineupImportInput");
+      const form = dialog.querySelector("form");
+      const cancelButton = dialog.querySelector("[data-lineup-import-cancel]");
+      input.value = "";
+      dialog.showModal();
+      requestAnimationFrame(() => input.focus());
+      return new Promise(resolve => {
+        const finish = value => {
+          form.removeEventListener("submit", submit);
+          cancelButton.removeEventListener("click", cancel);
+          dialog.removeEventListener("cancel", cancel);
+          if (dialog.open) dialog.close();
+          resolve(value);
+        };
+        const submit = event => {
+          event.preventDefault();
+          finish(input.value.trim());
+        };
+        const cancel = event => {
+          event.preventDefault();
+          finish("");
+        };
+        form.addEventListener("submit", submit);
+        cancelButton.addEventListener("click", cancel);
+        dialog.addEventListener("cancel", cancel);
+      });
+    }
+
+    async function importLineupCodeControlled() {
+      if (el.actionMenu) el.actionMenu.open = false;
+      const input = await requestLineupCodeInput();
+      if (!input) return;
+      try {
+        const normalized = normalizeH5LineupImportPayload(
+          decodeLineupCode(input),
+          cards,
+          filteredPool(),
+          shuffle
+        );
+        el.era.value = normalized.settings.era;
+        el.injury.value = normalized.settings.injury;
+        el.chem.value = normalized.settings.chem;
+        el.injuryValue.textContent = el.injury.value;
+        el.chemValue.textContent = el.chem.value;
+        el.posFilter.value = "all";
+        h5AppStateController.commitRestoredState(normalized.state);
+        document.body.classList.remove("card-preview-open");
+        render();
+        resetResult();
+        el.poolInfo.textContent = isEnglishLocale()
+          ? "Lineup imported; the season is ready to simulate"
+          : "阵容码已导入，可以直接模拟赛季";
+        document.querySelector(".top-lineup")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      } catch (_) {
+        alert(isEnglishLocale()
+          ? "Invalid lineup code, or a player is not eligible at the fixed position."
+          : "阵容码无效，或其中球员不符合固定位置规则。");
+      }
+    }
+
+    function replaceControlledButton(buttonKey, handler) {
+      const previousButton = el[buttonKey];
+      const nextButton = previousButton.cloneNode(true);
+      previousButton.replaceWith(nextButton);
+      el[buttonKey] = nextButton;
+      nextButton.addEventListener("click", handler);
+    }
+
+    replaceControlledButton("saveBtn", saveGameControlled);
+    replaceControlledButton("loadBtn", loadGameControlled);
+    replaceControlledButton("importLineupBtn", importLineupCodeControlled);
+</script>
 </body>
 </html>
