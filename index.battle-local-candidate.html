@@ -19532,6 +19532,863 @@ function renderV6Timeline(timeline = []) {
     replaceControlledButton("saveBtn", saveGameControlled);
     replaceControlledButton("loadBtn", loadGameControlled);
     replaceControlledButton("importLineupBtn", importLineupCodeControlled);
+(function installH5BattleNarrativeCandidate(globalScope) {
+  "use strict";
+
+  const SCHEMA_VERSION = "battle-narrative-candidate-1.0.0";
+  const RESULT_EFFECT = "explanationOnly";
+  const MAX_FAMILY_USES_PER_SERIES = 2;
+  const FORBIDDEN_STORY_TERMS = [
+    "犯罪", "违法", "刑事", "警方", "逮捕", "毒品", "枪", "法律指控",
+    "crime", "criminal", "illegal", "police", "arrest", "drug", "firearm", "legal allegation"
+  ];
+  const HISTORICAL_CLAIM_STATUSES = Object.freeze([
+    "documentedBasketballEvent",
+    "investigation",
+    "allegation",
+    "arrest",
+    "conviction"
+  ]);
+  const HISTORICAL_EVIDENCE_EVENT_CONTRACT = Object.freeze({
+    requiredFields: Object.freeze([
+      "id", "stablePlayerKey", "stableCardKey", "seasonWindow", "claimStatus",
+      "title", "detail", "evidence", "resultEffect"
+    ]),
+    requiredEvidenceFields: Object.freeze([
+      "sourceId", "publisher", "title", "url", "publishedAt", "accessedAt"
+    ]),
+    allowedClaimStatuses: HISTORICAL_CLAIM_STATUSES,
+    resultEffect: RESULT_EFFECT,
+    notes: Object.freeze([
+      "A historical event must bind to one stable player key and one stable card key.",
+      "The season/time window must be explicit and must include the active card season.",
+      "Investigation, allegation, arrest, and conviction are distinct statuses and must never be collapsed.",
+      "The default battle registry is empty until an event is separately verified and approved."
+    ])
+  });
+  const HISTORICAL_EVIDENCE_EVENTS = Object.freeze([]);
+
+  function clamp(value, minimum, maximum) {
+    return Math.max(minimum, Math.min(maximum, Number(value) || 0));
+  }
+
+  function hashText(value) {
+    let hash = 2166136261;
+    const text = String(value ?? "");
+    for (let index = 0; index < text.length; index += 1) {
+      hash ^= text.charCodeAt(index);
+      hash = Math.imul(hash, 16777619);
+    }
+    return hash >>> 0;
+  }
+
+  function seededUnit(seed) {
+    let value = hashText(seed);
+    value += 0x6D2B79F5;
+    let next = value;
+    next = Math.imul(next ^ next >>> 15, next | 1);
+    next ^= next + Math.imul(next ^ next >>> 7, next | 61);
+    return ((next ^ next >>> 14) >>> 0) / 4294967296;
+  }
+
+  function seededPick(items, seed) {
+    if (!Array.isArray(items) || !items.length) return null;
+    return items[Math.min(items.length - 1, Math.floor(seededUnit(seed) * items.length))];
+  }
+
+  function localize(locale, chinese, english) {
+    return String(locale || "zh-CN").toLowerCase().startsWith("en") ? english : chinese;
+  }
+
+  function cardKey(card) {
+    return String(card?.v34?.cardId || card?.eventProfile?.versionKey || card?.cardId
+      || card?.versionKey || `${card?.name || "unknown"}|${card?.version || "unknown"}`);
+  }
+
+  function cardName(card, locale) {
+    if (!card) return localize(locale, "未知球员", "Unknown player");
+    return localize(locale, card.displayName || card.name, card.name || card.displayName);
+  }
+
+  function cardNumber(card, field, fallback = 0) {
+    const value = Number(card?.[field] ?? card?.manual?.[field] ?? fallback);
+    return Number.isFinite(value) ? value : Number(fallback) || 0;
+  }
+
+  function seasonNumber(card, field, fallback = 0) {
+    const value = Number(card?.seasonStats?.[field] ?? card?.[field] ?? fallback);
+    return Number.isFinite(value) ? value : Number(fallback) || 0;
+  }
+
+  function lineupMap(team) {
+    return new Map((team?.lineup || []).map(card => [cardKey(card), card]));
+  }
+
+  function teamById(teamA, teamB, id) {
+    return id === teamA?.id ? teamA : id === teamB?.id ? teamB : null;
+  }
+
+  function boxByTeamId(game, teamA, teamB, id) {
+    if (id === teamA?.id) return game?.teamABox;
+    if (id === teamB?.id) return game?.teamBBox;
+    return null;
+  }
+
+  function opponentId(teamA, teamB, id) {
+    return id === teamA?.id ? teamB?.id : teamA?.id;
+  }
+
+  function pct(made, attempts) {
+    return attempts > 0 ? made / attempts : 0;
+  }
+
+  function safeTotals(box) {
+    return {
+      pts: Number(box?.totals?.pts || 0),
+      reb: Number(box?.totals?.reb || 0),
+      ast: Number(box?.totals?.ast || 0),
+      stl: Number(box?.totals?.stl || 0),
+      blk: Number(box?.totals?.blk || 0),
+      tov: Number(box?.totals?.tov || 0),
+      fgm: Number(box?.totals?.fgm || 0),
+      fga: Number(box?.totals?.fga || 0),
+      threePm: Number(box?.totals?.threePm || 0),
+      threePa: Number(box?.totals?.threePa || 0),
+      ftm: Number(box?.totals?.ftm || 0),
+      fta: Number(box?.totals?.fta || 0)
+    };
+  }
+
+  function topPlayers(box) {
+    return [...(box?.players || [])].sort((left, right) =>
+      right.pts - left.pts
+      || (right.ast + right.reb) - (left.ast + left.reb)
+      || String(left.cardKey).localeCompare(String(right.cardKey)));
+  }
+
+  function collectCardTraits(card) {
+    const profileTraits = card?.personalityV1?.traits || {};
+    const eventProfile = card?.eventProfile || {};
+    const values = {
+      personality: [...(eventProfile.personalityTraits || []), ...(profileTraits.personalityTraits || [])],
+      leadership: [...(eventProfile.leadershipTraits || []), ...(profileTraits.leadershipTraits || [])],
+      discipline: [...(eventProfile.disciplineTraits || []), ...(profileTraits.disciplineTraits || [])],
+      media: [...(eventProfile.mediaTraits || []), ...(profileTraits.mediaTraits || [])]
+    };
+    const all = new Set(Object.values(values).flat().map(String));
+    return {
+      ...values,
+      all,
+      emotionalVolatility: clamp(card?.personalityV1?.emotionalVolatility, 0, 1),
+      roleSensitivity: clamp(card?.personalityV1?.roleSensitivity, 0, 1),
+      coachCompliance: clamp(card?.personalityV1?.coachCompliance ?? 1, 0, 1),
+      disciplineRisk: clamp(card?.personalityV1?.disciplineRisk, 0, 1),
+      mediaHeat: clamp(card?.personalityV1?.mediaHeat, 0, 1)
+    };
+  }
+
+  function isQualifiedHighVolumeShooter(card, playerLine) {
+    if (!card || !playerLine) return false;
+    const observedThreePa = seasonNumber(card, "threeAttempts", 0);
+    const archetype = String(card.archetype || "");
+    const shooterRole = ["movementShooter", "shotCreator", "deepShooter", "stretchBig"].includes(archetype);
+    const ratingGate = cardNumber(card, "shoot") >= 88 && cardNumber(card, "space") >= 86;
+    return playerLine.threePm >= 4 && playerLine.threePa >= 7
+      && (observedThreePa >= 5.5 || shooterRole || ratingGate);
+  }
+
+  function scoreStateAfter(game, scoreBefore, teamA, teamB) {
+    const after = { ...scoreBefore };
+    if (game?.winnerId && Object.prototype.hasOwnProperty.call(after, game.winnerId)) after[game.winnerId] += 1;
+    return after;
+  }
+
+  function extractBattleGameEvidence({ game, teamA, teamB, scoreBefore = null, finalGameNumber = null, seriesWinnerId = null }) {
+    if (!game || !teamA || !teamB) throw new Error("battle-narrative-invalid-game-input");
+    const before = scoreBefore || { [teamA.id]: 0, [teamB.id]: 0 };
+    const after = scoreStateAfter(game, before, teamA, teamB);
+    const winnerId = game.winnerId;
+    const loserId = opponentId(teamA, teamB, winnerId);
+    const winnerBox = boxByTeamId(game, teamA, teamB, winnerId);
+    const loserBox = boxByTeamId(game, teamA, teamB, loserId);
+    const winnerTotals = safeTotals(winnerBox);
+    const loserTotals = safeTotals(loserBox);
+    const winnerPlayers = topPlayers(winnerBox);
+    const loserPlayers = topPlayers(loserBox);
+    const scoreA = Number(game.teamAScore || 0);
+    const scoreB = Number(game.teamBScore || 0);
+    const margin = Math.abs(scoreA - scoreB);
+    const isFinalGame = Number(game.number) === Number(finalGameNumber);
+    const clinched = isFinalGame && winnerId === seriesWinnerId && after[winnerId] === 4;
+    const tiedBefore = before[teamA.id] === before[teamB.id];
+    const trailedBefore = before[winnerId] < before[loserId];
+    const winnerFgPct = pct(winnerTotals.fgm, winnerTotals.fga);
+    const loserFgPct = pct(loserTotals.fgm, loserTotals.fga);
+    const winnerThreePct = pct(winnerTotals.threePm, winnerTotals.threePa);
+    const loserThreePct = pct(loserTotals.threePm, loserTotals.threePa);
+    const winnerAstTov = winnerTotals.ast / Math.max(1, winnerTotals.tov);
+    const loserAstTov = loserTotals.ast / Math.max(1, loserTotals.tov);
+    return {
+      gameNumber: Number(game.number),
+      winnerId,
+      loserId,
+      homeTeamId: game.homeTeamId || null,
+      margin,
+      closeGame: margin <= 5,
+      clinched,
+      isGameSeven: Number(game.number) === 7,
+      tiedBefore,
+      trailedBefore,
+      scoreBefore: { ...before },
+      scoreAfter: after,
+      winnerTotals,
+      loserTotals,
+      winnerFgPct,
+      loserFgPct,
+      winnerThreePct,
+      loserThreePct,
+      winnerAstTov,
+      loserAstTov,
+      deltas: {
+        fgPct: winnerFgPct - loserFgPct,
+        threePm: winnerTotals.threePm - loserTotals.threePm,
+        threePct: winnerThreePct - loserThreePct,
+        reb: winnerTotals.reb - loserTotals.reb,
+        ast: winnerTotals.ast - loserTotals.ast,
+        tov: loserTotals.tov - winnerTotals.tov,
+        astTov: winnerAstTov - loserAstTov
+      },
+      winnerLeaders: winnerPlayers.slice(0, 3),
+      loserLeaders: loserPlayers.slice(0, 2),
+      rawGame: game
+    };
+  }
+
+  const FAMILY_DEFINITIONS = Object.freeze({
+    game_highlight: {
+      priority: evidence => evidence.closeGame ? 8 : evidence.winnerLeaders[0]?.pts >= 32 ? 7 : 0,
+      eligible: evidence => evidence.closeGame || evidence.winnerLeaders[0]?.pts >= 32,
+      actor: evidence => evidence.winnerLeaders[0],
+      fragments: {
+        zh: {
+          openings: ["本场最亮眼的回合来自", "比赛的决定性表现属于", "比分被拉开前，率先站出来的是", "高强度对抗中，最稳定的输出来自"],
+          actions: ["在关键回合持续完成终结", "顶住对手回应并维持得分", "把个人进攻转成了胜方最可靠的支点", "在胶着阶段接管主要出手"],
+          consequences: ["胜方因此守住了最后的分差", "这成为本场最直接的得分支点", "球队围绕这次爆发完成了收官", "这一表现让对手的追分没有完成"]
+        },
+        en: {
+          openings: ["The defining individual performance came from", "The game's clearest scoring answer belonged to", "Before the margin settled, the player who stepped forward was", "The most stable output in a high-pressure game came from"],
+          actions: ["kept finishing the winner's most important possessions", "answered every run with another score", "became the winner's most reliable scoring outlet", "handled the heaviest scoring work in a close game"],
+          consequences: ["That production protected the final margin", "It became the most direct scoring edge of the game", "The winner built its close around that performance", "The opponent never completed its comeback"]
+        }
+      }
+    },
+    shooting: {
+      priority: evidence => Math.abs(evidence.deltas.threePm) * .8 + Math.abs(evidence.deltas.fgPct) * 40,
+      eligible: evidence => evidence.deltas.threePm >= 3 || evidence.deltas.fgPct >= .045,
+      actor: evidence => [...evidence.winnerLeaders].sort((a, b) => b.threePm - a.threePm || b.pts - a.pts)[0],
+      fragments: {
+        zh: {
+          openings: ["投射差距首先体现在", "胜方把出手机会兑现成了", "本场外线与整体效率的差别来自", "比赛节奏被投篮效率拉开，关键点是"],
+          actions: ["更稳定地命中已经创造出的机会", "在相同回合数里交出更高的命中产量", "用真实命中数惩罚了对手的防守选择", "让外线产量与整体效率同时占优"],
+          consequences: ["比分因此始终向胜方倾斜", "对手无法只靠一次得分潮追回差距", "这一效率差最终留在终场比分里", "投射优势成为本场最清楚的分水岭"]
+        },
+        en: {
+          openings: ["The shooting gap first showed through", "The winner converted its created looks through", "The difference in perimeter and overall efficiency came from", "Shot efficiency changed the rhythm, led by"],
+          actions: ["converted the available chances more consistently", "produced more makes from a similar game environment", "punished the opponent's choices with actual makes", "combined perimeter volume with the stronger overall efficiency"],
+          consequences: ["The score kept leaning toward the winner", "One opposing run was not enough to erase the gap", "That efficiency difference remained in the final score", "Shooting became the clearest dividing line"]
+        }
+      }
+    },
+    rebounding: {
+      priority: evidence => Math.max(0, evidence.deltas.reb),
+      eligible: evidence => evidence.deltas.reb >= 6,
+      actor: evidence => [...evidence.winnerLeaders].sort((a, b) => b.reb - a.reb || b.pts - a.pts)[0],
+      fragments: {
+        zh: {
+          openings: ["篮板差由", "胜方结束防守回合最稳定的一点是", "双方拼抢的差别集中在", "本场的篮板支点是"],
+          actions: ["持续收下关键篮板", "把更多对抗回合留在本队手里", "在篮板统计上建立了明确优势", "用稳定卡位帮助球队控制回合"],
+          consequences: ["胜方因此获得了更稳定的进攻轮次", "对手很难连续发动追分", "这一差距帮助球队守住比赛节奏", "篮板成为系列赛里可重复观察的优势"]
+        },
+        en: {
+          openings: ["The rebounding gap was anchored by", "The winner's steadiest way to finish defensive possessions came from", "The difference in contested possessions centered on", "The game's rebounding anchor was"],
+          actions: ["kept securing important rebounds", "kept more contested possessions with the winner", "helped create a clear team rebounding edge", "used consistent positioning to control possessions"],
+          consequences: ["The winner earned a more stable supply of possessions", "The opponent struggled to sustain a run", "That gap helped the winner control the game's rhythm", "Rebounding became a repeatable series advantage"]
+        }
+      }
+    },
+    possession_control: {
+      priority: evidence => Math.max(0, evidence.deltas.tov) + Math.max(0, evidence.deltas.astTov) * 2,
+      eligible: evidence => evidence.deltas.tov >= 4 || evidence.deltas.astTov >= .8,
+      actor: evidence => [...evidence.winnerLeaders].sort((a, b) => b.ast - a.ast || a.tov - b.tov)[0],
+      fragments: {
+        zh: {
+          openings: ["球权控制的核心是", "胜方把组织优势交给了", "助攻与失误的差别由", "本场进攻秩序最清楚地体现在"],
+          actions: ["在传球和失误之间保持更好的平衡", "让球队以更低代价完成进攻发起", "把更多回合送到可靠的终结点", "减少了会直接送给对手的转换机会"],
+          consequences: ["有限回合因此没有被轻易浪费", "这让胜方在胶着阶段更稳定", "对手必须用更高难度的方式追分", "球权差最终累积成了比分差"]
+        },
+        en: {
+          openings: ["Possession control centered on", "The winner trusted its organization to", "The assist-turnover difference was driven by", "The clearest sign of offensive order came from"],
+          actions: ["balanced creation against turnovers", "initiated offense at a lower cost", "delivered more possessions to reliable finishers", "cut down the transition chances handed to the opponent"],
+          consequences: ["The winner wasted fewer limited possessions", "That stability mattered in a close game", "The opponent had to score through harder possessions", "The possession gap accumulated into the final margin"]
+        }
+      }
+    },
+    core_and_support: {
+      priority: evidence => {
+        const first = evidence.winnerLeaders[0]?.pts || 0;
+        const second = evidence.winnerLeaders[1]?.pts || 0;
+        return second >= 18 ? second + Math.max(0, 8 - (first - second)) : 0;
+      },
+      eligible: evidence => (evidence.winnerLeaders[1]?.pts || 0) >= 18,
+      actor: evidence => evidence.winnerLeaders[0],
+      support: evidence => evidence.winnerLeaders[1],
+      fragments: {
+        zh: {
+          openings: ["第一得分点没有独自承担全部压力，", "胜方的双支点由", "当防守集中到主要持球人时，", "本场得分层级真正拉开差距的是"],
+          actions: ["与第二得分点共同维持输出", "带动另一名核心接住了空出的回合", "让球队始终保有第二套得分答案", "把主攻与支援角色分得更清楚"],
+          consequences: ["对手因此无法只限制一个人", "这让胜方的进攻没有在夹击后停住", "两层得分来源撑过了对方的调整", "系列赛的进攻结构因此更加稳定"]
+        },
+        en: {
+          openings: ["The primary scorer did not carry every possession alone;", "The winner's two scoring pillars were", "When the defense loaded toward the main creator,", "The scoring hierarchy separated the teams through"],
+          actions: ["shared the scoring load with a second option", "helped another core player absorb the open possessions", "kept a second scoring answer available", "made the primary and support roles clearer"],
+          consequences: ["The opponent could not solve the offense by stopping one player", "The offense kept moving after the first trap", "Two scoring layers survived the opponent's adjustments", "The series offense became more stable"]
+        }
+      }
+    },
+    defensive_limit: {
+      priority: evidence => Math.max(0, .46 - evidence.loserFgPct) * 60 + Math.max(0, evidence.loserTotals.tov - 13),
+      eligible: evidence => evidence.loserFgPct <= .43 || evidence.loserTotals.tov >= 16,
+      actor: evidence => [...evidence.winnerLeaders].sort((a, b) =>
+        (b.stl * 2 + b.blk * 1.7 + b.reb * .35) - (a.stl * 2 + a.blk * 1.7 + a.reb * .35))[0],
+      fragments: {
+        zh: {
+          openings: ["防守端最可验证的结果来自", "胜方没有只靠得分，", "对手进攻被压低时，防守支点是", "本场限制效果集中在"],
+          actions: ["帮助球队压低了对手整体命中率", "让对手付出了更多失误代价", "通过防守参与维持了回合完整性", "把防守价值转成了对手真实的低效"],
+          consequences: ["这项贡献不能只用个人得分衡量", "胜方因此不需要每回合都靠高难度进攻", "对手始终没有建立稳定效率", "防守核心的价值最终反映在对方数据上"]
+        },
+        en: {
+          openings: ["The clearest verifiable defensive result came through", "The winner did not rely on scoring alone;", "As the opponent's offense fell, the defensive anchor was", "The game's limiting effect centered on"],
+          actions: ["helped suppress the opponent's overall shooting", "made the opponent pay a higher turnover cost", "preserved possessions through defensive involvement", "turned defensive value into actual opponent inefficiency"],
+          consequences: ["That contribution cannot be measured by points alone", "The winner did not need a difficult shot every possession", "The opponent never established stable efficiency", "The defensive core's value appeared in the opponent's numbers"]
+        }
+      }
+    }
+  });
+
+  const STAGE_FRAGMENTS = Object.freeze({
+    opening: {
+      zh: ["系列赛首战先由胜方建立样本", "第一场给出了双方的第一个明确答案", "系列赛开局先留下了一项可继续观察的差距"],
+      en: ["The opener gave the winner the first sample", "Game 1 supplied the matchup's first clear answer", "The series began with one measurable gap to track"]
+    },
+    response: {
+      zh: ["上一场的失利没有延续，胜方在本场完成回应", "系列赛走势在这一场发生反转", "落后一方用一场胜利重新打开系列赛"],
+      en: ["The previous loss did not carry forward; the winner answered", "The series direction turned in this game", "The trailing side reopened the series with a response"]
+    },
+    sustained: {
+      zh: ["同一方连续取胜，优势开始形成延续", "胜方把上一场的结果继续带进本场", "系列赛暂时出现了连续性"],
+      en: ["The same side won again and began to sustain its edge", "The winner carried the previous result into this game", "A repeatable series pattern began to form"]
+    },
+    tied: {
+      zh: ["这一场把系列赛重新拉回同一起点", "总比分被追平，下一场重新决定主动权", "双方在系列赛比分上再次回到平衡"],
+      en: ["This game pulled the series back to level", "The series was tied and the next game would reset control", "The overall score returned to balance"]
+    },
+    closeout: {
+      zh: ["胜方把第四场胜利变成了系列赛终点", "这一场完成了最后的淘汰条件", "系列赛在本场正式结束"],
+      en: ["The winner turned its fourth win into the end of the series", "This game completed the final elimination condition", "The series officially ended here"]
+    },
+    game7: {
+      zh: ["抢七没有后续修正空间，本场数据就是最终答案", "系列赛被推到第七场，最后一局决定全部结果", "双方用抢七完成了最终结算"],
+      en: ["Game 7 left no later adjustment; this result was final", "The series reached a seventh game and one last result decided everything", "The matchup reached its final accounting in Game 7"]
+    }
+  });
+
+  function familyCandidates(evidence) {
+    return Object.entries(FAMILY_DEFINITIONS)
+      .filter(([, definition]) => definition.eligible(evidence))
+      .map(([family, definition]) => ({ family, definition, priority: definition.priority(evidence) }))
+      .sort((left, right) => right.priority - left.priority || left.family.localeCompare(right.family));
+  }
+
+  function numericEvidenceForFamily(family, evidence) {
+    if (family === "shooting") return {
+      winnerFgPct: Number((evidence.winnerFgPct * 100).toFixed(1)),
+      loserFgPct: Number((evidence.loserFgPct * 100).toFixed(1)),
+      winnerThreePm: evidence.winnerTotals.threePm,
+      loserThreePm: evidence.loserTotals.threePm
+    };
+    if (family === "rebounding") return { winnerReb: evidence.winnerTotals.reb, loserReb: evidence.loserTotals.reb };
+    if (family === "possession_control") return {
+      winnerAst: evidence.winnerTotals.ast, winnerTov: evidence.winnerTotals.tov,
+      loserAst: evidence.loserTotals.ast, loserTov: evidence.loserTotals.tov
+    };
+    if (family === "defensive_limit") return {
+      loserFgPct: Number((evidence.loserFgPct * 100).toFixed(1)), loserTov: evidence.loserTotals.tov
+    };
+    if (family === "core_and_support") return {
+      leaderPts: evidence.winnerLeaders[0]?.pts || 0, supportPts: evidence.winnerLeaders[1]?.pts || 0
+    };
+    return { actorPts: evidence.winnerLeaders[0]?.pts || 0, margin: evidence.margin };
+  }
+
+  function evidenceSentence(family, evidence, locale) {
+    const values = numericEvidenceForFamily(family, evidence);
+    if (family === "shooting") return localize(locale,
+      `胜方投篮命中率 ${values.winnerFgPct}%，对手 ${values.loserFgPct}%；三分命中数 ${values.winnerThreePm}-${values.loserThreePm}。`,
+      `The winner shot ${values.winnerFgPct}% to the opponent's ${values.loserFgPct}%, with a ${values.winnerThreePm}-${values.loserThreePm} edge in made threes.`);
+    if (family === "rebounding") return localize(locale,
+      `双方篮板为 ${values.winnerReb}-${values.loserReb}。`,
+      `The rebounding count finished ${values.winnerReb}-${values.loserReb}.`);
+    if (family === "possession_control") return localize(locale,
+      `胜方 ${values.winnerAst} 次助攻、${values.winnerTov} 次失误；对手为 ${values.loserAst} 次助攻、${values.loserTov} 次失误。`,
+      `The winner recorded ${values.winnerAst} assists and ${values.winnerTov} turnovers; the opponent had ${values.loserAst} assists and ${values.loserTov} turnovers.`);
+    if (family === "defensive_limit") return localize(locale,
+      `对手投篮命中率被限制到 ${values.loserFgPct}%，并出现 ${values.loserTov} 次失误。`,
+      `The opponent was held to ${values.loserFgPct}% shooting with ${values.loserTov} turnovers.`);
+    if (family === "core_and_support") return localize(locale,
+      `第一得分点得到 ${values.leaderPts} 分，第二得分点得到 ${values.supportPts} 分。`,
+      `The leading scorer had ${values.leaderPts} points and the second scorer added ${values.supportPts}.`);
+    return localize(locale,
+      `本场个人最高分为 ${values.actorPts} 分，最终分差 ${values.margin} 分。`,
+      `The game's leading winner scored ${values.actorPts} points and the final margin was ${values.margin}.`);
+  }
+
+  function renderFamilyBeat({ family, definition, evidence, teamA, teamB, seed, locale, continuity }) {
+    const winnerTeam = teamById(teamA, teamB, evidence.winnerId);
+    const cards = lineupMap(winnerTeam);
+    const actorLine = definition.actor(evidence);
+    const supportLine = definition.support ? definition.support(evidence) : null;
+    const actor = cards.get(actorLine?.cardKey);
+    const support = cards.get(supportLine?.cardKey);
+    const language = String(locale).toLowerCase().startsWith("en") ? "en" : "zh";
+    const fragments = definition.fragments[language];
+    const opening = seededPick(fragments.openings, `${seed}|${family}|opening`);
+    const action = seededPick(fragments.actions, `${seed}|${family}|action`);
+    const consequence = seededPick(fragments.consequences, `${seed}|${family}|consequence`);
+    const actorText = cardName(actor, locale);
+    const supportText = support ? cardName(support, locale) : null;
+    const subject = supportText
+      ? localize(locale, `${actorText}和${supportText}`, `${actorText} and ${supportText}`)
+      : actorText;
+    const text = language === "en"
+      ? `${opening} ${subject}, ${action}. ${evidenceSentence(family, evidence, locale)} ${consequence}.`
+      : `${opening} ${subject}，${action}。${evidenceSentence(family, evidence, locale)}${consequence}。`;
+    return {
+      id: `${family}-g${evidence.gameNumber}`,
+      family,
+      layer: "gameEvidence",
+      resultEffect: RESULT_EFFECT,
+      simulatedStoryline: false,
+      gameNumber: evidence.gameNumber,
+      teamId: evidence.winnerId,
+      actorCardKey: actorLine?.cardKey || null,
+      supportCardKey: supportLine?.cardKey || null,
+      targetCardKey: null,
+      continuity,
+      evidence: numericEvidenceForFamily(family, evidence),
+      text
+    };
+  }
+
+  function stageContext(evidence, previousGame) {
+    if (evidence.isGameSeven) return "game7";
+    if (evidence.clinched) return "closeout";
+    if (evidence.scoreAfter[evidence.winnerId] === evidence.scoreAfter[evidence.loserId]) return "tied";
+    if (previousGame && previousGame.winnerId !== evidence.winnerId) return "response";
+    if (previousGame && previousGame.winnerId === evidence.winnerId) return "sustained";
+    return "opening";
+  }
+
+  function renderStageBeat(evidence, previousGame, seed, locale) {
+    const context = stageContext(evidence, previousGame);
+    const language = String(locale).toLowerCase().startsWith("en") ? "en" : "zh";
+    const first = seededPick(STAGE_FRAGMENTS[context][language], `${seed}|stage|${context}`);
+    const score = `${evidence.scoreAfter[evidence.winnerId]}-${evidence.scoreAfter[evidence.loserId]}`;
+    const text = localize(locale,
+      `${first}；本场结束后，胜方视角的系列赛比分为 ${score}。`,
+      `${first}; after the game, the series stood ${score} from the winner's perspective.`);
+    return {
+      id: `series_stage-${context}-g${evidence.gameNumber}`,
+      family: "series_stage",
+      layer: "seriesContinuity",
+      resultEffect: RESULT_EFFECT,
+      simulatedStoryline: false,
+      gameNumber: evidence.gameNumber,
+      teamId: evidence.winnerId,
+      actorCardKey: null,
+      supportCardKey: null,
+      targetCardKey: null,
+      continuity: context,
+      evidence: { scoreAfter: { ...evidence.scoreAfter }, gameNumber: evidence.gameNumber },
+      text
+    };
+  }
+
+  function deepThreeClinchCandidate(evidence, teamA, teamB) {
+    if (!evidence.clinched || evidence.margin > 2) return null;
+    const winner = teamById(teamA, teamB, evidence.winnerId);
+    const cards = lineupMap(winner);
+    const box = boxByTeamId(evidence.rawGame, teamA, teamB, evidence.winnerId);
+    const candidate = [...(box?.players || [])]
+      .filter(line => isQualifiedHighVolumeShooter(cards.get(line.cardKey), line))
+      .sort((left, right) => right.threePm - left.threePm || right.pts - left.pts)[0];
+    return candidate ? { line: candidate, card: cards.get(candidate.cardKey) } : null;
+  }
+
+  function renderDeepThreeClinch(evidence, teamA, teamB, seed, locale) {
+    const candidate = deepThreeClinchCandidate(evidence, teamA, teamB);
+    if (!candidate) return null;
+    const name = cardName(candidate.card, locale);
+    const variants = String(locale).toLowerCase().startsWith("en") ? [
+      `${name} produced the simulated storyline's long-range game-winner in the closing possession. The evidence gate was strict: a ${evidence.margin}-point clincher and ${candidate.line.threePm}-${candidate.line.threePa} three-point shooting from a proven high-volume shooter.`,
+      `Simulated storyline: ${name} ended the closeout with a deep three. It was eligible only because the final margin was ${evidence.margin} and the qualified shooter made ${candidate.line.threePm} of ${candidate.line.threePa} threes.`
+    ] : [
+      `模拟剧情：${name}在最后回合命中超远三分绝杀。该情节只因本场是分差 ${evidence.margin} 分的系列赛终结战，且这名真实高产射手三分 ${candidate.line.threePm}-${candidate.line.threePa} 才获得资格。`,
+      `模拟剧情：${name}用超远三分结束系列赛。资格证据是终场分差 ${evidence.margin} 分，同时他本场三分 ${candidate.line.threePm}-${candidate.line.threePa}，并通过高产射手门槛。`
+    ];
+    return {
+      id: `signature_deep_three-g${evidence.gameNumber}`,
+      family: "signature_deep_three",
+      layer: "simulatedHighlight",
+      resultEffect: RESULT_EFFECT,
+      simulatedStoryline: true,
+      gameNumber: evidence.gameNumber,
+      teamId: evidence.winnerId,
+      actorCardKey: candidate.line.cardKey,
+      supportCardKey: null,
+      targetCardKey: null,
+      continuity: "closeout",
+      evidence: {
+        margin: evidence.margin,
+        clinched: true,
+        threePm: candidate.line.threePm,
+        threePa: candidate.line.threePa
+      },
+      text: seededPick(variants, `${seed}|deep-three`)
+    };
+  }
+
+  function teamDynamicCandidates(team) {
+    const lineup = team?.lineup || [];
+    const entries = lineup.map(card => ({ card, traits: collectCardTraits(card) }));
+    const leadership = entries.filter(entry => entry.traits.leadership.length
+      || entry.traits.all.has("practicePressure") || entry.traits.all.has("filmRoomPressure"));
+    const roleFriction = entries.filter(entry => entry.traits.roleSensitivity >= .58
+      || entry.traits.emotionalVolatility >= .62);
+    const coachFriction = entries.filter(entry => entry.traits.coachCompliance <= .58
+      && (entry.traits.roleSensitivity >= .5 || entry.traits.leadership.length));
+    const discipline = entries.filter(entry => entry.traits.discipline.length || entry.traits.disciplineRisk >= .55);
+    const media = entries.filter(entry => entry.traits.media.length || entry.traits.mediaHeat >= .58);
+    const candidates = [];
+    if (leadership.length && roleFriction.length) candidates.push({ family: "leadership_role_tension", primary: leadership[0], secondary: roleFriction.find(item => item.card !== leadership[0].card) || roleFriction[0] });
+    if (coachFriction.length) candidates.push({ family: "coach_role_friction", primary: coachFriction[0], secondary: null });
+    if (discipline.length) candidates.push({ family: "discipline_tension", primary: discipline[0], secondary: null });
+    if (media.length) candidates.push({ family: "media_pressure", primary: media[0], secondary: null });
+    return candidates;
+  }
+
+  const TEAM_DYNAMIC_FRAGMENTS = Object.freeze({
+    leadership_role_tension: {
+      zh: {
+        openings: ["模拟剧情：高标准的队内沟通出现摩擦", "模拟剧情：球队在失利后重新讨论核心责任", "模拟剧情：训练强度与角色接受度发生碰撞"],
+        actions: ["要求全队提高执行标准", "推动录像复盘和防守沟通", "希望重新明确收官分工"],
+        responses: ["则需要适应更直接的沟通方式", "对角色边界给出了自己的回应", "在下一场前与队友重新确认职责"],
+        consequences: ["这只是基于性格字段生成的虚构球队剧情，不对应真实冲突", "该内容不代表现实人物关系，只用于本次模拟的系列赛氛围", "故事不会改变比分、球员数据或后续比赛结果"]
+      },
+      en: {
+        openings: ["Simulated storyline: high internal standards created friction", "Simulated storyline: the team revisited core responsibilities after a loss", "Simulated storyline: practice demands collided with role acceptance"],
+        actions: ["asked the team to raise its execution standard", "pushed a sharper film review and defensive dialogue", "wanted the closing roles clarified"],
+        responses: ["had to adapt to a more direct communication style", "responded by defining a clearer role boundary", "reconfirmed responsibilities before the next game"],
+        consequences: ["This is fictional team drama derived from personality fields, not a claim about a real conflict", "It describes only this simulation and not the real relationship between the players", "The storyline does not change scores, player statistics, or later results"]
+      }
+    },
+    coach_role_friction: {
+      zh: {
+        openings: ["模拟剧情：教练组与球员对轮换职责出现分歧", "模拟剧情：一次失利引发了关于收官角色的讨论", "模拟剧情：球队重新划定临场决策边界"],
+        actions: ["希望保留更多自主处理空间", "对轮换安排提出不同意见", "要求在关键回合获得更明确的职责"],
+        responses: ["教练组用录像会议重新解释方案", "双方把分歧限制在战术层面", "球队在下一场前完成了角色确认"],
+        consequences: ["这是明确标注的虚构教练剧情，不对应现实冲突", "该剧情不涉及未经证实的严重场外指控", "故事只用于解释系列赛氛围，不改变模拟结果"]
+      },
+      en: {
+        openings: ["Simulated storyline: the coaching staff and a player disagreed over rotation duties", "Simulated storyline: a loss triggered a discussion about closing roles", "Simulated storyline: the team redrew its in-game decision boundaries"],
+        actions: ["wanted more freedom to make reads", "offered a different view of the rotation", "asked for a clearer late-game responsibility"],
+        responses: ["the staff used film review to explain the plan", "both sides kept the disagreement tactical", "the team clarified roles before the next game"],
+        consequences: ["This is explicitly fictional coaching drama and not a claim about a real conflict", "It contains no unsupported serious off-court allegation", "The story explains series atmosphere only and does not alter the simulation"]
+      }
+    },
+    discipline_tension: {
+      zh: {
+        openings: ["模拟剧情：比赛情绪让队内纪律承受压力", "模拟剧情：高强度对抗后球队强调情绪控制", "模拟剧情：教练组要求避免无谓的技术犯规风险"],
+        actions: ["在暂停期间被提醒保持专注", "接受了更明确的场上行为边界", "与队友重新确认了冲突后的处理方式"],
+        responses: ["球队把问题限制在比赛纪律范围", "后续沟通只围绕场上执行展开", "教练组没有让情绪问题扩大"],
+        consequences: ["这是虚构的模拟剧情，不声称现实中发生过任何违规行为", "该内容不生成未经证实的严重场外指控", "纪律剧情不会反向修改任何比赛结果"]
+      },
+      en: {
+        openings: ["Simulated storyline: game emotion put pressure on team discipline", "Simulated storyline: the team emphasized emotional control after a physical game", "Simulated storyline: the staff wanted to avoid unnecessary technical-foul risk"],
+        actions: ["was reminded to stay focused during a timeout", "accepted a clearer boundary for on-court conduct", "reconfirmed how the team would handle confrontation"],
+        responses: ["the team kept the issue within basketball discipline", "the follow-up stayed focused on execution", "the staff prevented the emotion from expanding"],
+        consequences: ["This fictional storyline does not claim any real misconduct", "It generates no unsupported serious off-court allegation", "The discipline story never changes a game result"]
+      }
+    },
+    media_pressure: {
+      zh: {
+        openings: ["模拟剧情：外界讨论放大了系列赛压力", "模拟剧情：连续赛果让赛后采访变得更尖锐", "模拟剧情：球队需要处理不断升高的舆论关注"],
+        actions: ["在采访中把焦点重新带回比赛", "避免公开讨论队内角色争议", "要求全队只回应可验证的场上问题"],
+        responses: ["队友随后用统一口径回应", "球队没有让外界讨论进入战术会议", "教练组把注意力留在下一场准备"],
+        consequences: ["这是虚构媒体剧情，不代表现实言论或真实争议", "该故事不生成严重无证据丑闻", "它只丰富展示，不会影响模拟状态"]
+      },
+      en: {
+        openings: ["Simulated storyline: outside discussion amplified the series pressure", "Simulated storyline: consecutive results sharpened the postgame questions", "Simulated storyline: the team had to manage rising public attention"],
+        actions: ["redirected the interview toward basketball", "avoided publicly debating internal roles", "asked the team to answer only verifiable on-court questions"],
+        responses: ["teammates then used a consistent message", "the team kept outside discussion out of tactical meetings", "the staff kept its focus on the next game"],
+        consequences: ["This is fictional media drama and not a claim about real comments or controversy", "It creates no unsupported serious scandal", "It enriches presentation only and does not affect simulation state"]
+      }
+    }
+  });
+
+  function renderTeamDynamic(candidate, team, seed, locale) {
+    const language = String(locale).toLowerCase().startsWith("en") ? "en" : "zh";
+    const fragments = TEAM_DYNAMIC_FRAGMENTS[candidate.family][language];
+    const primaryName = cardName(candidate.primary.card, locale);
+    const secondaryName = candidate.secondary ? cardName(candidate.secondary.card, locale) : localize(locale, "球队", "the team");
+    const opening = seededPick(fragments.openings, `${seed}|opening`);
+    const action = seededPick(fragments.actions, `${seed}|action`);
+    const response = seededPick(fragments.responses, `${seed}|response`);
+    const consequence = seededPick(fragments.consequences, `${seed}|consequence`);
+    return {
+      id: `${candidate.family}-${team.id}`,
+      family: candidate.family,
+      layer: "simulatedTeamDynamic",
+      resultEffect: RESULT_EFFECT,
+      simulatedStoryline: true,
+      gameNumber: null,
+      teamId: team.id,
+      actorCardKey: cardKey(candidate.primary.card),
+      supportCardKey: candidate.secondary ? cardKey(candidate.secondary.card) : null,
+      targetCardKey: null,
+      continuity: "seriesAtmosphere",
+      evidence: {
+        eligibility: candidate.family,
+        personalityFieldsUsed: ["personality", "leadership", "discipline", "media", "roleSensitivity", "coachCompliance"]
+      },
+      text: `${opening}：${primaryName}${action}，${secondaryName}${response}。${consequence}。`
+    };
+  }
+
+  function buildTeamDynamicStorylines({ teamA, teamB, seed, locale }) {
+    return [teamA, teamB].flatMap(team => {
+      const candidates = teamDynamicCandidates(team);
+      if (!candidates.length) return [];
+      const chosen = seededPick(candidates, `${seed}|team-dynamic|${team.id}`);
+      return [renderTeamDynamic(chosen, team, `${seed}|team-dynamic|${team.id}|${chosen.family}`, locale)];
+    });
+  }
+
+  function validateHistoricalEvidenceEvent(event) {
+    const errors = [];
+    for (const field of HISTORICAL_EVIDENCE_EVENT_CONTRACT.requiredFields) {
+      if (event?.[field] === undefined || event?.[field] === null || event?.[field] === "") errors.push(`missing:${field}`);
+    }
+    if (!HISTORICAL_CLAIM_STATUSES.includes(event?.claimStatus)) errors.push("invalid:claimStatus");
+    if (event?.resultEffect !== RESULT_EFFECT) errors.push("invalid:resultEffect");
+    if (!event?.seasonWindow || !Number.isFinite(Number(event.seasonWindow.startYear))
+      || !Number.isFinite(Number(event.seasonWindow.endYear))
+      || Number(event.seasonWindow.startYear) > Number(event.seasonWindow.endYear)) {
+      errors.push("invalid:seasonWindow");
+    }
+    for (const field of HISTORICAL_EVIDENCE_EVENT_CONTRACT.requiredEvidenceFields) {
+      if (event?.evidence?.[field] === undefined || event?.evidence?.[field] === null || event?.evidence?.[field] === "") {
+        errors.push(`missing:evidence.${field}`);
+      }
+    }
+    return { ok: errors.length === 0, errors };
+  }
+
+  function historicalEvidenceEventsForLineups({ teamA, teamB, registry = HISTORICAL_EVIDENCE_EVENTS }) {
+    const cards = [...(teamA?.lineup || []), ...(teamB?.lineup || [])];
+    const cardKeys = new Set(cards.map(cardKey));
+    const playerKeys = new Set(cards.map(card => String(card?.name || "")));
+    return (registry || []).filter(event => validateHistoricalEvidenceEvent(event).ok
+      && cardKeys.has(String(event.stableCardKey))
+      && playerKeys.has(String(event.stablePlayerKey)));
+  }
+
+  function selectRepresentativeEvent(gameNarratives) {
+    const scored = (gameNarratives || []).flatMap(game => (game.beats || []).map(beat => {
+      const base = beat.family === "signature_deep_three" ? 100
+        : beat.layer === "gameEvidence" ? 60
+          : beat.continuity === "game7" || beat.continuity === "closeout" ? 45 : 20;
+      const numericWeight = Object.values(beat.evidence || {}).reduce((sum, value) =>
+        sum + (Number.isFinite(Number(value)) ? Math.min(10, Math.abs(Number(value))) : 0), 0);
+      return { beat, score: base + numericWeight + Number(game.gameNumber || 0) * .01 };
+    })).sort((left, right) => right.score - left.score || left.beat.id.localeCompare(right.beat.id));
+    return scored[0]?.beat || null;
+  }
+
+  function buildBattleNarrative({ series, teamA, teamB, seed = null, locale = "zh-CN", enabled = true }) {
+    if (!enabled) return {
+      schemaVersion: SCHEMA_VERSION,
+      resultEffect: RESULT_EFFECT,
+      enabled: false,
+      seed: String(seed ?? series?.seed ?? ""),
+      games: [],
+      seriesStorylines: [],
+      historicalEvidenceEvents: [],
+      representativeEvent: null
+    };
+    if (!series || !Array.isArray(series.games) || !teamA || !teamB) throw new Error("battle-narrative-invalid-series-input");
+    const resolvedSeed = String(seed ?? series.seed ?? "battle-narrative");
+    const score = { [teamA.id]: 0, [teamB.id]: 0 };
+    const familyCounts = new Map();
+    const gameNarratives = [];
+    let previousGame = null;
+    let previousPrimaryFamily = null;
+    for (const game of series.games) {
+      const evidence = extractBattleGameEvidence({
+        game,
+        teamA,
+        teamB,
+        scoreBefore: score,
+        finalGameNumber: series.games.length,
+        seriesWinnerId: series.winnerId
+      });
+      const deepThree = renderDeepThreeClinch(evidence, teamA, teamB, `${resolvedSeed}|g${game.number}`, locale);
+      const eligibleFamilies = familyCandidates(evidence)
+        .filter(entry => (familyCounts.get(entry.family) || 0) < MAX_FAMILY_USES_PER_SERIES);
+      const selected = eligibleFamilies.slice(0, deepThree ? 1 : 2);
+      const beats = [];
+      if (deepThree) beats.push(deepThree);
+      selected.forEach((entry, index) => {
+        const continuity = previousPrimaryFamily === entry.family
+          ? "repeat"
+          : previousGame && previousGame.winnerId !== evidence.winnerId ? "answer" : "new";
+        beats.push(renderFamilyBeat({
+          ...entry,
+          evidence,
+          teamA,
+          teamB,
+          seed: `${resolvedSeed}|g${game.number}|${index}`,
+          locale,
+          continuity
+        }));
+        familyCounts.set(entry.family, (familyCounts.get(entry.family) || 0) + 1);
+      });
+      if (!beats.length) {
+        const fallback = { family: "game_highlight", definition: FAMILY_DEFINITIONS.game_highlight };
+        beats.push(renderFamilyBeat({
+          ...fallback,
+          evidence,
+          teamA,
+          teamB,
+          seed: `${resolvedSeed}|g${game.number}|fallback`,
+          locale,
+          continuity: "new"
+        }));
+        familyCounts.set("game_highlight", (familyCounts.get("game_highlight") || 0) + 1);
+      }
+      beats.push(renderStageBeat(evidence, previousGame, `${resolvedSeed}|g${game.number}`, locale));
+      gameNarratives.push({
+        gameNumber: game.number,
+        winnerId: evidence.winnerId,
+        resultEffect: RESULT_EFFECT,
+        beats,
+        evidence: {
+          margin: evidence.margin,
+          scoreBefore: { ...evidence.scoreBefore },
+          scoreAfter: { ...evidence.scoreAfter }
+        }
+      });
+      score[game.winnerId] += 1;
+      previousGame = game;
+      previousPrimaryFamily = selected[0]?.family || deepThree?.family || "game_highlight";
+    }
+    const seriesStorylines = buildTeamDynamicStorylines({ teamA, teamB, seed: resolvedSeed, locale });
+    const historicalEvidenceEvents = historicalEvidenceEventsForLineups({ teamA, teamB });
+    return {
+      schemaVersion: SCHEMA_VERSION,
+      resultEffect: RESULT_EFFECT,
+      enabled: true,
+      seed: resolvedSeed,
+      locale,
+      games: gameNarratives,
+      seriesStorylines,
+      historicalEvidenceEvents,
+      representativeEvent: selectRepresentativeEvent(gameNarratives)
+    };
+  }
+
+  function templateCombinationCapacity() {
+    let gameCapacity = 0;
+    for (const definition of Object.values(FAMILY_DEFINITIONS)) {
+      const fragments = definition.fragments.zh;
+      gameCapacity += fragments.openings.length * fragments.actions.length * fragments.consequences.length;
+    }
+    let dynamicCapacity = 0;
+    for (const definition of Object.values(TEAM_DYNAMIC_FRAGMENTS)) {
+      const fragments = definition.zh;
+      dynamicCapacity += fragments.openings.length * fragments.actions.length
+        * fragments.responses.length * fragments.consequences.length;
+    }
+    const stageCapacity = Object.values(STAGE_FRAGMENTS).reduce((sum, entry) => sum + entry.zh.length, 0);
+    return { gameCapacity, dynamicCapacity, stageCapacity, total: gameCapacity + dynamicCapacity + stageCapacity };
+  }
+
+  function validateBattleNarrative(narrative, { series, teamA, teamB }) {
+    const errors = [];
+    if (narrative?.resultEffect !== RESULT_EFFECT) errors.push("narrative-must-be-explanation-only");
+    if ((narrative?.games || []).length !== (series?.games || []).length) errors.push("narrative-game-count-mismatch");
+    const validCardKeys = new Set([...(teamA?.lineup || []), ...(teamB?.lineup || [])].map(cardKey));
+    const validTeamIds = new Set([teamA?.id, teamB?.id]);
+    const allBeats = [
+      ...(narrative?.games || []).flatMap(game => game.beats || []),
+      ...(narrative?.seriesStorylines || [])
+    ];
+    for (const beat of allBeats) {
+      if (beat.resultEffect !== RESULT_EFFECT) errors.push(`beat-not-explanation-only:${beat.id}`);
+      if (beat.teamId && !validTeamIds.has(beat.teamId)) errors.push(`unknown-team:${beat.id}`);
+      for (const key of [beat.actorCardKey, beat.supportCardKey, beat.targetCardKey].filter(Boolean)) {
+        if (!validCardKeys.has(key)) errors.push(`unknown-card:${beat.id}:${key}`);
+      }
+      if (/\{\{[^}]+\}\}/.test(beat.text || "")) errors.push(`unresolved-placeholder:${beat.id}`);
+      if (FORBIDDEN_STORY_TERMS.some(term => String(beat.text || "").toLowerCase().includes(term.toLowerCase()))) {
+        errors.push(`forbidden-story-term:${beat.id}`);
+      }
+      if (beat.family === "signature_deep_three") {
+        const game = series.games.find(item => item.number === beat.gameNumber);
+        const evidence = extractBattleGameEvidence({
+          game, teamA, teamB,
+          scoreBefore: Object.fromEntries([teamA.id, teamB.id].map(id => [id, series.games.filter(item => item.number < beat.gameNumber && item.winnerId === id).length])),
+          finalGameNumber: series.games.length,
+          seriesWinnerId: series.winnerId
+        });
+        if (!deepThreeClinchCandidate(evidence, teamA, teamB)) errors.push(`invalid-deep-three:${beat.id}`);
+      }
+      if (beat.continuity === "game7" && beat.gameNumber !== 7) errors.push(`invalid-game7:${beat.id}`);
+    }
+    if ((series?.games || []).length === 4 && allBeats.some(beat => beat.gameNumber === 5)) errors.push("four-zero-generated-game-five");
+    return { ok: errors.length === 0, errors };
+  }
+
+  const api = Object.freeze({
+    schemaVersion: SCHEMA_VERSION,
+    resultEffect: RESULT_EFFECT,
+    buildBattleNarrative,
+    extractBattleGameEvidence,
+    buildTeamDynamicStorylines,
+    selectRepresentativeEvent,
+    collectCardTraits,
+    isQualifiedHighVolumeShooter,
+    templateCombinationCapacity,
+    validateBattleNarrative,
+    validateHistoricalEvidenceEvent,
+    historicalEvidenceEventsForLineups,
+    historicalEvidenceEventContract: HISTORICAL_EVIDENCE_EVENT_CONTRACT,
+    historicalEvidenceEvents: HISTORICAL_EVIDENCE_EVENTS,
+    forbiddenStoryTerms: Object.freeze([...FORBIDDEN_STORY_TERMS])
+  });
+
+  globalScope.H5BattleNarrativeCandidate = api;
+  if (typeof module !== "undefined" && module.exports) module.exports = api;
+})(typeof globalThis !== "undefined" ? globalThis : window);
     // H5_BATTLE_CORE_BEGIN
     const H5_BATTLE_CODE_PREFIX = "NBA5-";
     const H5_BATTLE_CODE_VERSION = 1;
@@ -19643,6 +20500,365 @@ function renderV6Timeline(timeline = []) {
       return h5BattleClamp(1 / (1 + Math.exp(-((matchupA - matchupB) + homeEdge) / 7.2)), .18, .82);
     }
 
+    const H5_BATTLE_GAME_EVENT_TYPES = [
+      "shotmaking_swing",
+      "paint_pressure",
+      "ball_security",
+      "glass_control",
+      "foul_pressure",
+      "tactical_adjustment"
+    ];
+
+    function h5BattleTeamTrait(team, key, fallback) {
+      if (!Array.isArray(team?.lineup) || !team.lineup.length) return Number(team?.[fallback] || 75);
+      return team.lineup.reduce((sum, card) => sum + h5BattleCardNumber(card, key), 0) / team.lineup.length;
+    }
+
+    function h5BattleEventActor(team, type) {
+      if (!Array.isArray(team?.lineup) || !team.lineup.length) return null;
+      const traitByType = {
+        shotmaking_swing: "shoot",
+        paint_pressure: "finish",
+        ball_security: "pass",
+        glass_control: "reb",
+        foul_pressure: "def",
+        tactical_adjustment: "impact"
+      };
+      const trait = traitByType[type] || "impact";
+      return [...team.lineup].sort((left, right) =>
+        h5BattleCardNumber(right, trait) - h5BattleCardNumber(left, trait)
+        || h5BattleCardNumber(right, "impact") - h5BattleCardNumber(left, "impact"))[0];
+    }
+
+    function buildH5BattleGameEvent({ teamA, teamB, seed, gameNumber, wins }) {
+      const rng = h5BattleRng(h5BattleSeedNumber(
+        seed, teamA.id, teamB.id, `game-${gameNumber}`, "nba5-game-event-v1"
+      ));
+      const roll = rng();
+      const type = roll < .22 ? "shotmaking_swing"
+        : roll < .40 ? "paint_pressure"
+          : roll < .57 ? "ball_security"
+            : roll < .72 ? "glass_control"
+              : roll < .84 ? "foul_pressure"
+                : "tactical_adjustment";
+      const traitByType = {
+        shotmaking_swing: "shoot",
+        paint_pressure: "finish",
+        ball_security: "pass",
+        glass_control: "reb",
+        foul_pressure: "def",
+        tactical_adjustment: "impact"
+      };
+      let beneficiary;
+      if (type === "tactical_adjustment" && gameNumber > 1 && wins[teamA.id] !== wins[teamB.id]) {
+        beneficiary = wins[teamA.id] < wins[teamB.id] ? teamA : teamB;
+      } else {
+        const trait = traitByType[type];
+        const scoreA = h5BattleTeamTrait(teamA, trait, type === "foul_pressure" ? "defense" : "offense")
+          + (rng() - .5) * 12;
+        const scoreB = h5BattleTeamTrait(teamB, trait, type === "foul_pressure" ? "defense" : "offense")
+          + (rng() - .5) * 12;
+        beneficiary = scoreA >= scoreB ? teamA : teamB;
+      }
+      const affected = beneficiary.id === teamA.id ? teamB : teamA;
+      const magnitudeByType = {
+        shotmaking_swing: .035,
+        paint_pressure: .03,
+        ball_security: .028,
+        glass_control: .025,
+        foul_pressure: .033,
+        tactical_adjustment: .027
+      };
+      const actor = h5BattleEventActor(beneficiary, type);
+      const target = ["foul_pressure", "ball_security"].includes(type) && Array.isArray(affected.lineup)
+        ? [...affected.lineup].sort((left, right) =>
+          h5BattleCardNumber(right, "usage") - h5BattleCardNumber(left, "usage"))[0]
+        : null;
+      const magnitude = magnitudeByType[type];
+      return {
+        schemaVersion: "battle-game-event-1.0.0",
+        type,
+        beneficiaryId: beneficiary.id,
+        affectedTeamId: affected.id,
+        actorCardKey: actor ? h5BattleCardKey(actor) : null,
+        targetCardKey: target ? h5BattleCardKey(target) : null,
+        probabilityModifierTeamA: beneficiary.id === teamA.id ? magnitude : -magnitude,
+        statFocus: type === "shotmaking_swing" ? "shooting"
+          : type === "paint_pressure" ? "scoring"
+            : type === "ball_security" ? "assists-and-turnovers"
+              : type === "glass_control" ? "rebounds"
+                : type === "foul_pressure" ? "minutes"
+                  : "assists",
+        provenance: "simulated-series-state",
+        changesOutcomeProbability: true
+      };
+    }
+
+    function h5BattleAllocateWhole(total, weights) {
+      const safeWeights = weights.map(value => Math.max(.001, Number(value) || 0));
+      const weightTotal = safeWeights.reduce((sum, value) => sum + value, 0);
+      const raw = safeWeights.map(value => total * value / weightTotal);
+      const allocated = raw.map(Math.floor);
+      let remainder = total - allocated.reduce((sum, value) => sum + value, 0);
+      const order = raw
+        .map((value, index) => ({ index, fraction: value - Math.floor(value) }))
+        .sort((left, right) => right.fraction - left.fraction || left.index - right.index);
+      for (let index = 0; index < remainder; index += 1) {
+        allocated[order[index % order.length].index] += 1;
+      }
+      return allocated;
+    }
+
+    function h5BattleCardNumber(card, key, fallback = 75) {
+      const value = Number(card?.[key]);
+      return Number.isFinite(value) ? value : fallback;
+    }
+
+    function h5BattleSeasonNumber(card, key, fallback = null) {
+      const value = Number(card?.seasonStats?.[key]);
+      return Number.isFinite(value) ? value : fallback;
+    }
+
+    function h5BattleRateCount(rate, rng, maximum = 8) {
+      const gameRate = h5BattleClamp(Number(rate) || 0, 0, maximum) * (.55 + rng() * .9);
+      const whole = Math.floor(gameRate);
+      return Math.min(maximum, whole + (rng() < gameRate - whole ? 1 : 0));
+    }
+
+    function h5BattleAllocateBoundedWhole(total, weights, minimums, maximums) {
+      const allocations = weights.map((_, index) => Math.max(0, Math.round(Number(minimums[index]) || 0)));
+      const limits = weights.map((_, index) => Math.max(allocations[index], Math.round(Number(maximums[index]) || 0)));
+      const minimumTotal = allocations.reduce((sum, value) => sum + value, 0);
+      const maximumTotal = limits.reduce((sum, value) => sum + value, 0);
+      let remaining = h5BattleClamp(Math.round(total), minimumTotal, maximumTotal) - minimumTotal;
+      while (remaining > 0) {
+        const active = allocations.map((value, index) => value < limits[index] ? index : -1).filter(index => index >= 0);
+        if (!active.length) break;
+        const weightTotal = active.reduce((sum, index) => sum + Math.max(.001, Number(weights[index]) || 0), 0);
+        let assigned = 0;
+        active.forEach(index => {
+          const capacity = limits[index] - allocations[index];
+          const share = Math.min(capacity, Math.floor(remaining * Math.max(.001, Number(weights[index]) || 0) / weightTotal));
+          allocations[index] += share;
+          assigned += share;
+        });
+        remaining -= assigned;
+        if (remaining <= 0) break;
+        const ranked = active.sort((left, right) =>
+          (Math.max(.001, Number(weights[right]) || 0) / (allocations[right] - minimums[right] + 1))
+          - (Math.max(.001, Number(weights[left]) || 0) / (allocations[left] - minimums[left] + 1))
+          || left - right);
+        for (const index of ranked) {
+          if (remaining <= 0) break;
+          if (allocations[index] >= limits[index]) continue;
+          allocations[index] += 1;
+          remaining -= 1;
+        }
+      }
+      return allocations;
+    }
+
+    function h5BattleShootingLine(points, card, rng, options = {}) {
+      const shoot = h5BattleCardNumber(card, "shoot");
+      const finish = h5BattleCardNumber(card, "finish");
+      const offense = h5BattleCardNumber(card, "off", h5BattleCardNumber(card, "ovr"));
+      const observedThreeAttempts = h5BattleSeasonNumber(card, "threeAttempts");
+      const observedFieldGoalAttempts = h5BattleSeasonNumber(card, "fga");
+      const hasObservedShotVolume = Number.isFinite(observedThreeAttempts)
+        && Number.isFinite(observedFieldGoalAttempts) && observedFieldGoalAttempts > 0;
+      const desiredThreeShare = hasObservedShotVolume
+        ? (observedThreeAttempts <= .35
+          ? 0
+          : h5BattleClamp(observedThreeAttempts / observedFieldGoalAttempts, .025, .62))
+        : h5BattleClamp(.10 + (shoot - 70) * .008, .04, .48);
+      let threePm = Math.min(
+        Math.floor(points / 3),
+        Math.max(0, Math.round(points * desiredThreeShare / 3 * (.82 + rng() * .36)))
+      );
+      const afterThrees = points - threePm * 3;
+      let ftm = Math.min(
+        afterThrees,
+        Math.max(0, Math.round(points * h5BattleClamp(.12 + (finish - 72) * .004, .08, .26) * (.8 + rng() * .4)))
+      );
+      if ((afterThrees - ftm) % 2 !== 0) {
+        if (ftm < afterThrees) ftm += 1;
+        else if (ftm > 0) ftm -= 1;
+      }
+      const twoPm = Math.max(0, (afterThrees - ftm) / 2);
+      const efficiencyBoost = Number(options.efficiencyBoost || 0);
+      const observedThreePct = observedThreeAttempts >= 1
+        ? h5BattleSeasonNumber(card, "three")
+        : null;
+      const threePct = h5BattleClamp(
+        (Number.isFinite(observedThreePct) && observedThreePct > 0
+          ? observedThreePct
+          : .31 + (shoot - 72) * .0045)
+        + (rng() - .5) * .05 + efficiencyBoost,
+        .22,
+        .58
+      );
+      const twoPct = h5BattleClamp(.48 + (finish + offense - 150) * .0025 + (rng() - .5) * .05 + efficiencyBoost, .40, .74);
+      const ftPct = h5BattleClamp(.72 + (shoot - 72) * .003 + (rng() - .5) * .04, .60, .94);
+      const threePa = desiredThreeShare === 0
+        ? 0
+        : threePm
+          ? Math.max(threePm, Math.round(threePm / threePct))
+          : (rng() < desiredThreeShare ? 1 : 0);
+      const twoPa = twoPm ? Math.max(twoPm, Math.round(twoPm / twoPct)) : Math.round(rng());
+      const fta = ftm ? Math.max(ftm, Math.round(ftm / ftPct)) : 0;
+      return {
+        fgm: twoPm + threePm,
+        fga: twoPa + threePa,
+        threePm,
+        threePa,
+        ftm,
+        fta
+      };
+    }
+
+    function buildH5BattleTeamBox(team, opponent, score, pace, rng, gameEvent = null) {
+      if (!Array.isArray(team?.lineup) || team.lineup.length !== 5) return null;
+      const lineup = h5BattleValidateLineup(team.lineup);
+      const benefitsEvent = gameEvent?.beneficiaryId === team.id;
+      const affectedByEvent = gameEvent?.affectedTeamId === team.id;
+      const coreMinuteTarget = 188 + Math.floor(rng() * 13);
+      const minuteMinimums = lineup.map(card => gameEvent?.type === "foul_pressure" && affectedByEvent
+        && h5BattleCardKey(card) === gameEvent.targetCardKey ? 24 : 30);
+      const minuteMaximums = lineup.map(card => gameEvent?.type === "foul_pressure" && affectedByEvent
+        && h5BattleCardKey(card) === gameEvent.targetCardKey ? 36 : 44);
+      const minutes = h5BattleAllocateBoundedWhole(coreMinuteTarget, lineup.map(card => {
+        const foulPenalty = gameEvent?.type === "foul_pressure" && affectedByEvent
+          && h5BattleCardKey(card) === gameEvent.targetCardKey ? .68 : 1;
+        return Math.exp(
+          (h5BattleCardNumber(card, "impact") - 80) / 22
+          + (h5BattleCardNumber(card, "ovr") - 84) / 45
+        ) * (.9 + rng() * .2) * foulPenalty;
+      }), minuteMinimums, minuteMaximums);
+      const scoringProfiles = lineup.map(card => {
+        const observedUsage = h5BattleSeasonNumber(card, "usage", h5BattleCardNumber(card, "usage") * .34);
+        const observedPpg = h5BattleSeasonNumber(card, "ppg", Number(card?.ppg) || 12);
+        return .25
+          + Math.pow(h5BattleClamp(observedUsage, 8, 40) / 20, 1.25) * .5
+          + Math.pow(h5BattleClamp(observedPpg, 4, 38) / 20, 1.15) * .4
+          + h5BattleClamp((h5BattleCardNumber(card, "off") - 65) / 30, 0, .9) * .15;
+      });
+      const scoringOrder = scoringProfiles
+        .map((value, index) => ({ value, index }))
+        .sort((left, right) => right.value - left.value || left.index - right.index);
+      const scoringRankMultiplier = [1.18, 1.07, .98, .9, .82];
+      const rankMultiplierByIndex = Array(5).fill(1);
+      scoringOrder.forEach((entry, rank) => { rankMultiplierByIndex[entry.index] = scoringRankMultiplier[rank]; });
+      const points = h5BattleAllocateWhole(score, lineup.map((card, index) => {
+        const actorBoost = benefitsEvent && h5BattleCardKey(card) === gameEvent.actorCardKey
+          && ["shotmaking_swing", "paint_pressure", "tactical_adjustment"].includes(gameEvent.type) ? 1.24 : 1;
+        const foulPenalty = gameEvent?.type === "foul_pressure" && affectedByEvent
+          && h5BattleCardKey(card) === gameEvent.targetCardKey ? .78 : 1;
+        return scoringProfiles[index] * rankMultiplierByIndex[index]
+          * (minutes[index] / 38) * (.78 + rng() * .44) * actorBoost * foulPenalty;
+      }));
+      const shooting = points.map((value, index) => h5BattleShootingLine(value, lineup[index], rng, {
+        efficiencyBoost: benefitsEvent && gameEvent.type === "shotmaking_swing"
+          && h5BattleCardKey(lineup[index]) === gameEvent.actorCardKey ? .055 : 0
+      }));
+      const totalFgm = shooting.reduce((sum, line) => sum + line.fgm, 0);
+      const teamRebounds = h5BattleClamp(Math.round(
+        39 + (pace - 101) * .13
+        + (lineup.reduce((sum, card) => sum + h5BattleCardNumber(card, "reb"), 0) / 5 - 75) * .12
+        + (rng() - .5) * 8
+        + (benefitsEvent && gameEvent.type === "glass_control" ? 5 : 0)
+        - (affectedByEvent && gameEvent.type === "glass_control" ? 3 : 0)
+      ), 31, 57);
+      const teamAssists = h5BattleClamp(Math.round(
+        18 + (lineup.reduce((sum, card) => sum + h5BattleCardNumber(card, "pass"), 0) / 5 - 68) * .18
+        + rng() * 6
+        + (benefitsEvent && ["ball_security", "tactical_adjustment"].includes(gameEvent.type) ? 3 : 0)
+      ), 14, Math.max(14, totalFgm));
+      const rebounds = h5BattleAllocateWhole(teamRebounds, lineup.map(card => {
+        const observedRpg = h5BattleSeasonNumber(card, "rpg", Number(card?.rpg) || 4);
+        return .12 + Math.pow(h5BattleClamp(observedRpg, .5, 16), 1.35)
+          * (.82 + rng() * .36) + h5BattleCardNumber(card, "reb") * .025;
+      }));
+      const assists = h5BattleAllocateWhole(teamAssists, lineup.map(card => {
+        const observedApg = h5BattleSeasonNumber(card, "apg", Number(card?.apg) || 2);
+        return .1 + Math.pow(h5BattleClamp(observedApg, .3, 13), 1.42)
+          * (.8 + rng() * .4) + h5BattleCardNumber(card, "pass") * .018;
+      }));
+      const players = lineup.map((card, index) => {
+        const defense = h5BattleCardNumber(card, "def");
+        const usage = h5BattleCardNumber(card, "usage");
+        const ballSecurity = h5BattleCardNumber(card, "pass");
+        const observedSteals = h5BattleSeasonNumber(card, "spg", Number(card?.spg) || Math.max(0, (defense - 60) / 30));
+        const observedBlocks = h5BattleSeasonNumber(card, "bpg", Number(card?.bpg) || Math.max(0, (defense + h5BattleCardNumber(card, "reb") - 140) / 45));
+        const observedTurnovers = h5BattleSeasonNumber(card, "tov", usage / 38 + (82 - ballSecurity) / 28);
+        return {
+          cardKey: h5BattleCardKey(card),
+          minutes: minutes[index],
+          pts: points[index],
+          reb: rebounds[index],
+          ast: assists[index],
+          stl: h5BattleRateCount(observedSteals, rng, 5)
+            + (benefitsEvent && gameEvent.type === "ball_security"
+              && h5BattleCardKey(card) === gameEvent.actorCardKey ? 1 : 0),
+          blk: h5BattleRateCount(observedBlocks, rng, 7),
+          tov: h5BattleRateCount(observedTurnovers, rng, 7)
+            + (affectedByEvent && gameEvent.type === "ball_security"
+              && h5BattleCardKey(card) === gameEvent.targetCardKey ? 1 : 0),
+          ...shooting[index]
+        };
+      });
+      const totals = players.reduce((total, player) => {
+        for (const key of ["minutes", "pts", "reb", "ast", "stl", "blk", "tov", "fgm", "fga", "threePm", "threePa", "ftm", "fta"]) {
+          total[key] += player[key];
+        }
+        return total;
+      }, {
+        minutes: 0, pts: 0, reb: 0, ast: 0, stl: 0, blk: 0, tov: 0,
+        fgm: 0, fga: 0, threePm: 0, threePa: 0, ftm: 0, fta: 0
+      });
+      const coreMinutes = totals.minutes;
+      const rotation = { coreMinutes, benchMinutes: 240 - coreMinutes };
+      totals.minutes = 240;
+      return { teamId: team.id, opponentId: opponent.id, players, rotation, totals };
+    }
+
+    function summarizeH5BattleSeriesLineup(series, side) {
+      const boxKey = side === "B" ? "teamBBox" : "teamABox";
+      const boxes = series.games.map(game => game[boxKey]).filter(Boolean);
+      if (!boxes.length) return [];
+      const totalsByCard = new Map();
+      boxes.forEach(box => box.players.forEach(player => {
+        if (!totalsByCard.has(player.cardKey)) {
+          totalsByCard.set(player.cardKey, {
+            cardKey: player.cardKey,
+            games: 0,
+            minutes: 0, pts: 0, reb: 0, ast: 0, stl: 0, blk: 0, tov: 0,
+            fgm: 0, fga: 0, threePm: 0, threePa: 0, ftm: 0, fta: 0
+          });
+        }
+        const total = totalsByCard.get(player.cardKey);
+        total.games += 1;
+        for (const key of ["minutes", "pts", "reb", "ast", "stl", "blk", "tov", "fgm", "fga", "threePm", "threePa", "ftm", "fta"]) {
+          total[key] += player[key];
+        }
+      }));
+      return Array.from(totalsByCard.values(), total => ({
+        ...total,
+        mpg: Number((total.minutes / total.games).toFixed(1)),
+        ppg: Number((total.pts / total.games).toFixed(1)),
+        rpg: Number((total.reb / total.games).toFixed(1)),
+        apg: Number((total.ast / total.games).toFixed(1)),
+        spg: Number((total.stl / total.games).toFixed(1)),
+        bpg: Number((total.blk / total.games).toFixed(1)),
+        tpg: Number((total.tov / total.games).toFixed(1)),
+        fgPct: total.fga ? Number((total.fgm / total.fga * 100).toFixed(1)) : 0,
+        threePct: total.threePa ? Number((total.threePm / total.threePa * 100).toFixed(1)) : 0,
+        ftPct: total.fta ? Number((total.ftm / total.fta * 100).toFixed(1)) : 0,
+        tsPct: total.fga || total.fta
+          ? Number((total.pts / (2 * (total.fga + .44 * total.fta)) * 100).toFixed(1))
+          : 0
+      }));
+    }
+
     function simulateH5BattleSeries({ teamA, teamB, seed }) {
       if (!teamA || !teamB || teamA.id === teamB.id) throw new Error("invalid-battle-teams");
       const resolvedSeed = String(seed || "");
@@ -19654,25 +20870,47 @@ function renderV6Timeline(timeline = []) {
       for (let gameIndex = 0; gameIndex < 7; gameIndex += 1) {
         if (wins[teamA.id] === 4 || wins[teamB.id] === 4) break;
         const homeTeamId = homePattern[gameIndex];
-        const probabilityA = h5BattleGameProbability(teamA, teamB, homeTeamId);
+        const baseProbabilityA = h5BattleGameProbability(teamA, teamB, homeTeamId);
+        const gameEvent = buildH5BattleGameEvent({
+          teamA,
+          teamB,
+          seed: resolvedSeed,
+          gameNumber: gameIndex + 1,
+          wins
+        });
+        const probabilityA = h5BattleClamp(
+          baseProbabilityA + gameEvent.probabilityModifierTeamA,
+          .18,
+          .82
+        );
         const winner = rng() < probabilityA ? teamA : teamB;
         const loser = winner.id === teamA.id ? teamB : teamA;
         const pace = 101 + Math.round((rng() - .5) * 15);
         const winnerScore = Math.max(86, Math.round(pace + winner.offense * .12 - loser.defense * .055 + 8 + rng() * 8));
         const loserScore = Math.max(82, winnerScore - 2 - Math.floor(rng() * 14));
+        const teamAScore = winner.id === teamA.id ? winnerScore : loserScore;
+        const teamBScore = winner.id === teamB.id ? winnerScore : loserScore;
+        const statsRng = h5BattleRng(h5BattleSeedNumber(
+          resolvedSeed, teamA.id, teamB.id, `game-${gameIndex + 1}`, "nba5-box-v2"
+        ));
         wins[winner.id] += 1;
         games.push({
           number: gameIndex + 1,
           homeTeamId,
           winnerId: winner.id,
-          teamAScore: winner.id === teamA.id ? winnerScore : loserScore,
-          teamBScore: winner.id === teamB.id ? winnerScore : loserScore,
-          probabilityTeamA: Number(probabilityA.toFixed(6))
+          pace,
+          teamAScore,
+          teamBScore,
+          baseProbabilityTeamA: Number(baseProbabilityA.toFixed(6)),
+          probabilityTeamA: Number(probabilityA.toFixed(6)),
+          event: gameEvent,
+          teamABox: buildH5BattleTeamBox(teamA, teamB, teamAScore, pace, statsRng, gameEvent),
+          teamBBox: buildH5BattleTeamBox(teamB, teamA, teamBScore, pace, statsRng, gameEvent)
         });
       }
       const winnerId = wins[teamA.id] === 4 ? teamA.id : teamB.id;
       return {
-        schemaVersion: "battle-series-1.0.0",
+        schemaVersion: "battle-series-1.3.0",
         seed: resolvedSeed,
         teamAId: teamA.id,
         teamBId: teamB.id,
@@ -19683,16 +20921,54 @@ function renderV6Timeline(timeline = []) {
       };
     }
 
-    function buildH5BattleRandomLineup(allCards, seed) {
+    function h5BattleAverageOvr(lineup) {
+      return lineup.reduce((sum, card) => sum + Number(card?.ovr || 0), 0) / Math.max(1, lineup.length);
+    }
+
+    function h5BattleRandomOpponentProfile(ownLineup, seed) {
+      h5BattleValidateLineup(ownLineup);
+      const ownAverageOvr = h5BattleAverageOvr(ownLineup);
+      const rng = h5BattleRng(h5BattleSeedNumber(seed, "nba5-random-opponent-profile-v2"));
+      const roll = rng();
+      let tier;
+      let delta;
+      if (roll < .12) {
+        tier = "underdog";
+        delta = -4.5 + rng() * 2.5;
+      } else if (roll < .72) {
+        tier = "even";
+        delta = -1.5 + rng() * 3;
+      } else if (roll < .94) {
+        tier = "challenger";
+        delta = 1.5 + rng() * 2.5;
+      } else {
+        tier = "powerhouse";
+        delta = 4 + rng() * 2.5;
+      }
+      return {
+        tier,
+        ownAverageOvr: Number(ownAverageOvr.toFixed(2)),
+        targetAverageOvr: Number(h5BattleClamp(ownAverageOvr + delta, 76, 96).toFixed(2))
+      };
+    }
+
+    function buildH5BattleRandomLineup(allCards, seed, options = {}) {
       const rng = h5BattleRng(h5BattleSeedNumber(seed, "nba5-random-opponent-v1"));
+      const targetAverageOvr = Number.isFinite(Number(options.targetAverageOvr))
+        ? h5BattleClamp(Number(options.targetAverageOvr), 76, 96)
+        : 86;
       const lineup = [];
       const usedNames = new Set();
       for (let slot = 1; slot <= 5; slot += 1) {
+        const slotTarget = targetAverageOvr + (rng() - .5) * 3;
         const eligible = allCards
           .filter(card => card.slots?.includes(slot) && !usedNames.has(card.name))
-          .map(card => ({ card, score: rng() + Math.max(0, Number(card.ovr || 0) - 78) * .018 }))
-          .sort((left, right) => right.score - left.score);
-        const choice = eligible[Math.floor(rng() * Math.min(10, eligible.length))]?.card;
+          .map(card => ({
+            card,
+            score: Math.abs(Number(card.ovr || 0) - slotTarget) * .72 + rng() * 4.5
+          }))
+          .sort((left, right) => left.score - right.score);
+        const choice = eligible[Math.floor(rng() * Math.min(7, eligible.length))]?.card;
         if (!choice) throw new Error("random-library-cannot-fill-lineup");
         lineup.push(choice);
         usedNames.add(choice.name);
@@ -19706,8 +20982,14 @@ function renderV6Timeline(timeline = []) {
       mode: "solo",
       opponent: null,
       opponentSource: null,
+      opponentTier: null,
       lastSeries: null,
-      lastSeed: null
+      lastSeed: null,
+      lastOwnTeam: null,
+      lastOpponentTeam: null,
+      renderedLocale: null,
+      starting: false,
+      lastOwnCount: selectedCount()
     };
 
     function h5BattleEnglish() {
@@ -19724,20 +21006,24 @@ function renderV6Timeline(timeline = []) {
     }
 
     function h5BattleTeamFromLineup(id, lineup) {
+      const fixedLineup = h5BattleValidateLineup(lineup).map((card, index) => ({
+        ...card,
+        lineupSlot: index + 1
+      }));
       const previousInjury = el.injury.value;
       const previousChemistry = el.chem.value;
       el.injury.value = "0";
       el.chem.value = "0";
       let result;
       try {
-        result = calculateTeam(lineup);
+        result = calculateTeam(fixedLineup);
       } finally {
         el.injury.value = previousInjury;
         el.chem.value = previousChemistry;
       }
       return {
         id,
-        lineup,
+        lineup: fixedLineup,
         offense: Number(result.modelOffense || result.offense),
         defense: Number(result.modelDefense || result.defense),
         fit: Number(result.fit),
@@ -19789,7 +21075,11 @@ function renderV6Timeline(timeline = []) {
     function h5BattleSync() {
       const english = h5BattleEnglish();
       const copyTextCurrent = document.getElementById("battleCopyOwnCode")?.textContent || "";
+      const ownCount = selectedCount();
       const ownLineup = h5BattleCurrentOwnLineup();
+      const justCompletedOwnLineup = h5BattleState.mode === "battle"
+        && h5BattleState.lastOwnCount < 5 && ownCount === 5;
+      h5BattleState.lastOwnCount = ownCount;
       const panel = document.getElementById("battlePanel");
       if (!panel) return;
       document.body.classList.toggle("battle-mode-active", h5BattleState.mode === "battle");
@@ -19802,11 +21092,11 @@ function renderV6Timeline(timeline = []) {
       document.querySelector('[data-battle-mode="solo"]').textContent = english ? "Solo season" : "自行模拟";
       document.querySelector('[data-battle-mode="battle"]').textContent = english ? "NBA5 battle" : "阵容对战";
       document.getElementById("battleTitle").textContent = english
-        ? "Build your strongest five, then play a best-of-seven"
-        : "我的最强五人，直接打七场";
+        ? "Set up an NBA5 series"
+        : "准备 NBA5 系列赛";
       document.getElementById("battleSubtitle").textContent = english
-        ? "Complete five positions to create your NBA5. Paste a friend's code or draw a library opponent."
-        : "选满五人自动生成 NBA5；粘贴朋友代码，或者直接随机一个库内对手。";
+        ? "Your five are ready. Add a friend code or draw a hidden library opponent."
+        : "确认自己的五人，再导入朋友阵容码或抽取一个隐藏的库内对手。";
       document.getElementById("battleOwnTitle").textContent = english ? "My NBA5" : "我的 NBA5";
       document.getElementById("battleOwnHint").textContent = english
         ? "This is your shareable lineup code for communities and friend challenges."
@@ -19825,14 +21115,8 @@ function renderV6Timeline(timeline = []) {
         ? "Random library opponent"
         : "随机库内对手";
       document.getElementById("battleStartSeries").textContent = english
-        ? "Start best-of-seven"
-        : "开始七场四胜";
-      document.getElementById("battleRematch").textContent = english
-        ? "Rematch with a new seed"
-        : "换一个 seed 再战";
-      document.getElementById("battleReplay").textContent = english
-        ? "Replay the same seed"
-        : "复盘同一 seed";
+        ? (h5BattleState.starting ? "Simulating…" : "Start series")
+        : (h5BattleState.starting ? "正在模拟…" : "开始系列赛");
       const finalFlowStep = document.querySelector('[data-flow-step="4"] span');
       if (h5BattleState.mode === "battle" && finalFlowStep) {
         finalFlowStep.textContent = english ? "Choose opponent" : "选择对手";
@@ -19843,7 +21127,8 @@ function renderV6Timeline(timeline = []) {
       if (ownLineup) {
         codeInput.value = encodeH5BattleLineup(ownLineup);
         copyButton.disabled = false;
-        ownPreview.innerHTML = h5BattleLineupMarkup(ownLineup);
+        ownPreview.innerHTML = `<div class="battle-own-ready"><b>${english ? "Five-player lineup ready" : "五人阵容已就位"}</b>
+          <span>${english ? "Copy the NBA5 code to share this exact lineup." : "复制 NBA5 即可分享这套具体阵容。"}</span></div>`;
       } else {
         codeInput.value = "";
         copyButton.disabled = true;
@@ -19855,14 +21140,16 @@ function renderV6Timeline(timeline = []) {
         copyButton.textContent = english ? "Copy NBA5" : "复制 NBA5";
       }
       const opponentPreview = document.getElementById("battleOpponentPreview");
-      opponentPreview.innerHTML = h5BattleState.opponent
+      opponentPreview.innerHTML = h5BattleState.opponent && h5BattleState.lastSeries
         ? h5BattleLineupMarkup(h5BattleState.opponent, { concealCode: h5BattleState.opponentSource === "library" })
+        : h5BattleState.opponent
+          ? `<p class="battle-empty battle-opponent-ready">${english
+            ? "Opponent locked in. The five cards will be revealed after the series."
+            : "对手阵容已锁定，五张球员卡将在系列赛结束后揭晓。"}</p>`
         : `<p class="battle-empty">${english
           ? "Paste a friend's NBA5 or draw a hidden-code opponent from the lineup library."
           : "粘贴朋友的 NBA5，或者从阵容库随机选择一个隐藏代码的对手。"}</p>`;
-      document.getElementById("battleStartSeries").disabled = !(ownLineup && h5BattleState.opponent);
-      document.getElementById("battleRematch").disabled = !(ownLineup && h5BattleState.opponent);
-      document.getElementById("battleReplay").disabled = !h5BattleState.lastSeries;
+      document.getElementById("battleStartSeries").disabled = h5BattleState.starting || !(ownLineup && h5BattleState.opponent);
       if (h5BattleState.mode === "battle") {
         [el.simulateBtn, el.simulateBtnInline, el.simulateBtnFloating, el.flowActionBtn].forEach(button => {
           if (!button) return;
@@ -19880,14 +21167,36 @@ function renderV6Timeline(timeline = []) {
             ? "<b>Build your NBA5 first.</b> Fill all five fixed positions from this 25-card pack."
             : "<b>先组建你的 NBA5。</b> 从本包 25 张候选卡中按固定位置选满五人。");
       }
+      if (h5BattleState.lastSeries && h5BattleState.lastOwnTeam && h5BattleState.lastOpponentTeam
+        && h5BattleState.renderedLocale !== (english ? "en" : "zh")) {
+        const result = document.getElementById("battleResult");
+        result.innerHTML = h5BattleResultMarkup(
+          h5BattleState.lastSeries,
+          h5BattleState.lastOwnTeam,
+          h5BattleState.lastOpponentTeam
+        );
+        const modalContent = document.getElementById("battleResultModalContent");
+        if (modalContent) modalContent.innerHTML = result.innerHTML;
+        h5BattleState.renderedLocale = english ? "en" : "zh";
+      }
+      document.getElementById("battleResultsTitle").textContent = english ? "Series result" : "系列赛结果";
+      document.getElementById("battleOpenResult").textContent = english ? "Open result" : "打开结果";
+      document.getElementById("battleResultModalTitle").textContent = english ? "NBA5 series result" : "NBA5 系列赛结果";
+      if (justCompletedOwnLineup) {
+        requestAnimationFrame(() => panel.scrollIntoView({ behavior: "smooth", block: "start" }));
+      }
     }
 
     function h5BattleSetMode(mode) {
       h5BattleState.mode = mode === "battle" ? "battle" : "solo";
       if (h5BattleState.mode === "solo") render();
+      if (h5BattleState.mode === "solo") document.getElementById("battleResultModal").hidden = true;
       h5BattleSync();
       if (h5BattleState.mode === "battle") {
-        document.querySelector(".top-lineup")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        const target = h5BattleCurrentOwnLineup()
+          ? document.getElementById("battlePanel")
+          : document.querySelector(".top-lineup");
+        target?.scrollIntoView({ behavior: "smooth", block: "start" });
       }
     }
 
@@ -19899,12 +21208,15 @@ function renderV6Timeline(timeline = []) {
           cards
         );
         h5BattleState.opponentSource = "friend";
+        h5BattleState.opponentTier = null;
         h5BattleState.lastSeries = null;
-        document.getElementById("battleResult").hidden = true;
+        document.getElementById("battleResultsSection").hidden = true;
+        document.getElementById("battleResultModal").hidden = true;
         h5BattleStatus(english ? "Friend lineup ready" : "朋友阵容已就位", "success");
       } catch (error) {
         h5BattleState.opponent = null;
         h5BattleState.opponentSource = null;
+        h5BattleState.opponentTier = null;
         h5BattleStatus(english
           ? "Invalid NBA5: check for damage, unknown cards, duplicate players, or wrong positions."
           : "NBA5 无效：请检查复制损坏、未知卡、同人重复或位置错误。", "error");
@@ -19914,37 +21226,241 @@ function renderV6Timeline(timeline = []) {
 
     function h5BattleRandomOpponent() {
       const seed = h5BattleFreshSeed();
-      h5BattleState.opponent = buildH5BattleRandomLineup(cards, seed);
+      const ownLineup = h5BattleCurrentOwnLineup();
+      if (!ownLineup) return;
+      const profile = h5BattleRandomOpponentProfile(ownLineup, seed);
+      h5BattleState.opponent = buildH5BattleRandomLineup(cards, seed, {
+        targetAverageOvr: profile.targetAverageOvr
+      });
       h5BattleState.opponentSource = "library";
+      h5BattleState.opponentTier = profile.tier;
       h5BattleState.lastSeries = null;
       document.getElementById("battleOpponentCode").value = "";
-      document.getElementById("battleResult").hidden = true;
-      h5BattleStatus(h5BattleEnglish() ? "Random library opponent ready" : "随机阵容库对手已就位", "success");
+      document.getElementById("battleResultsSection").hidden = true;
+      document.getElementById("battleResultModal").hidden = true;
+      const english = h5BattleEnglish();
+      h5BattleStatus(english
+        ? "Random opponent ready · lineup hidden until the series ends"
+        : "随机对手已就位 · 阵容将在系列赛结束后揭晓", "success");
       h5BattleSync();
+    }
+
+    function h5BattleFindCard(lineup, cardKey) {
+      return lineup.find(card => h5BattleCardKey(card) === cardKey);
+    }
+
+    function h5BattleStatTable(title, summary, lineup) {
+      const english = h5BattleEnglish();
+      return `
+        <section class="battle-stat-card">
+          <h4>${title}</h4>
+          <div class="battle-table-scroll">
+            <table class="battle-stat-table">
+              <thead><tr>
+                <th>${english ? "Player" : "球员"}</th><th>MIN</th><th>PTS</th><th>REB</th><th>AST</th>
+                <th>STL</th><th>BLK</th><th>TO</th><th>FG%</th><th>3P%</th><th>FT%</th><th>TS%</th>
+              </tr></thead>
+              <tbody>${summary.map(player => {
+                const card = h5BattleFindCard(lineup, player.cardKey);
+                return `<tr><th>${h5BattlePlayerName(card)}</th><td>${player.mpg}</td><td>${player.ppg}</td>
+                  <td>${player.rpg}</td><td>${player.apg}</td><td>${player.spg}</td><td>${player.bpg}</td>
+                  <td>${player.tpg}</td><td>${player.fgPct}</td><td>${player.threePct}</td>
+                  <td>${player.ftPct}</td><td>${player.tsPct}</td></tr>`;
+              }).join("")}</tbody>
+            </table>
+          </div>
+        </section>`;
+    }
+
+    function h5BattleGameTable(title, box, lineup) {
+      const english = h5BattleEnglish();
+      return `
+        <section class="battle-game-box">
+          <h5>${title}</h5>
+          <div class="battle-table-scroll">
+            <table class="battle-stat-table compact">
+              <thead><tr>
+                <th>${english ? "Player" : "球员"}</th><th>MIN</th><th>PTS</th><th>REB</th><th>AST</th>
+                <th>STL</th><th>BLK</th><th>TO</th><th>FG</th><th>3P</th>
+              </tr></thead>
+              <tbody>${box.players.map(player => {
+                const card = h5BattleFindCard(lineup, player.cardKey);
+                return `<tr><th>${h5BattlePlayerName(card)}</th><td>${player.minutes}</td><td>${player.pts}</td>
+                  <td>${player.reb}</td><td>${player.ast}</td><td>${player.stl}</td><td>${player.blk}</td>
+                  <td>${player.tov}</td><td>${player.fgm}-${player.fga}</td>
+                  <td>${player.threePm}-${player.threePa}</td></tr>`;
+              }).join("")}</tbody>
+            </table>
+          </div>
+        </section>`;
+    }
+
+    function h5BattlePlayerSeriesValue(player) {
+      return player.ppg + player.rpg * .7 + player.apg * 1.12 + player.spg * 2.4
+        + player.bpg * 2.2 - player.tpg * .8 + (player.fgPct - 50) * .12;
+    }
+
+    function h5BattleGameTopPlayer(box) {
+      return [...box.players].sort((left, right) =>
+        (right.pts + right.reb * .8 + right.ast * 1.15 + right.stl * 1.8 + right.blk * 1.6 - right.tov * .7)
+        - (left.pts + left.reb * .8 + left.ast * 1.15 + left.stl * 1.8 + left.blk * 1.6 - left.tov * .7))[0];
+    }
+
+    function h5BattleGameEventStory(game, ownTeam, opponentTeam) {
+      const english = h5BattleEnglish();
+      const event = game.event;
+      const teamById = id => id === ownTeam.id ? ownTeam : opponentTeam;
+      const boxById = id => id === ownTeam.id ? game.teamABox : game.teamBBox;
+      const beneficiaryTeam = teamById(event.beneficiaryId);
+      const affectedTeam = teamById(event.affectedTeamId);
+      const beneficiaryBox = boxById(event.beneficiaryId);
+      const affectedBox = boxById(event.affectedTeamId);
+      const actorCard = event.actorCardKey
+        ? h5BattleFindCard(beneficiaryTeam.lineup, event.actorCardKey)
+        : null;
+      const actorLine = event.actorCardKey
+        ? beneficiaryBox.players.find(player => player.cardKey === event.actorCardKey)
+        : null;
+      const targetCard = event.targetCardKey
+        ? h5BattleFindCard(affectedTeam.lineup, event.targetCardKey)
+        : null;
+      const targetLine = event.targetCardKey
+        ? affectedBox.players.find(player => player.cardKey === event.targetCardKey)
+        : null;
+      const winnerTeam = teamById(game.winnerId);
+      const winnerBox = boxById(game.winnerId);
+      const winnerTop = h5BattleGameTopPlayer(winnerBox);
+      const winnerTopCard = h5BattleFindCard(winnerTeam.lineup, winnerTop.cardKey);
+      const beneficiaryWon = game.winnerId === event.beneficiaryId;
+      const labels = english ? {
+        shotmaking_swing: "Shotmaking swing",
+        paint_pressure: "Paint pressure",
+        ball_security: "Ball security",
+        glass_control: "Control of the glass",
+        foul_pressure: "Foul pressure",
+        tactical_adjustment: "Tactical adjustment"
+      } : {
+        shotmaking_swing: "投篮手感",
+        paint_pressure: "篮下压力",
+        ball_security: "球权控制",
+        glass_control: "篮板争夺",
+        foul_pressure: "犯规压力",
+        tactical_adjustment: "战术调整"
+      };
+      let evidence;
+      if (event.type === "shotmaking_swing") {
+        evidence = english
+          ? `${h5BattlePlayerName(actorCard)} scored ${actorLine.pts} on ${actorLine.fgm}-${actorLine.fga} shooting.`
+          : `${h5BattlePlayerName(actorCard)}拿到 ${actorLine.pts} 分，投篮 ${actorLine.fgm}-${actorLine.fga}。`;
+      } else if (event.type === "paint_pressure") {
+        evidence = english
+          ? `${h5BattlePlayerName(actorCard)} turned rim pressure into ${actorLine.pts} points.`
+          : `${h5BattlePlayerName(actorCard)}持续冲击篮下并得到 ${actorLine.pts} 分。`;
+      } else if (event.type === "ball_security") {
+        evidence = english
+          ? `The advantaged lineup posted ${beneficiaryBox.totals.ast} assists against ${beneficiaryBox.totals.tov} turnovers.`
+          : `占优一方送出 ${beneficiaryBox.totals.ast} 次助攻，同时只有 ${beneficiaryBox.totals.tov} 次失误。`;
+      } else if (event.type === "glass_control") {
+        evidence = english
+          ? `The rebounding count finished ${beneficiaryBox.totals.reb}-${affectedBox.totals.reb}.`
+          : `双方篮板数为 ${beneficiaryBox.totals.reb}-${affectedBox.totals.reb}。`;
+      } else if (event.type === "foul_pressure") {
+        evidence = english
+          ? `${h5BattlePlayerName(targetCard)} was held to ${targetLine.minutes} minutes under foul pressure.`
+          : `${h5BattlePlayerName(targetCard)}受到犯规压力，出场时间被压缩到 ${targetLine.minutes} 分钟。`;
+      } else {
+        evidence = english
+          ? `The adjustment produced ${beneficiaryBox.totals.ast} assists and changed the matchup rhythm.`
+          : `这次调整带来了 ${beneficiaryBox.totals.ast} 次助攻，并改变了对位节奏。`;
+      }
+      const outcome = beneficiaryWon
+        ? (english
+          ? `That edge became a direct part of the win; ${h5BattlePlayerName(winnerTopCard)} led the winner with ${winnerTop.pts} points.`
+          : `这一优势直接转化为胜利；${h5BattlePlayerName(winnerTopCard)}以 ${winnerTop.pts} 分领衔获胜方。`)
+        : (english
+          ? `The other lineup survived that edge because ${h5BattlePlayerName(winnerTopCard)} answered with ${winnerTop.pts} points.`
+          : `但另一方顶住了这项优势，${h5BattlePlayerName(winnerTopCard)}用 ${winnerTop.pts} 分完成回应。`);
+      return { label: labels[event.type], evidence, outcome };
     }
 
     function h5BattleResultMarkup(series, ownTeam, opponentTeam) {
       const english = h5BattleEnglish();
+      const narrative = globalThis.H5BattleNarrativeCandidate?.buildBattleNarrative({
+        series,
+        teamA: ownTeam,
+        teamB: opponentTeam,
+        seed: series.seed,
+        locale: english ? "en" : "zh-CN"
+      }) || null;
+      const narrativeByGame = new Map((narrative?.games || []).map(game => [game.gameNumber, game]));
+      const representativeEvent = narrative?.representativeEvent || null;
       const ownWon = series.winnerId === ownTeam.id;
+      const ownSummary = summarizeH5BattleSeriesLineup(series, "A");
+      const opponentSummary = summarizeH5BattleSeriesLineup(series, "B");
+      const winnerSummary = ownWon ? ownSummary : opponentSummary;
       const winnerLineup = ownWon ? ownTeam.lineup : opponentTeam.lineup;
-      const mvp = [...winnerLineup].sort((left, right) =>
-        (right.impact + right.usage * .45) - (left.impact + left.usage * .45))[0];
+      const mvpSummary = [...winnerSummary].sort((left, right) =>
+        h5BattlePlayerSeriesValue(right) - h5BattlePlayerSeriesValue(left))[0];
+      const mvp = h5BattleFindCard(winnerLineup, mvpSummary.cardKey);
       const edge = ownTeam.power - opponentTeam.power;
       return `
         <div class="battle-result-hero ${ownWon ? "won" : "lost"}">
           <span>${english ? "BEST OF SEVEN" : "七场四胜"}</span>
           <h3>${ownWon ? (english ? "Your NBA5 wins" : "你的 NBA5 获胜") : (english ? "Opponent wins" : "对手获胜")}</h3>
           <div class="battle-series-score">${series.scoreA}–${series.scoreB}</div>
-          <p>${english ? "Series MVP" : "系列赛关键球员"}：<strong>${h5BattlePlayerName(mvp)}</strong></p>
+          <section class="battle-mvp-card">
+            <div class="battle-mvp-identity"><span>${english ? "Series MVP" : "系列赛 MVP"}</span>
+              <strong>${h5BattlePlayerName(mvp)}</strong></div>
+            <div class="battle-table-scroll"><table class="battle-mvp-table">
+              <thead><tr><th>PTS</th><th>REB</th><th>AST</th><th>STL</th><th>BLK</th>
+                <th>FG%</th><th>3P%</th><th>FT%</th><th>TS%</th></tr></thead>
+              <tbody><tr><td>${mvpSummary.ppg}</td><td>${mvpSummary.rpg}</td><td>${mvpSummary.apg}</td>
+                <td>${mvpSummary.spg}</td><td>${mvpSummary.bpg}</td><td>${mvpSummary.fgPct}</td>
+                <td>${mvpSummary.threePct}</td><td>${mvpSummary.ftPct}</td><td>${mvpSummary.tsPct}</td></tr></tbody>
+            </table></div>
+          </section>
         </div>
-        <div class="battle-games">${series.games.map(game => `
-          <article>
-            <b>G${game.number}</b>
-            <span>${game.teamAScore}–${game.teamBScore}</span>
-            <small>${game.winnerId === ownTeam.id
-              ? (english ? "Your lineup" : "你的阵容")
-              : (english ? "Opponent" : "对手")}</small>
-          </article>`).join("")}</div>
+        <section class="battle-series-stats">
+          <h3>${english ? "Series averages" : "双方系列赛场均数据"}</h3>
+          <div class="battle-stat-columns">
+            ${h5BattleStatTable(english ? "Your NBA5" : "你的 NBA5", ownSummary, ownTeam.lineup)}
+            ${h5BattleStatTable(english ? "Opponent" : "对手", opponentSummary, opponentTeam.lineup)}
+          </div>
+        </section>
+        <section class="battle-game-log">
+          <h3>${english ? "Game by game" : "逐场比赛"}</h3>
+          ${series.games.map(game => {
+            const ownTop = h5BattleGameTopPlayer(game.teamABox);
+            const opponentTop = h5BattleGameTopPlayer(game.teamBBox);
+            const eventStory = h5BattleGameEventStory(game, ownTeam, opponentTeam);
+            const narrativeGame = narrativeByGame.get(game.number);
+            const narrativeBeats = (narrativeGame?.beats || []).slice(0, 3);
+            const gameWinner = game.winnerId === ownTeam.id
+              ? (english ? "Your win" : "你的阵容获胜")
+              : (english ? "Opponent win" : "对手获胜");
+            return `<details class="battle-game-detail">
+              <summary><b>G${game.number}</b><span>${game.teamAScore}–${game.teamBScore}</span>
+                <strong>${gameWinner}</strong>
+                <small>${eventStory.label} · ${h5BattlePlayerName(h5BattleFindCard(ownTeam.lineup, ownTop.cardKey))} ${ownTop.pts}
+                  · ${h5BattlePlayerName(h5BattleFindCard(opponentTeam.lineup, opponentTop.cardKey))} ${opponentTop.pts}</small>
+              </summary>
+              <div class="battle-game-story"><strong>${eventStory.label}</strong>
+                <p>${eventStory.evidence} ${eventStory.outcome}</p>
+                ${narrativeBeats.length ? `<div class="battle-narrative-beats">${narrativeBeats
+                  .map(beat => `<p>${beat.text}</p>`).join("")}</div>` : ""}</div>
+              <div class="battle-game-boxes">
+                ${h5BattleGameTable(english ? "Your NBA5" : "你的 NBA5", game.teamABox, ownTeam.lineup)}
+                ${h5BattleGameTable(english ? "Opponent" : "对手", game.teamBBox, opponentTeam.lineup)}
+              </div>
+            </details>`;
+          }).join("")}
+        </section>
+        ${(narrative?.seriesStorylines || []).length ? `<section class="battle-series-storylines">
+          <h3>${english ? "Series storylines" : "系列赛支线"}</h3>
+          ${(narrative.seriesStorylines || []).map(story => `<article><strong>${english
+            ? "Simulated team storyline"
+            : "模拟球队剧情"}</strong><p>${story.text}</p></article>`).join("")}
+        </section>` : ""}
         <div class="battle-explanation">
           <strong>${english ? "Why the series tilted" : "系列赛为什么倒向这一边"}</strong>
           <p>${Math.abs(edge) < 1.5
@@ -19955,32 +21471,61 @@ function renderV6Timeline(timeline = []) {
                 : "你的阵容在进攻、防守、兼容性和高阶影响的综合比较中占优。")
               : (english ? "The opponent held the stronger combined offense, defense, fit and impact profile."
                 : "对手在进攻、防守、兼容性和高阶影响的综合比较中占优。")}</p>
-          <small>seed: ${series.seed}</small>
+          ${representativeEvent ? `<div class="battle-representative-event"><b>${english
+            ? "Representative event"
+            : "代表事件"}</b><p>${representativeEvent.text}</p></div>` : ""}
         </div>`;
     }
 
-    function h5BattleStartSeries(options = {}) {
+    async function h5BattleStartSeries(options = {}) {
       const ownLineup = h5BattleCurrentOwnLineup();
-      if (!ownLineup || !h5BattleState.opponent) return;
-      const ownTeam = h5BattleTeamFromLineup("mine", ownLineup);
-      const opponentTeam = h5BattleTeamFromLineup("opponent", h5BattleState.opponent);
-      const seed = options.reuseSeed && h5BattleState.lastSeed ? h5BattleState.lastSeed : h5BattleFreshSeed();
-      const series = simulateH5BattleSeries({ teamA: ownTeam, teamB: opponentTeam, seed });
-      h5BattleState.lastSeed = seed;
-      h5BattleState.lastSeries = series;
-      const result = document.getElementById("battleResult");
-      result.innerHTML = h5BattleResultMarkup(series, ownTeam, opponentTeam);
-      result.hidden = false;
+      if (!ownLineup || !h5BattleState.opponent) {
+        h5BattleStatus(h5BattleEnglish()
+          ? "Complete your NBA5 and choose an opponent first."
+          : "请先选满自己的五人，并导入或随机选择一个对手。", "error");
+        return;
+      }
+      if (h5BattleState.starting) return;
+      h5BattleState.starting = true;
       h5BattleSync();
-      result.scrollIntoView({ behavior: "smooth", block: "start" });
+      await new Promise(resolve => requestAnimationFrame(resolve));
+      try {
+        const ownTeam = h5BattleTeamFromLineup("mine", ownLineup);
+        const opponentTeam = h5BattleTeamFromLineup("opponent", h5BattleState.opponent);
+        const seed = options.reuseSeed && h5BattleState.lastSeed ? h5BattleState.lastSeed : h5BattleFreshSeed();
+        const series = simulateH5BattleSeries({ teamA: ownTeam, teamB: opponentTeam, seed });
+        const resultMarkup = h5BattleResultMarkup(series, ownTeam, opponentTeam);
+        h5BattleState.lastSeed = seed;
+        h5BattleState.lastSeries = series;
+        h5BattleState.lastOwnTeam = ownTeam;
+        h5BattleState.lastOpponentTeam = opponentTeam;
+        h5BattleState.renderedLocale = h5BattleEnglish() ? "en" : "zh";
+        const result = document.getElementById("battleResult");
+        result.innerHTML = resultMarkup;
+        document.getElementById("battleResultModalContent").innerHTML = resultMarkup;
+        document.getElementById("battleResultsSection").hidden = false;
+        document.getElementById("battleResultModal").hidden = false;
+        h5BattleStatus(h5BattleEnglish()
+          ? "Series complete · opponent lineup revealed"
+          : "系列赛已完成 · 对手阵容已揭晓", "success");
+      } catch (error) {
+        console.error("battle-series-start-failed", error);
+        h5BattleStatus(h5BattleEnglish()
+          ? "The series could not start. Please choose the opponent again and retry."
+          : "系列赛启动失败，请重新选择对手后再试。", "error");
+      } finally {
+        h5BattleState.starting = false;
+        h5BattleSync();
+      }
     }
 
     function h5BattleInstall() {
       const style = document.createElement("style");
       style.textContent = `
         .battle-mode-switch{display:flex;gap:8px;padding:8px;background:#e8e1d7;border-radius:16px;margin:0 0 16px}.battle-mode-switch button{flex:1;border:0;border-radius:11px;padding:12px 16px;background:transparent;color:#5d564e;font-weight:900;font-size:15px;cursor:pointer}.battle-mode-switch button.active{background:#191714;color:#fff;box-shadow:0 6px 18px rgba(25,23,20,.18)}
-        .battle-panel{margin:18px 0 26px;border:2px solid #191714;background:#fff}.battle-panel-head{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;margin-bottom:18px}.battle-panel-head h2{margin:0 0 6px}.battle-kicker{font-size:12px;font-weight:1000;letter-spacing:.12em;color:#d64032}.battle-columns{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;min-width:0}.battle-side{min-width:0;border:1px solid #d8d0c6;border-radius:16px;padding:16px;background:#f8f5f0}.battle-side h3{margin:0 0 5px}.battle-code-row{display:flex;gap:8px;margin:12px 0;min-width:0}.battle-code-row textarea,.battle-code-row input{box-sizing:border-box;width:100%;max-width:100%;flex:1;min-width:0;border:1px solid #aaa094;border-radius:10px;padding:10px;font:600 12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;background:#fff}.battle-code-row textarea{min-height:72px;resize:vertical}.battle-opponent-actions,.battle-final-actions{display:flex;gap:8px;flex-wrap:wrap}.battle-lineup-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-top:14px}.battle-player-card{position:relative;min-width:0;padding:8px;border-radius:12px;background:#201d19;color:#fff;text-align:center;overflow:hidden}.battle-player-position{position:absolute;top:5px;left:5px;z-index:2;background:#d64032;border-radius:99px;padding:2px 6px;font-size:10px;font-weight:1000}.battle-player-art{height:76px;display:grid;place-items:center;margin-bottom:5px;background:#39332d;border-radius:8px;overflow:hidden}.battle-player-art img{width:100%;height:100%;object-fit:contain}.battle-player-card strong,.battle-player-card small{display:block;overflow:hidden;text-overflow:ellipsis}.battle-player-card strong{font-size:11px;white-space:nowrap}.battle-player-card small{font-size:9px;color:#cfc7bd;height:26px}.battle-empty{min-height:78px;display:grid;place-items:center;text-align:center;color:#746c63}.battle-code-hidden{font-size:12px;font-weight:800;color:#8b3329}.battle-status{min-height:22px;margin:10px 0;font-weight:800;font-size:13px}.battle-status[data-tone=success]{color:#237a57}.battle-status[data-tone=error]{color:#b12d24}.battle-start{width:100%;margin-top:16px;padding:14px}.battle-result{margin-top:18px;border-top:1px solid #d8d0c6;padding-top:18px}.battle-result-hero{border-radius:16px;padding:20px;background:#191714;color:#fff;text-align:center}.battle-result-hero.won{background:#163f30}.battle-result-hero.lost{background:#4b211d}.battle-result-hero h3{margin:6px 0}.battle-series-score{font-size:54px;font-weight:1000}.battle-games{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:7px;margin:12px 0}.battle-games article{display:grid;gap:3px;padding:9px 5px;border:1px solid #d8d0c6;border-radius:10px;text-align:center}.battle-games span{font-weight:1000}.battle-games small{font-size:10px}.battle-explanation{padding:14px;border-radius:12px;background:#eee8df}.battle-explanation p{margin:6px 0}.battle-final-actions{margin-top:12px}.battle-mode-active .advanced-settings{display:none}
-        @media(max-width:780px){.battle-columns{grid-template-columns:1fr}.battle-panel-head{display:block}.battle-lineup-grid{grid-template-columns:repeat(5,110px);overflow-x:auto;padding-bottom:8px}.battle-games{grid-template-columns:repeat(4,1fr)}.battle-code-row{flex-direction:column}.battle-code-row .btn{width:100%}}
+        .battle-panel{margin:18px 0 26px;border:2px solid #191714;background:#fff}.battle-panel-head{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;margin-bottom:18px}.battle-panel-head h2{margin:0 0 6px}.battle-kicker{font-size:12px;font-weight:1000;letter-spacing:.12em;color:#d64032}.battle-columns{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;min-width:0}.battle-side{min-width:0;border:1px solid #d8d0c6;border-radius:16px;padding:16px;background:#f8f5f0}.battle-side h3{margin:0 0 5px}.battle-code-row{display:flex;gap:8px;margin:12px 0;min-width:0}.battle-code-row textarea,.battle-code-row input{box-sizing:border-box;width:100%;max-width:100%;flex:1;min-width:0;border:1px solid #aaa094;border-radius:10px;padding:10px;font:600 12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;background:#fff}.battle-code-row textarea{min-height:72px;resize:vertical}.battle-own-code-row{align-items:flex-start}.battle-own-code-row #battleCopyOwnCode{flex:0 0 auto;width:auto;max-width:132px;padding:8px 12px;white-space:nowrap}.battle-opponent-actions,.battle-final-actions{display:flex;gap:8px;flex-wrap:wrap}.battle-lineup-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-top:14px}.battle-player-card{position:relative;min-width:0;padding:8px;border-radius:12px;background:#201d19;color:#fff;text-align:center;overflow:hidden}.battle-player-position{position:absolute;top:5px;left:5px;z-index:2;background:#d64032;border-radius:99px;padding:2px 6px;font-size:10px;font-weight:1000}.battle-player-art{height:76px;display:grid;place-items:center;margin-bottom:5px;background:#39332d;border-radius:8px;overflow:hidden}.battle-player-art img{width:100%;height:100%;object-fit:contain}.battle-player-card strong,.battle-player-card small{display:block;overflow:hidden;text-overflow:ellipsis}.battle-player-card strong{font-size:11px;white-space:nowrap}.battle-player-card small{font-size:9px;color:#cfc7bd;height:26px}.battle-empty{min-height:78px;display:grid;place-items:center;text-align:center;color:#746c63}.battle-code-hidden{font-size:12px;font-weight:800;color:#8b3329}.battle-status{min-height:22px;margin:10px 0;font-weight:800;font-size:13px}.battle-status[data-tone=success]{color:#237a57}.battle-status[data-tone=error]{color:#b12d24}.battle-start{width:100%;margin-top:16px;padding:14px}.battle-result{margin-top:18px;border-top:1px solid #d8d0c6;padding-top:18px}.battle-result-hero{border-radius:16px;padding:20px;background:#191714;color:#fff;text-align:center}.battle-result-hero.won{background:#163f30}.battle-result-hero.lost{background:#4b211d}.battle-result-hero h3{margin:6px 0}.battle-series-score{font-size:54px;font-weight:1000}.battle-series-stats,.battle-game-log,.battle-series-storylines{margin-top:20px}.battle-stat-columns,.battle-game-boxes{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}.battle-stat-card,.battle-game-box{min-width:0;border:1px solid #d8d0c6;border-radius:12px;padding:12px;background:#fff}.battle-stat-card h4,.battle-game-box h5{margin:0 0 8px}.battle-table-scroll{max-width:100%;overflow-x:auto}.battle-stat-table{width:100%;min-width:650px;border-collapse:collapse;font-size:11px}.battle-stat-table th,.battle-stat-table td{padding:6px 5px;border-bottom:1px solid #e5ded5;text-align:right;white-space:nowrap}.battle-stat-table th:first-child,.battle-stat-table td:first-child{text-align:left}.battle-stat-table tbody th{max-width:150px;overflow:hidden;text-overflow:ellipsis}.battle-rotation-row{color:#746c63;background:#f4f0ea}.battle-rotation-row td[colspan]{text-align:center}.battle-game-detail{margin:10px 0;border:1px solid #d8d0c6;border-radius:12px;background:#f8f5f0;overflow:hidden}.battle-game-detail summary{display:grid;grid-template-columns:auto auto auto 1fr;gap:10px;align-items:center;padding:13px;cursor:pointer}.battle-game-detail summary span{font-size:20px;font-weight:1000}.battle-game-detail summary small{text-align:right;color:#746c63}.battle-game-story{margin:0 12px 12px;padding:12px;border-left:4px solid #d64032;background:#fff}.battle-game-story p{margin:5px 0 0}.battle-narrative-beats{margin-top:10px;padding-top:7px;border-top:1px solid #e5ded5}.battle-narrative-beats p{color:#4d463f}.battle-game-boxes{padding:0 12px 12px}.battle-series-storylines{display:grid;gap:10px}.battle-series-storylines h3{margin-bottom:0}.battle-series-storylines article{padding:13px;border:1px solid #d8d0c6;border-radius:12px;background:#fff8eb}.battle-series-storylines p{margin:5px 0 0}.battle-explanation{padding:14px;border-radius:12px;background:#eee8df}.battle-explanation p{margin:6px 0}.battle-representative-event{margin-top:10px;padding-top:10px;border-top:1px solid #cfc5b9}.battle-final-actions{margin-top:12px}.battle-mode-active .advanced-settings,.battle-mode-active #simulateBtnFloating,.battle-mode-active .layout>.side{display:none!important}.battle-mode-active .layout{grid-template-columns:minmax(0,1fr)}
+        .battle-mode-active .battle-panel{border:0;border-radius:24px;padding:24px;background:linear-gradient(145deg,#fffaf2,#f2ebe1);box-shadow:0 18px 50px rgba(38,31,25,.12)}.battle-panel-head{max-width:760px}.battle-panel-head h2{font-size:clamp(28px,4vw,46px);line-height:1.05}.battle-kicker{margin-bottom:8px}.battle-columns{grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);gap:14px}.battle-side{border:0;border-radius:18px;padding:18px;background:rgba(255,255,255,.78);box-shadow:inset 0 0 0 1px rgba(109,96,81,.14)}.battle-own-ready{display:flex;flex-direction:column;gap:3px;margin:14px 0;padding:12px 14px;border-radius:12px;background:#e8f2ec;color:#174a36}.battle-own-ready span{font-size:12px;color:#527063}.battle-code-row input{min-height:44px}.battle-own-code-row input{color:#756c62;background:#f8f5f0}.battle-action-or{align-self:center;color:#8c8176;font-size:12px;font-weight:900}.battle-opponent-actions{align-items:center}.battle-opponent-actions .btn{flex:1}.battle-opponent-ready{min-height:88px;border:1px dashed #c9bcae;border-radius:14px;background:#fbf7f1}.battle-start{border-radius:14px;font-size:17px;letter-spacing:.02em}.battle-results-section{display:none;margin-top:28px;border:0;border-radius:22px;padding:22px;background:#fff}.battle-mode-active .battle-results-section:not([hidden]){display:block}.battle-results-head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:12px}.battle-results-head span{font-size:11px;font-weight:1000;letter-spacing:.14em;color:#d64032}.battle-results-head h2{margin:4px 0 0}.battle-result{margin-top:0;border-top:0;padding-top:0}.battle-mvp-card{width:min(900px,100%);margin:18px auto 0;border:1px solid rgba(255,255,255,.24);border-radius:14px;overflow:hidden;background:rgba(255,255,255,.1);text-align:left}.battle-mvp-identity{display:flex;align-items:baseline;gap:10px;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.18)}.battle-mvp-identity span{font-size:12px;font-weight:900;letter-spacing:.05em;opacity:.8}.battle-mvp-identity strong{font-size:20px}.battle-mvp-table{width:100%;min-width:620px;border-collapse:collapse;text-align:center}.battle-mvp-table th{padding:7px 10px 4px;font-size:10px;letter-spacing:.04em;opacity:.72}.battle-mvp-table td{padding:3px 10px 10px;font-size:16px;font-weight:1000}.battle-result-modal{position:fixed;inset:0;z-index:10050;display:grid;place-items:center;padding:18px}.battle-result-modal[hidden]{display:none!important}.battle-result-modal-backdrop{position:absolute;inset:0;border:0;background:rgba(17,15,13,.72);backdrop-filter:blur(6px)}.battle-result-dialog{position:relative;width:min(1240px,calc(100vw - 36px));max-height:92vh;overflow:auto;border-radius:22px;background:#f8f5f0;box-shadow:0 24px 80px rgba(0,0,0,.35)}.battle-result-dialog>header{position:sticky;top:0;z-index:3;display:flex;justify-content:space-between;align-items:center;padding:14px 18px;background:rgba(248,245,240,.96);border-bottom:1px solid #d8d0c6}.battle-result-dialog>header h2{margin:0;font-size:20px}.battle-result-dialog>header button{width:38px;height:38px;border:0;border-radius:50%;background:#191714;color:#fff;font-size:24px;cursor:pointer}.battle-result-modal-content{padding:18px}
+        @media(max-width:780px){.battle-columns,.battle-stat-columns,.battle-game-boxes{grid-template-columns:1fr}.battle-panel-head{display:block}.battle-lineup-grid{grid-template-columns:repeat(5,110px);overflow-x:auto;padding-bottom:8px}.battle-own-code-row{align-items:flex-start}.battle-own-code-row #battleCopyOwnCode{width:auto}.battle-game-detail summary{grid-template-columns:auto auto 1fr}.battle-game-detail summary small{grid-column:1/-1;text-align:left}.battle-mode-active .battle-panel{padding:16px;border-radius:18px}.battle-opponent-actions{display:grid;grid-template-columns:1fr}.battle-action-or{display:none}.battle-results-head{align-items:flex-start}.battle-result-dialog{width:calc(100vw - 16px);max-height:96vh;border-radius:16px}.battle-result-modal{padding:8px}.battle-result-modal-content{padding:10px}}
       `;
       document.head.appendChild(style);
       const switcher = document.createElement("nav");
@@ -19996,16 +21541,29 @@ function renderV6Timeline(timeline = []) {
       panel.hidden = true;
       panel.innerHTML = `
         <div class="battle-panel-head">
-          <div><div class="battle-kicker">NBA5 BATTLE · LOCAL CANDIDATE</div><h2 id="battleTitle">我的最强五人，直接打七场</h2><p class="hint" id="battleSubtitle">选满五人自动生成 NBA5；粘贴朋友代码，或者直接随机一个库内对手。</p></div>
+          <div><div class="battle-kicker">NBA5 SERIES</div><h2 id="battleTitle">准备 NBA5 系列赛</h2><p class="hint" id="battleSubtitle">确认自己的五人，再导入朋友阵容码或抽取一个隐藏的库内对手。</p></div>
         </div>
         <div class="battle-columns">
-          <section class="battle-side"><h3 id="battleOwnTitle">我的 NBA5</h3><p class="hint" id="battleOwnHint">这是你的核心阵容码，可以复制到社群展示或发给朋友。</p><div class="battle-code-row"><textarea id="battleOwnCode" readonly aria-label="My NBA5"></textarea><button class="btn secondary" id="battleCopyOwnCode" type="button" disabled>复制 NBA5</button></div><div id="battleOwnPreview"></div></section>
-          <section class="battle-side"><h3 id="battleOpponentTitle">选择对手</h3><p class="hint" id="battleOpponentHint">朋友码和随机阵容库二选一。随机对手不会暴露其 NBA5。</p><div class="battle-code-row"><textarea id="battleOpponentCode" placeholder="粘贴朋友的 NBA5-..." aria-label="Opponent NBA5"></textarea></div><div class="battle-opponent-actions"><button class="btn secondary" id="battleImportOpponent" type="button">导入朋友 NBA5</button><button class="btn secondary" id="battleRandomOpponent" type="button">随机库内对手</button></div><p class="battle-status" id="battleOpponentStatus" aria-live="polite"></p><div id="battleOpponentPreview"></div></section>
+          <section class="battle-side battle-own-side"><h3 id="battleOwnTitle">我的 NBA5</h3><p class="hint" id="battleOwnHint">这是你的核心阵容码，可以复制到社群展示或发给朋友。</p><div id="battleOwnPreview"></div><div class="battle-code-row battle-own-code-row"><input id="battleOwnCode" readonly aria-label="My NBA5" /><button class="btn secondary" id="battleCopyOwnCode" type="button" disabled>复制 NBA5</button></div></section>
+          <section class="battle-side battle-opponent-side"><h3 id="battleOpponentTitle">选择对手</h3><p class="hint" id="battleOpponentHint">朋友码和随机阵容库二选一。随机对手不会暴露其 NBA5。</p><div class="battle-code-row"><input id="battleOpponentCode" placeholder="粘贴朋友的 NBA5-..." aria-label="Opponent NBA5" /></div><div class="battle-opponent-actions"><button class="btn secondary" id="battleImportOpponent" type="button">导入朋友 NBA5</button><span class="battle-action-or">或</span><button class="btn secondary" id="battleRandomOpponent" type="button">随机库内对手</button></div><p class="battle-status" id="battleOpponentStatus" aria-live="polite"></p><div id="battleOpponentPreview"></div></section>
         </div>
-        <button class="btn battle-start" id="battleStartSeries" type="button" disabled>开始七场四胜</button>
-        <section class="battle-result" id="battleResult" hidden></section>
-        <div class="battle-final-actions"><button class="btn secondary" id="battleRematch" type="button" disabled>换一个 seed 再战</button><button class="btn secondary" id="battleReplay" type="button" disabled>复盘同一 seed</button></div>`;
-      document.querySelector(".top-lineup")?.after(panel);
+        <button class="btn battle-start" id="battleStartSeries" type="button" disabled>开始系列赛</button>`;
+      document.querySelector(".layout")?.after(panel);
+      const resultsSection = document.createElement("section");
+      resultsSection.id = "battleResultsSection";
+      resultsSection.className = "panel battle-results-section";
+      resultsSection.hidden = true;
+      resultsSection.innerHTML = `<div class="battle-results-head"><div><span>NBA5 SERIES</span><h2 id="battleResultsTitle">系列赛结果</h2></div><button class="btn secondary" id="battleOpenResult" type="button">打开结果</button></div><div class="battle-result" id="battleResult"></div>`;
+      document.querySelector(".public-footer")?.before(resultsSection);
+      const resultModal = document.createElement("section");
+      resultModal.id = "battleResultModal";
+      resultModal.className = "battle-result-modal";
+      resultModal.setAttribute("role", "dialog");
+      resultModal.setAttribute("aria-modal", "true");
+      resultModal.setAttribute("aria-labelledby", "battleResultModalTitle");
+      resultModal.hidden = true;
+      resultModal.innerHTML = `<button class="battle-result-modal-backdrop" id="battleResultModalBackdrop" type="button" aria-label="关闭结果"></button><div class="battle-result-dialog"><header><h2 id="battleResultModalTitle">NBA5 系列赛结果</h2><button id="battleResultModalClose" type="button" aria-label="关闭结果">×</button></header><div class="battle-result-modal-content" id="battleResultModalContent"></div></div>`;
+      document.body.appendChild(resultModal);
       switcher.addEventListener("click", event => {
         const button = event.target.closest("[data-battle-mode]");
         if (button) h5BattleSetMode(button.dataset.battleMode);
@@ -20017,9 +21575,15 @@ function renderV6Timeline(timeline = []) {
       });
       document.getElementById("battleImportOpponent").addEventListener("click", h5BattleImportOpponent);
       document.getElementById("battleRandomOpponent").addEventListener("click", h5BattleRandomOpponent);
-      document.getElementById("battleStartSeries").addEventListener("click", () => h5BattleStartSeries());
-      document.getElementById("battleRematch").addEventListener("click", () => h5BattleStartSeries());
-      document.getElementById("battleReplay").addEventListener("click", () => h5BattleStartSeries({ reuseSeed: true }));
+      document.getElementById("battleStartSeries").addEventListener("click", () => { void h5BattleStartSeries(); });
+      document.getElementById("battleOpenResult").addEventListener("click", () => {
+        if (h5BattleState.lastSeries) document.getElementById("battleResultModal").hidden = false;
+      });
+      ["battleResultModalBackdrop", "battleResultModalClose"].forEach(id => {
+        document.getElementById(id).addEventListener("click", () => {
+          document.getElementById("battleResultModal").hidden = true;
+        });
+      });
       document.addEventListener("click", event => {
         if (h5BattleState.mode !== "battle") return;
         if (![el.simulateBtn, el.simulateBtnInline, el.simulateBtnFloating, el.flowActionBtn]
