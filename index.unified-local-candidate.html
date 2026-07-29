@@ -2410,6 +2410,36 @@
       .actions > .action-menu { flex-basis: 100%; }
       .flow-step { padding-inline: 3px; font-size: 9px; }
       .flow-step b { width: 20px; height: 20px; }
+      .player-card {
+        min-height: 0;
+        grid-template-columns: 76px minmax(0, 1fr);
+        grid-template-areas:
+          "portrait main"
+          "actions actions";
+        align-items: start;
+        gap: 8px 10px;
+      }
+      .player-card .portrait {
+        grid-area: portrait;
+        width: 76px;
+        height: 92px;
+      }
+      .player-card .card-main {
+        grid-area: main;
+      }
+      .player-card .card-actions {
+        grid-area: actions;
+        width: 100%;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .player-card .name {
+        font-size: 16px;
+        overflow-wrap: anywhere;
+      }
+      .player-card .version {
+        font-size: 12px;
+        overflow-wrap: anywhere;
+      }
     }
 
     /* PRODUCT_P0_PATCH_V1: styles */
@@ -22377,6 +22407,189 @@ function renderV6Timeline(timeline = []) {
       lastOwnCount: selectedCount()
     };
 
+    const H5_UNIFIED_COACH_STORAGE_KEY = "nbaUnifiedContextGuideV1";
+    const H5_UNIFIED_COACH_COPY = {
+      mode: {
+        progress: ["新手指引 · 第 1 步", "QUICK GUIDE · STEP 1"],
+        title: ["先选一种玩法", "Choose a mode"],
+        copy: [
+          "82 场赛季会模拟完整赛季；阵容对战会进行七场四胜。之后随时可以切换，卡包和阵容都不会清空。",
+          "The 82-game mode simulates a full season. Lineup battle plays a best-of-seven series. You can switch later without losing the pack or lineup."
+        ]
+      },
+      slot: {
+        progress: ["新手指引 · 第 2 步", "QUICK GUIDE · STEP 2"],
+        title: ["先点一个首发位置", "Choose a starting position"],
+        copy: [
+          "从 PG、SG、SF、PF、C 任意位置开始。点亮位置后，候选区会自动筛出能打这个位置的球员。",
+          "Start with any of PG, SG, SF, PF or C. Choosing a slot filters the candidates who can fill it."
+        ]
+      },
+      player: {
+        progress: ["新手指引 · 第 3 步", "QUICK GUIDE · STEP 3"],
+        title: ["再从候选卡中选球员", "Pick a player from the pack"],
+        copy: [
+          "点一张候选卡把球员放入当前位置。系统会自动前往下一个空位；同一名球员不能选择两个版本。",
+          "Tap a candidate to fill the active slot. The next empty position opens automatically, and two versions of the same player cannot be selected."
+        ]
+      },
+      opponent: {
+        progress: ["阵容对战 · 第 4 步", "LINEUP BATTLE · STEP 4"],
+        title: ["你的阵容码已经生成", "Your lineup code is ready"],
+        copy: [
+          "NBA5 只代表这五张具体版本球员卡。有朋友码就粘贴导入；没有就抽一个隐藏阵容码的库内对手。",
+          "NBA5 represents these five exact player versions. Import a friend's code, or draw a library opponent whose code stays hidden."
+        ]
+      },
+      series: {
+        progress: ["阵容对战 · 第 5 步", "LINEUP BATTLE · STEP 5"],
+        title: ["双方就位，可以开赛", "Both lineups are ready"],
+        copy: [
+          "点击“开始系列赛”会生成一轮新的七场四胜。完成后，本轮结果会一直保留，直到你主动再来一轮。",
+          "Start series creates a new best-of-seven. The result stays available until you deliberately play another series."
+        ]
+      },
+      simulate: {
+        progress: ["82 场赛季 · 第 4 步", "82-GAME SEASON · STEP 4"],
+        title: ["五人齐了，开始模拟", "Your five are ready"],
+        copy: [
+          "点击“模拟整个赛季”，就能查看 82 场战绩、季后赛、球员数据、奖项与赛季故事。",
+          "Simulate the full season to see the 82-game record, playoffs, player stats, awards and season story."
+        ]
+      },
+      result: {
+        progress: ["阵容对战 · 最后一步", "LINEUP BATTLE · FINAL STEP"],
+        title: ["结果可以按三部分看", "Read the result in three parts"],
+        copy: [
+          "先看双方系列赛场均数据，再展开每一场比赛，最后查看整轮胜负原因与代表事件。上方 1、2、3 可以直接跳转。",
+          "Start with series averages, expand each game, then review the overall reasons and representative events. Use 1, 2 and 3 above to jump between sections."
+        ]
+      }
+    };
+
+    function h5BattleReadCoachState() {
+      try {
+        const parsed = JSON.parse(localStorage.getItem(H5_UNIFIED_COACH_STORAGE_KEY) || "{}");
+        return {
+          version: 1,
+          dismissed: parsed.dismissed === true,
+          completed: parsed.completed === true,
+          seen: Array.isArray(parsed.seen) ? parsed.seen.filter(value => typeof value === "string") : []
+        };
+      } catch {
+        return { version: 1, dismissed: false, completed: false, seen: [] };
+      }
+    }
+
+    function h5BattleWriteCoachState(state) {
+      try {
+        localStorage.setItem(H5_UNIFIED_COACH_STORAGE_KEY, JSON.stringify({
+          version: 1,
+          dismissed: state.dismissed === true,
+          completed: state.completed === true,
+          seen: Array.from(new Set(state.seen || []))
+        }));
+      } catch {
+        // The guide remains usable for the current page even when storage is unavailable.
+      }
+    }
+
+    function h5BattleChooseCoachStep({
+      mode,
+      ownCount,
+      hasOpponent,
+      hasSeries,
+      resultOpen,
+      dismissed,
+      seen
+    }) {
+      if (dismissed) return null;
+      const seenSteps = new Set(seen || []);
+      if (mode === "battle" && resultOpen && hasSeries && !seenSteps.has("result")) return "result";
+      if (mode === "home") return seenSteps.has("mode") ? null : "mode";
+      if (ownCount === 0 && !seenSteps.has("slot")) return "slot";
+      if (ownCount < 5 && !seenSteps.has("player")) return "player";
+      if (mode === "battle" && ownCount === 5 && !hasOpponent && !seenSteps.has("opponent")) return "opponent";
+      if (mode === "battle" && ownCount === 5 && hasOpponent && !hasSeries && !seenSteps.has("series")) return "series";
+      if (mode === "solo" && ownCount === 5 && !seenSteps.has("simulate")) return "simulate";
+      return null;
+    }
+
+    function h5BattleCoachMark(stepId, options = {}) {
+      if (!stepId) return;
+      const state = h5BattleReadCoachState();
+      if (!state.seen.includes(stepId)) state.seen.push(stepId);
+      if (stepId === "result") state.completed = true;
+      h5BattleWriteCoachState(state);
+      if (stepId === "opponent") {
+        try {
+          localStorage.setItem("nba5CodeGuideSeenV1", "1");
+        } catch {
+          // The contextual guide still replaces the old inline explanation.
+        }
+      }
+      if (options.sync !== false) h5BattleSyncCoach(h5BattleEnglish());
+    }
+
+    function h5BattleCoachDismiss() {
+      const state = h5BattleReadCoachState();
+      state.dismissed = true;
+      h5BattleWriteCoachState(state);
+      h5BattleSyncCoach(h5BattleEnglish());
+    }
+
+    function h5BattleCoachTarget(stepId) {
+      const selectors = {
+        mode: ".battle-mode-switch",
+        slot: ".top-lineup",
+        player: "#cards",
+        opponent: ".battle-opponent-side",
+        series: ".battle-start-zone",
+        simulate: "#simulateBtnInline",
+        result: ".battle-result-roadmap"
+      };
+      return document.querySelector(selectors[stepId] || "");
+    }
+
+    function h5BattleSyncCoach(english) {
+      const coach = document.getElementById("unifiedCoach");
+      if (!coach) return;
+      document.querySelectorAll(".unified-coach-target").forEach(node => {
+        node.classList.remove("unified-coach-target");
+      });
+      const state = h5BattleReadCoachState();
+      const resultModal = document.getElementById("battleResultModal");
+      const stepId = h5BattleChooseCoachStep({
+        mode: h5BattleState.mode,
+        ownCount: selectedCount(),
+        hasOpponent: Boolean(h5BattleState.opponent),
+        hasSeries: Boolean(h5BattleState.lastSeries),
+        resultOpen: Boolean(resultModal && !resultModal.hidden),
+        dismissed: state.dismissed,
+        seen: state.seen
+      });
+      const copy = H5_UNIFIED_COACH_COPY[stepId];
+      if (!stepId || !copy) {
+        coach.hidden = true;
+        coach.dataset.step = "";
+        return;
+      }
+      const languageIndex = english ? 1 : 0;
+      coach.dataset.step = stepId;
+      document.getElementById("unifiedCoachProgress").textContent = copy.progress[languageIndex];
+      document.getElementById("unifiedCoachTitle").textContent = copy.title[languageIndex];
+      document.getElementById("unifiedCoachCopy").textContent = copy.copy[languageIndex];
+      document.getElementById("unifiedCoachSkip").textContent = english ? "Skip guide" : "跳过指引";
+      document.getElementById("unifiedCoachNext").textContent = stepId === "result"
+        ? (english ? "Finish" : "完成")
+        : stepId === "slot"
+          ? (english ? "Show candidates" : "去选球员")
+          : (english ? "Got it" : "知道了");
+      const target = h5BattleCoachTarget(stepId);
+      if (target) target.classList.add("unified-coach-target");
+      coach.hidden = false;
+    }
+
     function h5BattleEnglish() {
       return isEnglishLocale();
     }
@@ -22616,9 +22829,7 @@ function renderV6Timeline(timeline = []) {
       );
       textById("unifiedOnboardingSkip", "先自己看看", "Skip for now");
       const codeGuide = document.getElementById("battleCodeGuide");
-      if (codeGuide) {
-        codeGuide.hidden = !ownLineup || localStorage.getItem("nba5CodeGuideSeenV1") === "1";
-      }
+      if (codeGuide) codeGuide.hidden = true;
       textById("battleCodeGuideTitle", "这就是你的 NBA5", "This is your NBA5");
       textById(
         "battleCodeGuideCopy",
@@ -22664,7 +22875,8 @@ function renderV6Timeline(timeline = []) {
       const hint = document.getElementById("battleStartHint");
       if (hint) {
         hint.textContent = hasResult
-          ? (english ? "This matchup has produced one completed series." : "这组对决已经完成一轮系列赛。")
+          ? (english ? "The result is saved. View it anytime, or deliberately play another series."
+            : "本轮结果已保留，可随时查看；只有点击“再来一轮”才会生成新结果。")
           : hasOwn && hasOpponent
             ? (english ? "Both lineups are ready. The opponent will be revealed after the series." : "双方已经就位。对手五人将在系列赛完成后揭晓。")
             : hasOwn
@@ -22676,8 +22888,8 @@ function renderV6Timeline(timeline = []) {
       const modePill = document.getElementById("battlePanelModePill");
       if (modePill) modePill.textContent = english ? "BEST OF 7" : "七场四胜";
       const labels = english
-        ? ["Build your five", "Choose opponent", "Start series"]
-        : ["组建五人", "选择对手", "开始系列赛"];
+        ? ["Build your five", "Choose opponent", hasResult ? "Series complete" : "Start series"]
+        : ["组建五人", "选择对手", hasResult ? "系列赛完成" : "开始系列赛"];
       steps.forEach((step, index) => {
         const label = document.querySelector(`#${step.id} span`);
         if (label) label.textContent = labels[index];
@@ -22689,8 +22901,10 @@ function renderV6Timeline(timeline = []) {
       const copyTextCurrent = document.getElementById("battleCopyOwnCode")?.textContent || "";
       const ownCount = selectedCount();
       const ownLineup = h5BattleCurrentOwnLineup();
+      const addedPlayer = h5BattleState.lastOwnCount < ownCount && ownCount > 0;
       const justCompletedOwnLineup = h5BattleState.mode === "battle"
         && h5BattleState.lastOwnCount < 5 && ownCount === 5;
+      if (addedPlayer) h5BattleCoachMark("player", { sync: false });
       h5BattleState.lastOwnCount = ownCount;
       const panel = document.getElementById("battlePanel");
       if (!panel) return;
@@ -22728,8 +22942,8 @@ function renderV6Timeline(timeline = []) {
         ? "Draw a five-player lineup with a hidden code from the current library"
         : "从现有阵容库抽取一套隐藏代码的五人阵容";
       document.getElementById("battleStartSeries").textContent = english
-        ? (h5BattleState.starting ? "Simulating…" : "Start series")
-        : (h5BattleState.starting ? "正在模拟…" : "开始系列赛");
+        ? (h5BattleState.starting ? "Simulating…" : h5BattleState.lastSeries ? "Play another series" : "Start series")
+        : (h5BattleState.starting ? "正在模拟…" : h5BattleState.lastSeries ? "再来一轮" : "开始系列赛");
       const codeInput = document.getElementById("battleOwnCode");
       const copyButton = document.getElementById("battleCopyOwnCode");
       const ownPreview = document.getElementById("battleOwnPreview");
@@ -22790,13 +23004,21 @@ function renderV6Timeline(timeline = []) {
       }
       document.getElementById("battleResultsTitle").textContent = english ? "Series result" : "系列赛结果";
       document.getElementById("battleOpenResult").textContent = english ? "Open result" : "打开结果";
+      const resultFloating = document.getElementById("battleOpenResultFloating");
+      if (resultFloating) {
+        resultFloating.hidden = !(h5BattleState.mode === "battle" && h5BattleState.lastSeries);
+        resultFloating.querySelector("span").textContent = english ? "SERIES COMPLETE" : "系列赛已完成";
+        resultFloating.querySelector("strong").textContent = english ? "View series result" : "查看系列赛结果";
+      }
       document.getElementById("battleResultModalTitle").textContent = english ? "Series result" : "系列赛结果";
+      h5BattleSyncCoach(english);
       if (justCompletedOwnLineup) {
         requestAnimationFrame(() => panel.scrollIntoView({ behavior: "smooth", block: "start" }));
       }
     }
 
     function h5BattleSetMode(mode) {
+      if (mode === "battle" || mode === "solo") h5BattleCoachMark("mode", { sync: false });
       h5BattleState.mode = mode === "battle" ? "battle" : mode === "solo" ? "solo" : "home";
       if (h5BattleState.mode === "solo") render();
       if (h5BattleState.mode !== "battle") document.getElementById("battleResultModal").hidden = true;
@@ -22825,6 +23047,7 @@ function renderV6Timeline(timeline = []) {
         h5BattleState.lastSeries = null;
         document.getElementById("battleResultsSection").hidden = true;
         document.getElementById("battleResultModal").hidden = true;
+        h5BattleCoachMark("opponent", { sync: false });
         h5BattleStatus(english ? "Friend lineup ready" : "朋友阵容已就位", "success");
       } catch (error) {
         h5BattleState.opponent = null;
@@ -22848,6 +23071,7 @@ function renderV6Timeline(timeline = []) {
       h5BattleState.opponentSource = "library";
       h5BattleState.opponentTier = profile.tier;
       h5BattleState.lastSeries = null;
+      h5BattleCoachMark("opponent", { sync: false });
       document.getElementById("battleOpponentCode").value = "";
       document.getElementById("battleResultsSection").hidden = true;
       document.getElementById("battleResultModal").hidden = true;
@@ -23393,6 +23617,17 @@ function renderV6Timeline(timeline = []) {
                 <td>${mvpSummary.spg}</td><td>${mvpSummary.bpg}</td><td>${mvpSummary.fgPct}</td>
                 <td>${mvpSummary.threePct}</td><td>${mvpSummary.ftPct}</td><td>${mvpSummary.tsPct}</td></tr></tbody>
             </table></div>
+            <div class="battle-mvp-mobile-stats" aria-label="${english ? "Series MVP statistics" : "系列赛 MVP 数据"}">
+              <div><small>PTS</small><strong>${mvpSummary.ppg}</strong></div>
+              <div><small>REB</small><strong>${mvpSummary.rpg}</strong></div>
+              <div><small>AST</small><strong>${mvpSummary.apg}</strong></div>
+              <div><small>STL</small><strong>${mvpSummary.spg}</strong></div>
+              <div><small>BLK</small><strong>${mvpSummary.bpg}</strong></div>
+              <div><small>FG%</small><strong>${mvpSummary.fgPct}</strong></div>
+              <div><small>3P%</small><strong>${mvpSummary.threePct}</strong></div>
+              <div><small>FT%</small><strong>${mvpSummary.ftPct}</strong></div>
+              <div><small>TS%</small><strong>${mvpSummary.tsPct}</strong></div>
+            </div>
           </section>
         </div>
         ${seriesHeadline ? `<section class="battle-series-headline">
@@ -23401,9 +23636,9 @@ function renderV6Timeline(timeline = []) {
           <p>${seriesHeadline.body}</p>
         </section>` : ""}
         <nav class="battle-result-roadmap" aria-label="${english ? "How to read this result" : "结果阅读顺序"}">
-          <span><b>1</b>${english ? "Series averages" : "双方场均"}</span>
-          <span><b>2</b>${english ? "Game by game" : "逐场比赛"}</span>
-          <span><b>3</b>${english ? "Full review" : "整体复盘"}</span>
+          <button type="button" data-battle-jump="battle-series-stats"><b>1</b><span>${english ? "Series averages" : "双方场均"}</span></button>
+          <button type="button" data-battle-jump="battle-game-log"><b>2</b><span>${english ? "Game by game" : "逐场比赛"}</span></button>
+          <button type="button" data-battle-jump="battle-series-review"><b>3</b><span>${english ? "Full review" : "整体复盘"}</span></button>
         </nav>
         <section class="battle-series-stats">
           <h3>${english ? "Series averages" : "双方系列赛场均数据"}</h3>
@@ -23413,7 +23648,19 @@ function renderV6Timeline(timeline = []) {
           </div>
         </section>
         <section class="battle-game-log">
-          <h3>${english ? "Game by game" : "逐场比赛"}</h3>
+          <div class="battle-game-log-head">
+            <div>
+              <span class="battle-game-log-kicker">${english ? "SERIES TIMELINE" : "SERIES TIMELINE"}</span>
+              <h3>${english ? "Game by game" : "逐场比赛"}</h3>
+            </div>
+            <div class="battle-game-bulk-actions" role="group"
+              aria-label="${english ? "Control all game details" : "批量控制逐场详情"}">
+              <button class="battle-game-bulk-action" type="button"
+                data-battle-games-action="expand">${english ? "Expand all" : "全部展开"}</button>
+              <button class="battle-game-bulk-action" type="button"
+                data-battle-games-action="collapse" disabled>${english ? "Collapse all" : "全部收起"}</button>
+            </div>
+          </div>
           <p class="battle-section-hint">${english
             ? "Open any game to review its deciding sequence and both five-player box scores."
             : "展开任意一场，查看本场胜负经过与双方五人数据。"}</p>
@@ -23464,6 +23711,37 @@ function renderV6Timeline(timeline = []) {
         ${narrative?.disclaimer ? `<small class="battle-fiction-disclaimer">${narrative.disclaimer}</small>` : ""}`;
     }
 
+    function h5BattleJumpToResultSection(control) {
+      const resultRoot = control.closest(".battle-result-modal-content, .battle-result");
+      const targetClass = control.dataset.battleJump;
+      const target = resultRoot?.querySelector(`.${targetClass}`);
+      target?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    function h5BattleSyncGameControls(gameLog) {
+      const gameDetails = [...(gameLog?.querySelectorAll(".battle-game-detail") || [])];
+      if (!gameDetails.length) return;
+      const expandControl = gameLog.querySelector('[data-battle-games-action="expand"]');
+      const collapseControl = gameLog.querySelector('[data-battle-games-action="collapse"]');
+      if (expandControl) expandControl.disabled = gameDetails.every(detail => detail.open);
+      if (collapseControl) collapseControl.disabled = gameDetails.every(detail => !detail.open);
+    }
+
+    function h5BattleSetAllGames(control) {
+      const gameLog = control.closest(".battle-game-log");
+      const gameDetails = [...(gameLog?.querySelectorAll(".battle-game-detail") || [])];
+      if (!gameDetails.length) return;
+      const shouldOpen = control.dataset.battleGamesAction === "expand";
+      gameDetails.forEach(detail => { detail.open = shouldOpen; });
+      h5BattleSyncGameControls(gameLog);
+    }
+
+    function h5BattleOpenStoredResult() {
+      if (!h5BattleState.lastSeries) return;
+      document.getElementById("battleResultModal").hidden = false;
+      h5BattleSyncCoach(h5BattleEnglish());
+    }
+
     async function h5BattleStartSeries(options = {}) {
       const ownLineup = h5BattleCurrentOwnLineup();
       if (!ownLineup || !h5BattleState.opponent) {
@@ -23473,6 +23751,7 @@ function renderV6Timeline(timeline = []) {
         return;
       }
       if (h5BattleState.starting) return;
+      h5BattleCoachMark("series", { sync: false });
       h5BattleState.starting = true;
       h5BattleSync();
       await new Promise(resolve => requestAnimationFrame(resolve));
@@ -23510,7 +23789,7 @@ function renderV6Timeline(timeline = []) {
       const style = document.createElement("style");
       style.textContent = `
         .unified-mode-hub{margin:0 0 18px;padding:18px;border:1px solid #d8d0c6;border-radius:22px;background:linear-gradient(135deg,#fffdf9,#f0e9df);box-shadow:0 12px 34px rgba(38,31,25,.08)}.unified-mode-head{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:14px}.unified-mode-head h2{margin:0;font-size:clamp(22px,3vw,32px)}.unified-mode-head p{max-width:680px;margin:0;color:#6e655d;line-height:1.55}.battle-mode-switch{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.battle-mode-switch button{position:relative;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;min-height:92px;border:1px solid #d5ccc0;border-radius:16px;padding:16px;background:rgba(255,255,255,.78);color:#201d19;text-align:left;cursor:pointer;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease}.battle-mode-switch button:hover{transform:translateY(-2px);border-color:#a99d90}.battle-mode-switch button.active{border-color:#191714;background:#191714;color:#fff;box-shadow:0 12px 26px rgba(25,23,20,.18)}.unified-mode-icon{display:grid;place-items:center;width:46px;height:46px;border-radius:13px;background:#eee7de;font-size:19px;font-weight:1000}.active .unified-mode-icon{background:#d64032;color:#fff}.unified-mode-title,.unified-mode-copy{display:block}.unified-mode-title{font-size:18px;font-weight:1000}.unified-mode-copy{margin-top:4px;color:#746c63;font-size:12px;font-weight:700;line-height:1.4}.active .unified-mode-copy{color:rgba(255,255,255,.7)}.unified-mode-status{align-self:start;padding:4px 8px;border-radius:999px;background:#eee7de;color:#746c63;font-size:10px;font-weight:1000;white-space:nowrap}.active .unified-mode-status{background:#fff;color:#191714}.unified-onboarding{position:fixed;inset:0;z-index:10120;display:grid;place-items:center;padding:18px;background:rgba(17,15,13,.76);backdrop-filter:blur(8px)}.unified-onboarding[hidden]{display:none!important}.unified-onboarding-dialog{width:min(760px,100%);padding:26px;border-radius:24px;background:#f8f5f0;box-shadow:0 28px 90px rgba(0,0,0,.42)}.unified-onboarding-kicker{color:#d64032;font-size:11px;font-weight:1000;letter-spacing:.14em}.unified-onboarding-dialog h2{margin:7px 0 8px;font-size:clamp(28px,5vw,44px);line-height:1.05}.unified-onboarding-dialog>p{margin:0;color:#655d55;line-height:1.6}.unified-onboarding-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:20px}.unified-onboarding-option{display:block;border:1px solid #d5ccc0;border-radius:16px;padding:18px;background:#fff;text-align:left;cursor:pointer}.unified-onboarding-option:hover{border-color:#191714}.unified-onboarding-option b,.unified-onboarding-option span{display:block}.unified-onboarding-option b{font-size:18px}.unified-onboarding-option span{margin-top:6px;color:#746c63;font-size:13px;line-height:1.5}.unified-onboarding-footer{display:flex;justify-content:flex-end;margin-top:14px}.unified-onboarding-footer button{border:0;background:transparent;color:#655d55;font-weight:900;cursor:pointer}.battle-code-guide{position:relative;margin:12px 0;padding:14px 48px 14px 14px;border-radius:14px;background:#fff0cf;color:#563d0c}.battle-code-guide[hidden]{display:none}.battle-code-guide strong,.battle-code-guide span{display:block}.battle-code-guide span{margin-top:4px;font-size:12px;line-height:1.5}.battle-code-guide button{position:absolute;top:9px;right:9px;border:0;border-radius:999px;padding:6px 9px;background:#563d0c;color:#fff;font-size:10px;font-weight:900;cursor:pointer}.battle-code-label{display:flex;justify-content:space-between;gap:12px;align-items:baseline;margin-top:12px}.battle-code-label span{font-size:12px;font-weight:1000}.battle-code-label small{color:#81776d;font-size:10px}.season-modal-footer #seasonToBattleBtn{margin-right:auto}
-        .battle-panel{margin:18px 0 26px;border:2px solid #191714;background:#fff}.battle-panel-head{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;margin-bottom:18px}.battle-panel-head h2{margin:0 0 6px}.battle-kicker{font-size:12px;font-weight:1000;letter-spacing:.12em;color:#d64032}.battle-columns{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;min-width:0}.battle-side{min-width:0;border:1px solid #d8d0c6;border-radius:16px;padding:16px;background:#f8f5f0}.battle-side h3{margin:0 0 5px}.battle-code-row{display:flex;gap:8px;margin:12px 0;min-width:0}.battle-code-row textarea,.battle-code-row input{box-sizing:border-box;width:100%;max-width:100%;flex:1;min-width:0;border:1px solid #aaa094;border-radius:10px;padding:10px;font:600 12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;background:#fff}.battle-code-row textarea{min-height:72px;resize:vertical}.battle-own-code-row{align-items:flex-start}.battle-own-code-row #battleCopyOwnCode{flex:0 0 auto;width:auto;max-width:132px;padding:8px 12px;white-space:nowrap}.battle-opponent-actions,.battle-final-actions{display:flex;gap:8px;flex-wrap:wrap}.battle-lineup-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-top:14px}.battle-player-card{position:relative;min-width:0;padding:8px;border-radius:12px;background:#201d19;color:#fff;text-align:center;overflow:hidden}.battle-player-position{position:absolute;top:5px;left:5px;z-index:2;background:#d64032;border-radius:99px;padding:2px 6px;font-size:10px;font-weight:1000}.battle-player-art{height:76px;display:grid;place-items:center;margin-bottom:5px;background:#39332d;border-radius:8px;overflow:hidden}.battle-player-art img{width:100%;height:100%;object-fit:contain}.battle-player-card strong,.battle-player-card small{display:block;overflow:hidden;text-overflow:ellipsis}.battle-player-card strong{font-size:11px;white-space:nowrap}.battle-player-card small{font-size:9px;color:#cfc7bd;height:26px}.battle-empty{min-height:78px;display:grid;place-items:center;text-align:center;color:#746c63}.battle-code-hidden{font-size:12px;font-weight:800;color:#8b3329}.battle-status{min-height:22px;margin:10px 0;font-weight:800;font-size:13px}.battle-status[data-tone=success]{color:#237a57}.battle-status[data-tone=error]{color:#b12d24}.battle-start{width:100%;margin-top:16px;padding:14px}.battle-result{margin-top:18px;border-top:1px solid #d8d0c6;padding-top:18px}.battle-result-hero{border-radius:16px;padding:20px;background:#191714;color:#fff;text-align:center}.battle-result-hero.won{background:#163f30}.battle-result-hero.lost{background:#4b211d}.battle-result-hero h3{margin:6px 0}.battle-series-score{font-size:54px;font-weight:1000}.battle-series-stats,.battle-game-log,.battle-series-storylines{margin-top:20px}.battle-stat-columns,.battle-game-boxes{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}.battle-stat-card,.battle-game-box{min-width:0;border:1px solid #d8d0c6;border-radius:12px;padding:12px;background:#fff}.battle-stat-card h4,.battle-game-box h5{margin:0 0 8px}.battle-table-scroll{max-width:100%;overflow-x:auto}.battle-stat-table{width:100%;min-width:650px;border-collapse:collapse;font-size:11px}.battle-stat-table th,.battle-stat-table td{padding:6px 5px;border-bottom:1px solid #e5ded5;text-align:right;white-space:nowrap}.battle-stat-table th:first-child,.battle-stat-table td:first-child{text-align:left}.battle-stat-table tbody th{max-width:150px;overflow:hidden;text-overflow:ellipsis}.battle-rotation-row{color:#746c63;background:#f4f0ea}.battle-rotation-row td[colspan]{text-align:center}.battle-game-detail{margin:10px 0;border:1px solid #d8d0c6;border-radius:12px;background:#f8f5f0;overflow:hidden}.battle-game-detail summary{display:grid;grid-template-columns:auto auto auto 1fr;gap:10px;align-items:center;padding:13px;cursor:pointer}.battle-game-detail summary span{font-size:20px;font-weight:1000}.battle-game-detail summary small{text-align:right;color:#746c63}.battle-game-story{margin:0 12px 12px;padding:12px;border-left:4px solid #d64032;background:#fff}.battle-game-story p{margin:5px 0 0}.battle-narrative-beats{margin-top:10px;padding-top:7px;border-top:1px solid #e5ded5}.battle-narrative-beats p{color:#4d463f}.battle-game-boxes{padding:0 12px 12px}.battle-series-storylines{display:grid;gap:10px}.battle-series-storylines h3{margin-bottom:0}.battle-series-storylines article{padding:13px;border:1px solid #d8d0c6;border-radius:12px;background:#fff8eb}.battle-series-storylines p{margin:5px 0 0}.battle-explanation{padding:14px;border-radius:12px;background:#eee8df}.battle-explanation p{margin:6px 0}.battle-representative-event{margin-top:10px;padding-top:10px;border-top:1px solid #cfc5b9}.battle-final-actions{margin-top:12px}.battle-mode-active .controls,.battle-mode-active #simulateBtnFloating,.battle-mode-active .layout>.side{display:none!important}.battle-mode-active .layout{grid-template-columns:minmax(0,1fr)}
+        .battle-panel{margin:18px 0 26px;border:2px solid #191714;background:#fff}.battle-panel-head{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;margin-bottom:18px}.battle-panel-head h2{margin:0 0 6px}.battle-kicker{font-size:12px;font-weight:1000;letter-spacing:.12em;color:#d64032}.battle-columns{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;min-width:0}.battle-side{min-width:0;border:1px solid #d8d0c6;border-radius:16px;padding:16px;background:#f8f5f0}.battle-side h3{margin:0 0 5px}.battle-code-row{display:flex;gap:8px;margin:12px 0;min-width:0}.battle-code-row textarea,.battle-code-row input{box-sizing:border-box;width:100%;max-width:100%;flex:1;min-width:0;border:1px solid #aaa094;border-radius:10px;padding:10px;font:600 12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;background:#fff}.battle-code-row textarea{min-height:72px;resize:vertical}.battle-own-code-row{align-items:flex-start}.battle-own-code-row #battleCopyOwnCode{flex:0 0 auto;width:auto;max-width:132px;padding:8px 12px;white-space:nowrap}.battle-opponent-actions,.battle-final-actions{display:flex;gap:8px;flex-wrap:wrap}.battle-lineup-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-top:14px}.battle-player-card{position:relative;min-width:0;padding:8px;border-radius:12px;background:#201d19;color:#fff;text-align:center;overflow:hidden}.battle-player-position{position:absolute;top:5px;left:5px;z-index:2;background:#d64032;border-radius:99px;padding:2px 6px;font-size:10px;font-weight:1000}.battle-player-art{height:76px;display:grid;place-items:center;margin-bottom:5px;background:#39332d;border-radius:8px;overflow:hidden}.battle-player-art img{width:100%;height:100%;object-fit:contain}.battle-player-card strong,.battle-player-card small{display:block;overflow:hidden;text-overflow:ellipsis}.battle-player-card strong{font-size:11px;white-space:nowrap}.battle-player-card small{font-size:9px;color:#cfc7bd;height:26px}.battle-empty{min-height:78px;display:grid;place-items:center;text-align:center;color:#746c63}.battle-code-hidden{font-size:12px;font-weight:800;color:#8b3329}.battle-status{min-height:22px;margin:10px 0;font-weight:800;font-size:13px}.battle-status[data-tone=success]{color:#237a57}.battle-status[data-tone=error]{color:#b12d24}.battle-start{width:100%;margin-top:16px;padding:14px}.battle-result{margin-top:18px;border-top:1px solid #d8d0c6;padding-top:18px}.battle-result-hero{border-radius:16px;padding:20px;background:#191714;color:#fff;text-align:center}.battle-result-hero.won{background:#163f30}.battle-result-hero.lost{background:#4b211d}.battle-result-hero h3{margin:6px 0}.battle-series-score{font-size:54px;font-weight:1000}.battle-series-stats,.battle-game-log,.battle-series-storylines{margin-top:20px}.battle-stat-columns,.battle-game-boxes{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}.battle-stat-card,.battle-game-box{min-width:0;border:1px solid #d8d0c6;border-radius:12px;padding:12px;background:#fff}.battle-stat-card h4,.battle-game-box h5{margin:0 0 8px}.battle-table-scroll{max-width:100%;overflow-x:auto}.battle-stat-table{width:100%;min-width:650px;border-collapse:collapse;font-size:11px}.battle-stat-table th,.battle-stat-table td{padding:6px 5px;border-bottom:1px solid #e5ded5;text-align:right;white-space:nowrap}.battle-stat-table th:first-child,.battle-stat-table td:first-child{text-align:left}.battle-stat-table tbody th{max-width:150px;overflow:hidden;text-overflow:ellipsis}.battle-rotation-row{color:#746c63;background:#f4f0ea}.battle-rotation-row td[colspan]{text-align:center}.battle-game-detail{margin:10px 0;border:1px solid #d8d0c6;border-radius:12px;background:#f8f5f0;overflow:hidden}.battle-game-detail summary{display:grid;grid-template-columns:auto auto auto 1fr;gap:10px;align-items:center;padding:13px;cursor:pointer}.battle-game-detail summary span{font-size:20px;font-weight:1000}.battle-game-detail summary small{text-align:right;color:#746c63}.battle-game-story{margin:0 12px 12px;padding:12px;border-left:4px solid #d64032;background:#fff}.battle-game-story p{margin:5px 0 0}.battle-narrative-beats{margin-top:10px;padding-top:7px;border-top:1px solid #e5ded5}.battle-narrative-beats p{color:#4d463f}.battle-game-boxes{padding:0 12px 12px}.battle-series-storylines{display:grid;gap:10px}.battle-series-storylines h3{margin-bottom:0}.battle-series-storylines article{padding:13px;border:1px solid #d8d0c6;border-radius:12px;background:#fff8eb}.battle-series-storylines p{margin:5px 0 0}.battle-explanation{padding:14px;border-radius:12px;background:#eee8df}.battle-explanation p{margin:6px 0}.battle-representative-event{margin-top:10px;padding-top:10px;border-top:1px solid #cfc5b9}.battle-final-actions{margin-top:12px}.battle-mode-active .controls,.battle-mode-active #simulateBtnFloating,.battle-mode-active .layout>.side{display:none!important}.battle-mode-active .layout{grid-template-columns:minmax(0,1fr)}.battle-result-floating{position:fixed;right:20px;bottom:calc(20px + env(safe-area-inset-bottom));z-index:100;display:flex;align-items:center;gap:14px;min-width:250px;min-height:64px;padding:10px 18px;border:1px solid rgba(255,255,255,.13);border-radius:17px;background:rgba(25,23,20,.97);color:#fff;box-shadow:0 18px 48px rgba(25,23,20,.32);backdrop-filter:blur(14px);cursor:pointer;transition:transform .16s ease,box-shadow .16s ease}.battle-result-floating[hidden]{display:none!important}.battle-result-floating::before{content:"";align-self:stretch;width:4px;border-radius:99px;background:#d64032}.battle-result-floating::after{content:"→";margin-left:auto;color:#fff;font-size:22px;font-weight:700;line-height:1}.battle-result-floating span,.battle-result-floating strong{display:block;text-align:left}.battle-result-floating span{color:rgba(255,255,255,.5);font-size:9px;font-weight:1000;letter-spacing:.14em}.battle-result-floating strong{margin-top:3px;font-size:15px;letter-spacing:.01em}.battle-result-floating:hover{transform:translateY(-3px);box-shadow:0 24px 56px rgba(25,23,20,.38)}.battle-result-floating:focus-visible{outline:3px solid #d64032;outline-offset:3px}
         .battle-mode-active .battle-panel{border:0;border-radius:24px;padding:24px;background:linear-gradient(145deg,#fffaf2,#f2ebe1);box-shadow:0 18px 50px rgba(38,31,25,.12)}.battle-panel-head{max-width:760px}.battle-panel-head h2{font-size:clamp(28px,4vw,46px);line-height:1.05}.battle-kicker{margin-bottom:8px}.battle-columns{grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);gap:14px}.battle-side{border:0;border-radius:18px;padding:18px;background:rgba(255,255,255,.78);box-shadow:inset 0 0 0 1px rgba(109,96,81,.14)}.battle-own-ready{display:flex;flex-direction:column;gap:3px;margin:14px 0;padding:12px 14px;border-radius:12px;background:#e8f2ec;color:#174a36}.battle-own-ready span{font-size:12px;color:#527063}.battle-code-row input{min-height:44px}.battle-own-code-row input{color:#756c62;background:#f8f5f0}.battle-action-or{align-self:center;color:#8c8176;font-size:12px;font-weight:900}.battle-opponent-actions{align-items:center}.battle-opponent-actions .btn{flex:1}.battle-opponent-ready{min-height:88px;border:1px dashed #c9bcae;border-radius:14px;background:#fbf7f1}.battle-start{border-radius:14px;font-size:17px;letter-spacing:.02em}.battle-results-section{display:none;margin-top:28px;border:0;border-radius:22px;padding:22px;background:#fff}.battle-mode-active .battle-results-section:not([hidden]){display:block}.battle-results-head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:12px}.battle-results-head span{font-size:11px;font-weight:1000;letter-spacing:.14em;color:#d64032}.battle-results-head h2{margin:4px 0 0}.battle-result{margin-top:0;border-top:0;padding-top:0}.battle-mvp-card{width:min(900px,100%);margin:18px auto 0;border:1px solid rgba(255,255,255,.24);border-radius:14px;overflow:hidden;background:rgba(255,255,255,.1);text-align:left}.battle-mvp-identity{display:flex;align-items:baseline;gap:10px;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.18)}.battle-mvp-identity span{font-size:12px;font-weight:900;letter-spacing:.05em;opacity:.8}.battle-mvp-identity strong{font-size:20px}.battle-mvp-table{width:100%;min-width:620px;border-collapse:collapse;text-align:center}.battle-mvp-table th{padding:7px 10px 4px;font-size:10px;letter-spacing:.04em;opacity:.72}.battle-mvp-table td{padding:3px 10px 10px;font-size:16px;font-weight:1000}.battle-result-modal{position:fixed;inset:0;z-index:10050;display:grid;place-items:center;padding:18px}.battle-result-modal[hidden]{display:none!important}.battle-result-modal-backdrop{position:absolute;inset:0;border:0;background:rgba(17,15,13,.72);backdrop-filter:blur(6px)}.battle-result-dialog{position:relative;width:min(1240px,calc(100vw - 36px));max-height:92vh;overflow:auto;border-radius:22px;background:#f8f5f0;box-shadow:0 24px 80px rgba(0,0,0,.35)}.battle-result-dialog>header{position:sticky;top:0;z-index:3;display:flex;justify-content:space-between;align-items:center;padding:14px 18px;background:rgba(248,245,240,.96);border-bottom:1px solid #d8d0c6}.battle-result-dialog>header h2{margin:0;font-size:20px}.battle-result-dialog>header button{width:38px;height:38px;border:0;border-radius:50%;background:#191714;color:#fff;font-size:24px;cursor:pointer}.battle-result-modal-content{padding:18px}
         .battle-series-headline{margin-top:20px;padding:20px;border:1px solid #d64032;border-radius:16px;background:linear-gradient(135deg,#fff5ed,#fff)}.battle-series-headline span{font-size:11px;font-weight:1000;letter-spacing:.14em;color:#d64032}.battle-series-headline h3{margin:7px 0 8px;font-size:clamp(22px,3vw,34px);line-height:1.12}.battle-series-headline p{margin:0;color:#4d463f;line-height:1.7}.battle-result-roadmap{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:14px 0 0}.battle-result-roadmap span{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;background:#eee8df;color:#514941;font-size:11px;font-weight:1000}.battle-result-roadmap b{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:#191714;color:#fff}.battle-series-stats,.battle-game-log,.battle-series-review{margin-top:18px;padding:18px;border:1px solid #ded6cc;border-radius:16px;background:#f2ede6}.battle-series-stats>h3,.battle-game-log>h3,.battle-series-review>h3{margin:0 0 12px}.battle-section-hint{margin:-5px 0 13px;color:#746c63;font-size:12px;line-height:1.5}.battle-explanation{padding:14px;border-radius:12px;background:#fff}.battle-review-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:12px}.battle-review-grid article{padding:14px;border:1px solid #d8d0c6;border-radius:12px;background:#fff}.battle-review-grid article strong{display:block;margin-bottom:6px;color:#c2382d}.battle-review-grid article p{margin:0;line-height:1.65;color:#4d463f}.battle-outcome-label{display:inline-block;margin-top:8px;padding:3px 8px;border-radius:999px;background:#191714;color:#fff;font-size:11px;letter-spacing:.08em}.battle-fiction-disclaimer{display:block;margin:12px 2px 0;color:#8a8178;font-size:10px;line-height:1.5}
         @media(max-width:780px){.unified-mode-head{display:block}.unified-mode-head p{margin-top:7px}.battle-mode-switch,.unified-onboarding-options{grid-template-columns:1fr}.battle-mode-switch button{min-height:82px;padding:13px}.unified-onboarding-dialog{padding:20px}.battle-code-label{display:block}.battle-code-label small{display:block;margin-top:3px}.battle-columns,.battle-stat-columns,.battle-game-boxes,.battle-review-grid{grid-template-columns:1fr}.battle-result-roadmap{grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}.battle-result-roadmap span{justify-content:center;padding:8px 5px;text-align:center}.battle-series-stats,.battle-game-log,.battle-series-review{padding:12px}.battle-panel-head{display:block}.battle-lineup-grid{grid-template-columns:repeat(5,110px);overflow-x:auto;padding-bottom:8px}.battle-own-code-row{align-items:flex-start}.battle-own-code-row #battleCopyOwnCode{width:auto}.battle-game-detail summary{grid-template-columns:auto auto 1fr}.battle-game-detail summary small{grid-column:1/-1;text-align:left}.battle-mode-active .battle-panel{padding:16px;border-radius:18px}.battle-opponent-actions{display:grid;grid-template-columns:1fr}.battle-action-or{display:none}.battle-results-head{align-items:flex-start}.battle-result-dialog{width:calc(100vw - 16px);max-height:96vh;border-radius:16px}.battle-result-modal{padding:8px}.battle-result-modal-content{padding:10px}}
@@ -23521,8 +23800,66 @@ function renderV6Timeline(timeline = []) {
         .brand .logo{font-size:12px}.game-mode-home .unified-mode-hub{min-height:min(640px,calc(100svh - 150px));display:grid;align-content:center;margin-top:18px;padding:clamp(24px,5vw,64px);background:radial-gradient(circle at top right,rgba(214,64,50,.13),transparent 35%),linear-gradient(135deg,#fffdf9,#eee5da)}.game-mode-home .unified-mode-head{display:block;max-width:760px;margin-bottom:24px}.game-mode-home .unified-mode-head h2{font-size:clamp(34px,6vw,68px)}.game-mode-home .unified-mode-head p{max-width:720px;margin-top:10px;font-size:15px}.game-mode-home .battle-mode-switch button{min-height:150px;padding:24px}.game-mode-home .unified-mode-icon{width:58px;height:58px;font-size:22px}.game-mode-home .unified-mode-title{font-size:24px}.game-mode-home .unified-mode-copy{font-size:13px}.game-mode-home .controls,.game-mode-home .flow-progress,.game-mode-home .flow-action,.game-mode-home .top-lineup,.game-mode-home .layout,.game-mode-home .public-footer,.game-mode-home #battlePanel,.game-mode-home #battleResultsSection,.game-mode-home #simulateBtnFloating{display:none!important}.game-mode-home .actions>:not(#languageToggle){display:none!important}.game-mode-solo .unified-mode-hub,.game-mode-battle .unified-mode-hub{display:none}.unified-session-nav{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:12px;margin:4px 0 16px;padding:10px 12px;border:1px solid #d8d0c6;border-radius:14px;background:rgba(255,255,255,.8)}.unified-session-nav[hidden]{display:none!important}.unified-session-nav button{min-height:36px;padding:0 11px;border:1px solid #d8d0c6;border-radius:9px;background:#fff;font-size:12px;font-weight:900}.unified-session-nav #unifiedBackHome{min-height:44px;padding:0 18px;border-color:#191714;background:#191714;color:#fff;font-size:14px}.unified-session-nav button:hover{border-color:#191714}.unified-session-nav div{text-align:center}.unified-session-nav div span,.unified-session-nav div strong{display:block}.unified-session-nav div span{color:#81776d;font-size:9px;font-weight:900;letter-spacing:.08em}.unified-session-nav div strong{margin-top:2px;font-size:14px}
         .battle-panel-mode-pill{padding:6px 10px;border-radius:999px;background:#191714;color:#fff;font-size:10px;font-weight:1000;letter-spacing:.08em;white-space:nowrap}.battle-setup-label{margin:4px 0 8px;color:#8a8178;font-size:10px;font-weight:1000;letter-spacing:.12em}.battle-setup-progress{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:0 0 16px;padding:0;list-style:none}.battle-setup-progress li{display:flex;align-items:center;gap:8px;padding:10px;border-radius:12px;background:rgba(255,255,255,.55);color:#81776d;font-size:12px;font-weight:900}.battle-setup-progress li b{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:#ddd4c8;color:#6d645b}.battle-setup-progress li.active{box-shadow:inset 0 0 0 1px #191714;color:#191714}.battle-setup-progress li.active b{background:#191714;color:#fff}.battle-setup-progress li.complete{background:#e4f1e8;color:#174a36}.battle-setup-progress li.complete b{background:#237a57;color:#fff}.battle-side-heading{display:flex;align-items:flex-start;gap:10px}.battle-side-heading h3{margin:1px 0 5px}.battle-side-number{display:grid;place-items:center;flex:0 0 auto;width:28px;height:28px;border-radius:9px;background:#191714;color:#fff;font-size:12px;font-weight:1000}.has-own-lineup .battle-own-side .battle-side-number,.has-opponent .battle-opponent-side .battle-side-number{background:#237a57}.battle-friend-source{margin-top:14px;padding:13px;border-radius:13px;background:#fff}.battle-friend-source>strong{font-size:12px}.battle-friend-source .battle-code-row{margin:8px 0}.battle-friend-source .btn{width:100%}.battle-source-divider{display:flex;align-items:center;gap:10px;margin:12px 0;color:#91867a;font-size:10px;font-weight:900}.battle-source-divider::before,.battle-source-divider::after{content:"";height:1px;flex:1;background:#d8d0c6}.battle-random-source{display:block;width:100%;border:1px solid #c9bcae;border-radius:13px;padding:13px;background:#fbf7f1;color:#201d19;text-align:left;cursor:pointer}.battle-random-source:hover{border-color:#191714;background:#fff}.battle-random-source b,.battle-random-source span{display:block}.battle-random-source b{font-size:14px}.battle-random-source span{margin-top:4px;color:#81776d;font-size:11px;line-height:1.4}.battle-start-zone{display:grid;grid-template-columns:minmax(0,1fr) minmax(220px,340px);gap:18px;align-items:center;margin-top:16px;padding:14px;border-radius:16px;background:#191714}.battle-start-zone p{margin:0;color:rgba(255,255,255,.68);font-size:12px;line-height:1.55}.battle-start-zone .battle-start{margin:0;background:#d64032;color:#fff}.battle-start-zone .battle-start:disabled{background:#514b45;color:#918a83}.battle-panel[data-stage=ready] .battle-start-zone{background:#163f30}.battle-panel[data-stage=complete] .battle-start-zone{background:#2f2b27}
         @media(max-width:780px){.battle-structure-columns{grid-template-columns:1fr}.battle-panel-mode-pill{display:inline-block;margin-top:10px}.battle-setup-progress{grid-template-columns:1fr}.battle-setup-progress li{padding:8px}.battle-start-zone{grid-template-columns:1fr;gap:10px}.battle-start-zone .battle-start{width:100%}}
-        @media(max-width:480px){.unified-mode-hub{padding:12px;border-radius:16px}.game-mode-home .unified-mode-hub{min-height:calc(100svh - 128px);margin-top:8px;padding:18px}.game-mode-home .unified-mode-head{margin-bottom:16px}.game-mode-home .unified-mode-head h2{font-size:34px}.game-mode-home .unified-mode-head p{font-size:13px}.game-mode-home .battle-mode-switch button{min-height:112px;padding:16px}.game-mode-home .unified-mode-icon{width:46px;height:46px;font-size:18px}.game-mode-home .unified-mode-title{font-size:20px}.game-mode-home .unified-mode-copy{font-size:11px}.battle-mode-switch button{grid-template-columns:auto minmax(0,1fr);gap:9px;padding:11px}.unified-mode-status{grid-column:2;justify-self:start}.unified-mode-icon{width:40px;height:40px}.unified-mode-title{font-size:16px}.unified-session-nav{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;padding:8px}.unified-session-nav div{grid-column:1/-1;grid-row:1}.unified-session-nav button{width:100%;min-width:0;padding:0 7px;font-size:10px}.unified-session-nav #unifiedBackHome{min-height:42px;padding:0 8px;font-size:12px}.battle-own-code-row{flex-direction:column}.battle-own-code-row #battleCopyOwnCode{align-self:flex-start}.battle-result-roadmap span{flex-direction:column;gap:3px;font-size:10px}.battle-result-dialog>header{padding:10px 12px}.battle-result-modal-content{min-width:0;padding:7px}.battle-series-stats,.battle-game-log,.battle-series-review,.battle-stat-card,.battle-game-box{min-width:0}.battle-panel,.battle-results-section{min-width:0}.battle-game-detail summary{gap:7px;padding:10px}.battle-game-detail summary span{font-size:18px}}
+        @media(max-width:480px){.unified-mode-hub{padding:12px;border-radius:16px}.game-mode-home .unified-mode-hub{min-height:calc(100svh - 128px);margin-top:8px;padding:18px}.game-mode-home .unified-mode-head{margin-bottom:16px}.game-mode-home .unified-mode-head h2{font-size:34px}.game-mode-home .unified-mode-head p{font-size:13px}.game-mode-home .battle-mode-switch button{min-height:112px;padding:16px}.game-mode-home .unified-mode-icon{width:46px;height:46px;font-size:18px}.game-mode-home .unified-mode-title{font-size:20px}.game-mode-home .unified-mode-copy{font-size:11px}.battle-mode-switch button{grid-template-columns:auto minmax(0,1fr);gap:9px;padding:11px}.unified-mode-status{grid-column:2;justify-self:start}.unified-mode-icon{width:40px;height:40px}.unified-mode-title{font-size:16px}.unified-session-nav{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;padding:8px}.unified-session-nav div{grid-column:1/-1;grid-row:1}.unified-session-nav button{width:100%;min-width:0;padding:0 7px;font-size:10px}.unified-session-nav #unifiedBackHome{min-height:42px;padding:0 8px;font-size:12px}.battle-own-code-row{flex-direction:column}.battle-own-code-row #battleCopyOwnCode{align-self:flex-start}.battle-result-roadmap span{flex-direction:column;gap:3px;font-size:10px}.battle-result-dialog>header{padding:10px 12px}.battle-result-modal-content{min-width:0;padding:7px}.battle-series-stats,.battle-game-log,.battle-series-review,.battle-stat-card,.battle-game-box{min-width:0}.battle-panel,.battle-results-section{min-width:0}.battle-game-detail summary{gap:7px;padding:10px}.battle-game-detail summary span{font-size:18px}.battle-result-floating{left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));justify-content:flex-start;min-width:0;min-height:60px;padding:9px 16px}}
         @media(max-width:360px){.unified-mode-hub{padding:9px}.game-mode-home .unified-mode-hub{min-height:calc(100svh - 116px);padding:13px}.game-mode-home .unified-mode-head h2{font-size:29px}.game-mode-home .battle-mode-switch button{min-height:100px;padding:12px}.game-mode-home .unified-mode-title{font-size:18px}.battle-mode-switch button{padding:9px}.battle-mode-switch .unified-mode-copy{font-size:10px}.unified-session-nav{gap:5px;padding:7px}.unified-session-nav button{padding:0 5px;font-size:9px}.unified-session-nav #unifiedBackHome{padding:0 6px;font-size:11px}.battle-result-roadmap{gap:3px}.battle-result-roadmap span{padding:7px 2px;font-size:9px}.battle-result-roadmap b{width:20px;height:20px}.battle-mode-active .battle-panel{padding:10px}.battle-side{padding:12px}.battle-result-modal{padding:4px}.battle-result-dialog{width:calc(100vw - 8px)}}
+      `;
+      style.textContent += `
+        .battle-result-roadmap button{display:flex;align-items:center;gap:8px;padding:10px 12px;border:0;border-radius:12px;background:#eee8df;color:#514941;font:1000 11px/1.2 inherit;text-align:left;cursor:pointer}.battle-result-roadmap button>span{display:inline;padding:0;border-radius:0;background:transparent;color:inherit;font:inherit}.battle-result-roadmap button:hover,.battle-result-roadmap button:focus-visible{background:#ded4c8;outline:2px solid #191714;outline-offset:2px}.battle-series-stats,.battle-game-log,.battle-series-review{scroll-margin-top:72px}.battle-game-log-head{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid #ddd5cb}.battle-game-log-head h3{margin:3px 0 0;font-size:clamp(21px,2.5vw,28px);letter-spacing:-.02em}.battle-game-log-kicker{display:block;color:#a59a8d;font-size:9px;font-weight:1000;letter-spacing:.18em}.battle-game-bulk-actions{display:inline-flex;flex:0 0 auto;gap:3px;padding:3px;border:1px solid #ded6cd;border-radius:999px;background:#eee8df}.battle-game-bulk-action{min-height:34px;padding:0 13px;border:0;border-radius:999px;background:transparent;color:#8d8378;font-size:10px;font-weight:1000;white-space:nowrap;cursor:pointer;transition:background .16s ease,color .16s ease,box-shadow .16s ease}.battle-game-bulk-action:not(:disabled){background:#fff;color:#201d19;box-shadow:0 1px 3px rgba(35,29,23,.09)}.battle-game-bulk-action:not(:disabled):hover{background:#191714;color:#fff}.battle-game-bulk-action:focus-visible{outline:2px solid #191714;outline-offset:2px}.battle-game-bulk-action:disabled{cursor:default;opacity:.58}
+        @media(max-width:780px){.battle-result-roadmap button{justify-content:center;padding:8px 5px;text-align:center}}
+        @media(max-width:480px){.battle-result-roadmap button{flex-direction:column;gap:3px;font-size:10px}.battle-result-roadmap button>span{padding:0;font-size:10px}.battle-game-log-head{align-items:flex-start;gap:10px}.battle-game-log-head h3{font-size:21px}.battle-game-bulk-action{min-height:32px;padding:0 10px;font-size:9px}}
+        @media(max-width:360px){.battle-result-roadmap button{padding:7px 2px;font-size:9px}.battle-result-roadmap button>span{padding:0;font-size:9px}}
+      `;
+      style.textContent += `
+        /* H5_VINTAGE_SAGE_THEME */
+        body{--bg:#d3d8d1;--ink:#242824;--muted:#70766f;--line:#c2c9c1;--card:#f0f0e9;--card-2:#e2e5df;--panel:#ebece6;--red:#77877b;--gold:#b8a47a;--green:#586d60;--black:#28302c;--shadow:0 18px 46px rgba(40,48,44,.13);background:radial-gradient(circle at 12% 0,rgba(255,255,255,.26),transparent 34%),linear-gradient(90deg,rgba(40,48,44,.035) 1px,transparent 1px) 0 0/36px 36px,linear-gradient(rgba(40,48,44,.035) 1px,transparent 1px) 0 0/36px 36px,var(--bg)}
+        .logo{background:linear-gradient(135deg,#7a897d 0 49%,#28302c 50% 100%);box-shadow:0 9px 24px rgba(40,48,44,.18)}.panel{border-color:#c2c9c1;background:rgba(235,236,230,.92);box-shadow:var(--shadow)}.btn{background:#394a40;color:#f4f3ec;box-shadow:0 10px 24px rgba(40,48,44,.16)}.btn.secondary{border-color:#bcc4bc;background:#eceee8;color:#29312d}.flow-step.active{border-color:#6e8274;background:rgba(113,130,118,.13)}.flow-step.complete{border-color:rgba(88,109,96,.34);color:#4c6255}.flow-step.complete b{background:#586d60}.flow-action,.advanced-settings{border-color:#c2c9c1;background:rgba(240,240,233,.7)}
+        .unified-mode-hub{border-color:#bec6bd;background:linear-gradient(145deg,#eef0ea,#d8ddd6);box-shadow:0 18px 48px rgba(40,48,44,.13)}.game-mode-home .unified-mode-hub{background:radial-gradient(circle at 86% 5%,rgba(184,164,122,.18),transparent 34%),linear-gradient(145deg,#eceee8,#d5dad3)}.unified-mode-head p,.unified-mode-copy{color:#68716a}.battle-mode-switch button{border-color:#bdc5bc;background:rgba(240,240,233,.78);color:#242824}.battle-mode-switch button:hover{border-color:#718276}.battle-mode-switch button.active{border-color:#35443b;background:#2f3933;color:#f5f3eb;box-shadow:0 14px 30px rgba(40,48,44,.22)}.unified-mode-icon{background:#dce1da;color:#38463e}.active .unified-mode-icon{background:#b8a47a;color:#252923}.unified-mode-status{background:#dce1da;color:#667169}.active .unified-mode-status{background:#e8e4d8;color:#3c413b}.unified-session-nav{border-color:#bec6bd;background:rgba(235,237,231,.9)}.unified-session-nav button{border-color:#bdc5bc;background:#eef0ea}.unified-session-nav #unifiedBackHome{border-color:#35443b;background:#35443b}.unified-session-nav button:hover{border-color:#65796b}
+        .battle-mode-active .battle-panel{background:linear-gradient(145deg,#e9ebe5,#dce1da);box-shadow:0 20px 54px rgba(40,48,44,.15)}.battle-kicker,.battle-results-head span{color:#786b4f}.battle-panel-mode-pill{background:#35443b}.battle-side{background:rgba(242,242,235,.74);box-shadow:inset 0 0 0 1px rgba(83,101,90,.17)}.battle-own-ready{background:#dce4dd;color:#334c3d}.battle-own-ready span{color:#61756a}.battle-side-number{background:#394a40}.has-own-lineup .battle-own-side .battle-side-number,.has-opponent .battle-opponent-side .battle-side-number{background:#65796b}.battle-friend-source,.battle-random-source{border-color:#c2c9c1;background:#eceee8}.battle-code-row textarea,.battle-code-row input{border-color:#adb8ae;background:#f3f3ed}.battle-start-zone,.battle-panel[data-stage=ready] .battle-start-zone,.battle-panel[data-stage=complete] .battle-start-zone{background:#303a34}.battle-start-zone .battle-start{background:#667a6c;color:#fff}.battle-start-zone .battle-start:hover{background:#74897a}.battle-start-zone .battle-start:disabled{background:#4c5650;color:#949c96}
+        .battle-results-section{background:#e9ebe5}.battle-result-dialog{background:#e7e9e3}.battle-result-dialog>header{border-color:#c1c8c0;background:rgba(231,233,227,.96)}.battle-result-dialog>header button{background:#303a34}.battle-result-hero{background:#303633}.battle-result-hero.won{border:1px solid rgba(209,195,155,.48);background:#303a34;box-shadow:inset 0 0 0 1px rgba(209,195,155,.08)}.battle-result-hero.lost{background:#4e3d3b}.battle-result-hero.won .battle-series-score,.battle-result-hero.won>h3{color:#d1c39b}.battle-series-score{letter-spacing:-.045em}.battle-mvp-card{border-color:rgba(209,195,155,.42);background:rgba(209,195,155,.08)}.battle-mvp-identity{border-color:rgba(209,195,155,.27)}.battle-mvp-identity span{color:#d1c39b;opacity:1}.battle-mvp-identity strong{color:#f2ead2}.battle-series-headline{border-color:#9ca99f;background:linear-gradient(135deg,#e8ebe5,#f0f0e9)}.battle-series-headline span{color:#786b4f}.battle-series-headline p,.battle-review-grid article p,.battle-structure-item p{color:#48514b}.battle-result-roadmap button{background:#dce1da;color:#3d4841}.battle-result-roadmap button:hover,.battle-result-roadmap button:focus-visible{background:#cbd3cc;outline-color:#35443b}.battle-result-roadmap b{background:#394a40}.battle-series-stats,.battle-game-log,.battle-series-review{border-color:#c2c9c1;background:#e1e4de}.battle-stat-card,.battle-game-box,.battle-review-grid article,.battle-explanation{border-color:#c5cbc4;background:#f0f0e9}.battle-game-detail{border-color:#bec6bd;background:#e7e9e3}.battle-game-story{border-left-color:#718276;background:#f0f0e9}.battle-review-grid article strong,.battle-structure-item strong{color:#58695e}.battle-outcome-label{background:#394a40}.battle-game-log-head{border-color:#c2c9c1}.battle-game-log-kicker{color:#7e887f}.battle-game-bulk-actions{border-color:#c2c9c1;background:#d7dcd6}.battle-game-bulk-action:not(:disabled){background:#eef0ea;color:#2d3530}.battle-game-bulk-action:not(:disabled):hover{background:#394a40;color:#fff}.battle-result-floating{border-color:rgba(209,195,155,.24);background:rgba(40,48,44,.97);box-shadow:0 18px 48px rgba(40,48,44,.32)}.battle-result-floating::before{background:#b8a47a}.battle-result-floating::after{color:#d1c39b}.battle-result-floating:focus-visible{outline-color:#b8a47a}
+      `;
+      style.textContent += `
+        /* H5_LIGHT_VINTAGE_REFINEMENT */
+        body{--bg:#eef0eb;--ink:#20221f;--muted:#6d716a;--line:#d0d5cd;--card:#fbfaf5;--card-2:#eff1ec;--panel:#fbfaf5;--red:#b65f49;--gold:#c0a86f;--green:#5e7968;--black:#232521;--shadow:0 18px 44px rgba(38,43,39,.11);background:linear-gradient(90deg,rgba(68,78,70,.027) 1px,transparent 1px) 0 0/36px 36px,linear-gradient(rgba(68,78,70,.027) 1px,transparent 1px) 0 0/36px 36px,var(--bg)}
+        .logo{background:linear-gradient(135deg,#b65f49 0 49%,#232521 50% 100%);box-shadow:0 9px 24px rgba(97,75,65,.16)}.panel{border-color:#d0d5cd;background:rgba(251,250,245,.9);box-shadow:var(--shadow)}.btn{background:#252824;color:#fff;box-shadow:0 10px 24px rgba(32,34,31,.12)}.btn.secondary{border-color:#d0d5cd;background:#fffefa;color:#252824}.flow-step.active{border-color:#6e8978;background:rgba(94,121,104,.08)}.flow-step.complete{border-color:rgba(94,121,104,.26);color:#567161}.flow-step.complete b{background:#5e7968}.flow-action,.advanced-settings{border-color:#d0d5cd;background:rgba(255,255,251,.72)}
+        .unified-mode-hub{border-color:#d0d5cd;background:linear-gradient(145deg,#fffdf8,#eef1eb);box-shadow:0 15px 42px rgba(38,43,39,.1)}.game-mode-home .unified-mode-hub{background:radial-gradient(circle at 86% 5%,rgba(192,168,111,.1),transparent 34%),linear-gradient(145deg,#fffdf8,#edf0ea)}.unified-mode-head p,.unified-mode-copy{color:#6b7069}.battle-mode-switch button{border-color:#d0d5cd;background:rgba(255,254,250,.84);color:#20221f}.battle-mode-switch button:hover{border-color:#86958a}.battle-mode-switch button.active{border-color:#2e3430;background:#2e3430;color:#fff;box-shadow:0 12px 27px rgba(36,41,37,.18)}.unified-mode-icon{background:#e7eae4;color:#364039}.active .unified-mode-icon{background:#b86b52;color:#fff}.unified-mode-status{background:#eceee9;color:#6d716a}.active .unified-mode-status{background:#fff;color:#272b28}.unified-session-nav{border-color:#d0d5cd;background:rgba(255,254,250,.84)}.unified-session-nav button{border-color:#d0d5cd;background:#fffefa}.unified-session-nav #unifiedBackHome{border-color:#292d2a;background:#292d2a}.unified-session-nav button:hover{border-color:#737e76}
+        .battle-mode-active .battle-panel{background:linear-gradient(145deg,#fffaf2,#f1f3ed);box-shadow:0 18px 50px rgba(38,43,39,.11)}.battle-kicker{color:#a25743}.battle-results-head span{color:#8b7650}.battle-panel-mode-pill{background:#292d2a}.battle-side{background:rgba(255,255,251,.8);box-shadow:inset 0 0 0 1px rgba(101,111,103,.13)}.battle-own-ready{background:#e7eee8;color:#294837}.battle-own-ready span{color:#5a7063}.battle-side-number{background:#292d2a}.has-own-lineup .battle-own-side .battle-side-number,.has-opponent .battle-opponent-side .battle-side-number{background:#5e7968}.battle-friend-source,.battle-random-source{border-color:#d0d5cd;background:#fffefa}.battle-code-row textarea,.battle-code-row input{border-color:#bfc6be;background:#fff}.battle-start-zone,.battle-panel[data-stage=ready] .battle-start-zone,.battle-panel[data-stage=complete] .battle-start-zone{background:#292d2a}.battle-start-zone .battle-start{background:#a75d48;color:#fff}.battle-start-zone .battle-start:hover{background:#b96a52}.battle-start-zone .battle-start:disabled{background:#4d504c;color:#969994}
+        .battle-results-section{background:#fffefa}.battle-result-dialog{background:#faf9f4}.battle-result-dialog>header{border-color:#d0d5cd;background:rgba(250,249,244,.96)}.battle-result-dialog>header button{background:#292d2a}.battle-result-hero{background:#2d302d}.battle-result-hero.won{border-color:rgba(210,193,152,.45);background:#343f38}.battle-result-hero.lost{background:#55403d}.battle-result-hero.won .battle-series-score,.battle-result-hero.won>h3{color:#d2c198}.battle-mvp-card{border-color:rgba(210,193,152,.38);background:rgba(210,193,152,.07)}.battle-mvp-identity{border-color:rgba(210,193,152,.24)}.battle-mvp-identity span{color:#d2c198}.battle-mvp-identity strong{color:#fff5dd}.battle-series-headline{border-color:#c8cec6;background:linear-gradient(135deg,#f6f6f0,#fffefa)}.battle-series-headline span{color:#8b7650}.battle-series-headline p,.battle-review-grid article p,.battle-structure-item p{color:#4f544f}.battle-result-roadmap button{background:#e9ece6;color:#404640}.battle-result-roadmap button:hover,.battle-result-roadmap button:focus-visible{background:#dce2db;outline-color:#3e4942}.battle-result-roadmap b{background:#343b36}.battle-series-stats,.battle-game-log,.battle-series-review{border-color:#d2d7cf;background:#f1f2ed}.battle-stat-card,.battle-game-box,.battle-review-grid article,.battle-explanation{border-color:#d4d8d1;background:#fffefa}.battle-game-detail{border-color:#d0d5cd;background:#f5f5f0}.battle-game-story{border-left-color:#778b7e;background:#fffefa}.battle-review-grid article strong,.battle-structure-item strong{color:#596b60}.battle-outcome-label{background:#343b36}.battle-game-log-head{border-color:#d2d7cf}.battle-game-log-kicker{color:#858c86}.battle-game-bulk-actions{border-color:#d0d5cd;background:#e6e9e3}.battle-game-bulk-action:not(:disabled){background:#fffefa;color:#2f332f}.battle-game-bulk-action:not(:disabled):hover{background:#343b36;color:#fff}.battle-result-floating{border-color:rgba(210,193,152,.22);background:rgba(41,45,42,.97);box-shadow:0 18px 48px rgba(31,34,31,.28)}.battle-result-floating::before{background:#c0a86f}.battle-result-floating::after{color:#d2c198}.battle-result-floating:focus-visible{outline-color:#c0a86f}
+      `;
+      style.textContent += `
+        /* H5_LIGHTER_FINISH */
+        body{--bg:#f3f4f0;--card:#fffdf8;--card-2:#f5f6f1;--panel:#fffdf8;background:linear-gradient(90deg,rgba(68,78,70,.021) 1px,transparent 1px) 0 0/36px 36px,linear-gradient(rgba(68,78,70,.021) 1px,transparent 1px) 0 0/36px 36px,var(--bg)}.panel{background:rgba(255,253,248,.94)}.unified-mode-hub{background:linear-gradient(145deg,#fffefa,#f4f6f1)}.game-mode-home .unified-mode-hub{background:radial-gradient(circle at 86% 5%,rgba(192,168,111,.09),transparent 34%),linear-gradient(145deg,#fffefa,#f3f5f0)}.battle-mode-active .battle-panel{background:linear-gradient(145deg,#fffdf8,#f6f7f3)}.battle-side{background:rgba(255,255,252,.9)}.battle-results-section{background:#fff}.battle-result-dialog{background:#fdfcf8}.battle-result-dialog>header{background:rgba(253,252,248,.97)}.battle-series-stats,.battle-game-log,.battle-series-review{background:#f5f6f2}.battle-stat-card,.battle-game-box,.battle-review-grid article,.battle-explanation,.battle-game-story{background:#fff}
+      `;
+      style.textContent += `
+        /* H5_VICTORY_HIGHLIGHT_LIFT */
+        .battle-result-hero.won{border-color:rgba(224,211,170,.58);background:linear-gradient(145deg,#4b5b51,#3f4c45);box-shadow:inset 0 1px 0 rgba(255,255,255,.08),inset 0 0 0 1px rgba(224,211,170,.1)}.battle-result-hero.won>span{color:#d6c99f}.battle-result-hero.won .battle-series-score,.battle-result-hero.won>h3{color:#e0d3aa;text-shadow:0 1px 0 rgba(0,0,0,.18)}.battle-mvp-card{border-color:rgba(224,211,170,.56);background:linear-gradient(135deg,rgba(224,211,170,.15),rgba(255,255,255,.07))}.battle-mvp-identity{border-color:rgba(224,211,170,.34)}.battle-mvp-identity span{color:#e0d3aa}.battle-mvp-identity strong{color:#fff7df}.battle-mvp-table th{color:rgba(255,248,228,.78);opacity:1}.battle-mvp-table td{color:#fff9e9}
+      `;
+      style.textContent += `
+        /* H5_AMBIENT_LIGHT_LIFT */
+        body{--bg:#f7f8f4;--line:#d9ddd6;--card:#fffefa;--card-2:#f8f9f5;--panel:#fffefa;--shadow:0 14px 36px rgba(38,43,39,.075);background:linear-gradient(90deg,rgba(68,78,70,.016) 1px,transparent 1px) 0 0/36px 36px,linear-gradient(rgba(68,78,70,.016) 1px,transparent 1px) 0 0/36px 36px,var(--bg)}.panel{border-color:#d9ddd6;background:rgba(255,254,250,.97);box-shadow:var(--shadow)}.flow-action,.advanced-settings{border-color:#d9ddd6;background:rgba(255,255,252,.9)}.unified-mode-hub{border-color:#d9ddd6;background:linear-gradient(145deg,#fffefa,#f8faf6);box-shadow:0 13px 34px rgba(38,43,39,.075)}.game-mode-home .unified-mode-hub{background:radial-gradient(circle at 86% 5%,rgba(192,168,111,.07),transparent 34%),linear-gradient(145deg,#fffefa,#f8faf6)}.unified-mode-icon,.unified-mode-status{background:#eef1ec}.unified-session-nav{border-color:#d9ddd6;background:rgba(255,255,252,.95)}.battle-mode-active .battle-panel{background:linear-gradient(145deg,#fffefa,#fafbf8);box-shadow:0 15px 40px rgba(38,43,39,.08)}.battle-side{background:rgba(255,255,252,.96)}.battle-results-section,.battle-stat-card,.battle-game-box,.battle-review-grid article,.battle-explanation,.battle-game-story{background:#fffefa}.battle-series-stats,.battle-game-log,.battle-series-review{background:#f8f9f5}
+      `;
+      style.textContent += `
+        /* H5_SOLO_RESULT_VERSION_CONTRAST */
+        .season-result-hero .season-result-player{border-color:rgba(255,255,255,.18);background:#343a35}.season-result-hero .season-result-player-name-row b{color:#fff}.season-result-hero .season-result-player small{display:block;color:#e1e6df;opacity:1;text-shadow:0 1px 1px rgba(0,0,0,.3)}
+        @media(max-width:760px){.season-result-hero .season-result-player small{display:block;color:#e1e6df;font-size:8px;line-height:1.2}}
+      `;
+      style.textContent += `
+        /* H5_SOLO_SIMULATION_PANEL_CONTRAST */
+        .game-mode-solo .layout>.side>.result{border-color:#252824;background:#252824;color:#fff;box-shadow:0 18px 44px rgba(32,34,31,.18)}
+      `;
+      style.textContent += `
+        /* H5_MOBILE_MODE_LOBBY_DENSITY */
+        @media(max-width:480px){.game-mode-home .topbar{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:9px}.game-mode-home .topbar .brand{min-width:0}.game-mode-home .topbar .actions{width:auto;align-self:start}.game-mode-home #languageToggle{flex:0 0 auto;width:48px;min-height:42px;padding:0}.game-mode-home .unified-mode-hub{min-height:calc(100svh - 118px);align-content:start;margin-top:10px;padding:28px 18px 20px}.game-mode-home .unified-mode-head{margin-bottom:14px}.game-mode-home .battle-mode-switch{gap:10px}.game-mode-home .battle-mode-switch button{min-height:104px}}
+        @media(max-width:360px){.game-mode-home .topbar{gap:7px}.game-mode-home #languageToggle{width:44px;min-height:40px}.game-mode-home .unified-mode-hub{min-height:calc(100svh - 112px);padding:22px 13px 18px}.game-mode-home .battle-mode-switch button{min-height:96px}}
+      `;
+      style.textContent += `
+        /* H5_MOBILE_MVP_COMPLETE_STATS */
+        .battle-mvp-mobile-stats{display:none}
+        @media(max-width:480px){.battle-mvp-card .battle-table-scroll{display:none}.battle-mvp-mobile-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:rgba(224,211,170,.2)}.battle-mvp-mobile-stats>div{min-width:0;padding:8px 4px;background:rgba(49,50,47,.58);text-align:center}.battle-mvp-mobile-stats small,.battle-mvp-mobile-stats strong{display:block}.battle-mvp-mobile-stats small{color:rgba(255,248,228,.72);font-size:8px;font-weight:900;letter-spacing:.05em}.battle-mvp-mobile-stats strong{margin-top:3px;color:#fff9e9;font-size:15px;line-height:1}}
+      `;
+      style.textContent += `
+        /* H5_CONTEXTUAL_NEW_PLAYER_GUIDE */
+        .unified-coach{position:fixed;left:20px;bottom:calc(20px + env(safe-area-inset-bottom));z-index:10110;width:min(430px,calc(100vw - 40px));padding:15px;border:1px solid #cfd5cd;border-radius:17px;background:rgba(255,254,250,.98);color:#242824;box-shadow:0 18px 54px rgba(34,40,36,.2);backdrop-filter:blur(16px)}.unified-coach[hidden]{display:none!important}.unified-coach-progress{color:#8d7650;font-size:9px;font-weight:1000;letter-spacing:.13em}.unified-coach h2{margin:5px 0 4px;font-size:19px;line-height:1.2}.unified-coach p{margin:0;color:#5f665f;font-size:12px;line-height:1.55}.unified-coach-actions{display:flex;justify-content:flex-end;gap:7px;margin-top:12px}.unified-coach-actions button{min-height:38px;border:1px solid #cfd5cd;border-radius:10px;padding:0 13px;background:#fffefa;color:#4d554f;font-size:11px;font-weight:1000;cursor:pointer}.unified-coach-actions #unifiedCoachNext{border-color:#33433a;background:#33433a;color:#fff}.unified-coach-actions button:focus-visible{outline:3px solid rgba(184,164,122,.55);outline-offset:2px}.unified-coach-target{position:relative;z-index:1;outline:3px solid rgba(184,164,122,.72)!important;outline-offset:4px;scroll-margin-top:78px}.battle-result-modal .unified-coach-target{z-index:auto}
+        @media(max-width:480px){.unified-coach{left:10px;bottom:calc(10px + env(safe-area-inset-bottom));width:calc(100vw - 20px);padding:13px;border-radius:15px}.unified-coach h2{font-size:17px}.unified-coach p{font-size:11px}.unified-coach-actions button{min-height:40px}.battle-result-floating:not([hidden]){bottom:calc(164px + env(safe-area-inset-bottom))}}
       `;
       document.head.appendChild(style);
       const modeHub = document.createElement("section");
@@ -23581,6 +23918,23 @@ function renderV6Timeline(timeline = []) {
           <div class="unified-onboarding-footer"><button id="unifiedOnboardingSkip" type="button">先自己看看</button></div>
         </div>`;
       document.body.appendChild(unifiedOnboarding);
+      const unifiedCoach = document.createElement("aside");
+      unifiedCoach.id = "unifiedCoach";
+      unifiedCoach.className = "unified-coach";
+      unifiedCoach.setAttribute("role", "region");
+      unifiedCoach.setAttribute("aria-live", "polite");
+      unifiedCoach.setAttribute("aria-labelledby", "unifiedCoachTitle");
+      unifiedCoach.setAttribute("aria-describedby", "unifiedCoachCopy");
+      unifiedCoach.hidden = true;
+      unifiedCoach.innerHTML = `
+        <div class="unified-coach-progress" id="unifiedCoachProgress">新手指引</div>
+        <h2 id="unifiedCoachTitle">先选一种玩法</h2>
+        <p id="unifiedCoachCopy"></p>
+        <div class="unified-coach-actions">
+          <button id="unifiedCoachSkip" type="button">跳过指引</button>
+          <button id="unifiedCoachNext" type="button">知道了</button>
+        </div>`;
+      document.body.appendChild(unifiedCoach);
       const panel = document.createElement("section");
       panel.id = "battlePanel";
       panel.className = "panel battle-panel";
@@ -23617,6 +23971,13 @@ function renderV6Timeline(timeline = []) {
       resultModal.hidden = true;
       resultModal.innerHTML = `<button class="battle-result-modal-backdrop" id="battleResultModalBackdrop" type="button" aria-label="关闭结果"></button><div class="battle-result-dialog"><header><h2 id="battleResultModalTitle">系列赛结果</h2><button id="battleResultModalClose" type="button" aria-label="关闭结果">×</button></header><div class="battle-result-modal-content" id="battleResultModalContent"></div></div>`;
       document.body.appendChild(resultModal);
+      const resultFloating = document.createElement("button");
+      resultFloating.id = "battleOpenResultFloating";
+      resultFloating.className = "battle-result-floating";
+      resultFloating.type = "button";
+      resultFloating.hidden = true;
+      resultFloating.innerHTML = `<div><span>系列赛已完成</span><strong>查看系列赛结果</strong></div>`;
+      document.body.appendChild(resultFloating);
       const seasonToBattle = document.createElement("button");
       seasonToBattle.id = "seasonToBattleBtn";
       seasonToBattle.className = "btn secondary";
@@ -23641,6 +24002,16 @@ function renderV6Timeline(timeline = []) {
         unifiedOnboarding.hidden = true;
         if (modeButton) h5BattleSetMode(modeButton.dataset.onboardingMode);
       });
+      document.getElementById("unifiedCoachSkip").addEventListener("click", h5BattleCoachDismiss);
+      document.getElementById("unifiedCoachNext").addEventListener("click", () => {
+        const stepId = unifiedCoach.dataset.step;
+        h5BattleCoachMark(stepId);
+        if (stepId === "slot") {
+          requestAnimationFrame(() => {
+            document.getElementById("cards")?.scrollIntoView({ behavior: "smooth", block: "start" });
+          });
+        }
+      });
       document.getElementById("battleCodeGuideDone").addEventListener("click", () => {
         localStorage.setItem("nba5CodeGuideSeenV1", "1");
         document.getElementById("battleCodeGuide").hidden = true;
@@ -23660,14 +24031,39 @@ function renderV6Timeline(timeline = []) {
       [el.clearBtn, el.clearLineupQuickBtn].forEach(button => {
         button?.addEventListener("click", h5BattleResetAfterLineupClear);
       });
-      document.getElementById("battleOpenResult").addEventListener("click", () => {
-        if (h5BattleState.lastSeries) document.getElementById("battleResultModal").hidden = false;
-      });
+      document.getElementById("battleOpenResult").addEventListener("click", h5BattleOpenStoredResult);
+      resultFloating.addEventListener("click", h5BattleOpenStoredResult);
       ["battleResultModalBackdrop", "battleResultModalClose"].forEach(id => {
         document.getElementById(id).addEventListener("click", () => {
           document.getElementById("battleResultModal").hidden = true;
+          h5BattleSyncCoach(h5BattleEnglish());
         });
       });
+      document.addEventListener("click", event => {
+        const slot = event.target.closest("#lineup [data-slot]");
+        if (slot) {
+          h5BattleCoachMark("slot", { sync: false });
+          requestAnimationFrame(h5BattleSync);
+        }
+        if (h5BattleState.mode === "solo"
+          && [el.simulateBtn, el.simulateBtnInline, el.simulateBtnFloating, el.flowActionBtn]
+            .some(button => button && (event.target === button || button.contains(event.target)))) {
+          h5BattleCoachMark("simulate", { sync: false });
+        }
+      }, true);
+      document.addEventListener("click", event => {
+        const jumpControl = event.target.closest("[data-battle-jump]");
+        if (jumpControl) {
+          h5BattleJumpToResultSection(jumpControl);
+          return;
+        }
+        const bulkControl = event.target.closest("[data-battle-games-action]");
+        if (bulkControl) h5BattleSetAllGames(bulkControl);
+      });
+      document.addEventListener("toggle", event => {
+        if (!event.target.matches?.(".battle-game-detail")) return;
+        h5BattleSyncGameControls(event.target.closest(".battle-game-log"));
+      }, true);
       document.addEventListener("click", event => {
         if (h5BattleState.mode !== "battle") return;
         if (![el.simulateBtn, el.simulateBtnInline, el.simulateBtnFloating, el.flowActionBtn]
