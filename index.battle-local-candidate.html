@@ -19532,6 +19532,884 @@ function renderV6Timeline(timeline = []) {
     replaceControlledButton("saveBtn", saveGameControlled);
     replaceControlledButton("loadBtn", loadGameControlled);
     replaceControlledButton("importLineupBtn", importLineupCodeControlled);
+(function installH5BattleLineupCodeCandidate(globalScope) {
+  "use strict";
+
+  const SCHEMA_VERSION = "battle-lineup-code-candidate-1.0.0";
+  const CODE_PREFIX = "NBA5-S1-";
+  const CODE_FAMILY_PREFIX = "NBA5-";
+  const FORMAT_VERSION = 1;
+  const LINEUP_SIZE = 5;
+  const TOKEN_BYTES = 4;
+  const PAYLOAD_BYTES = 1 + LINEUP_SIZE * TOKEN_BYTES;
+  const CHECKSUM_BYTES = 4;
+  const ENCODED_BYTES = PAYLOAD_BYTES + CHECKSUM_BYTES;
+  const MAX_INPUT_LENGTH = 4096;
+
+  class BattleLineupCodeError extends Error {
+    constructor(code, details = {}) {
+      super(code);
+      this.name = "BattleLineupCodeError";
+      this.code = code;
+      this.details = details;
+    }
+  }
+
+  function fail(code, details) {
+    throw new BattleLineupCodeError(code, details);
+  }
+
+  function defaultVersionKey(card) {
+    return card?.v34?.cardId
+      || card?.eventProfile?.versionKey
+      || card?.versionKey
+      || (typeof card?.cardId === "string" ? card.cardId : "");
+  }
+
+  function defaultPlayerKey(card) {
+    return card?.playerIdentityKey
+      || card?.playerKey
+      || card?.eventProfile?.stablePlayerKey
+      || card?.eventProfile?.playerKey
+      || card?.v34?.playerKey
+      || card?.name
+      || "";
+  }
+
+  function defaultSlots(card) {
+    return card?.slots;
+  }
+
+  function normalizeKey(value, errorCode) {
+    if (typeof value !== "string" || !value.trim()) fail(errorCode);
+    return value.trim();
+  }
+
+  function normalizePlayerKey(value) {
+    return normalizeKey(value, "missing-stable-player-key")
+      .normalize("NFKC")
+      .toLocaleLowerCase("en-US");
+  }
+
+  function stableVersionToken(versionKey) {
+    // FNV-1a over Unicode code points. The token is only accepted after the
+    // complete catalog has been checked for collisions.
+    let hash = 2166136261;
+    for (const character of String(versionKey)) {
+      let codePoint = character.codePointAt(0);
+      do {
+        hash ^= codePoint & 0xff;
+        hash = Math.imul(hash, 16777619);
+        codePoint >>>= 8;
+      } while (codePoint > 0);
+    }
+    return hash >>> 0;
+  }
+
+  function checksum32(bytes, length = bytes.length) {
+    let hash = 2166136261;
+    for (let index = 0; index < length; index += 1) {
+      hash ^= bytes[index];
+      hash = Math.imul(hash, 16777619);
+    }
+    return hash >>> 0;
+  }
+
+  function writeUint32(bytes, offset, value) {
+    const number = Number(value) >>> 0;
+    bytes[offset] = number >>> 24;
+    bytes[offset + 1] = number >>> 16 & 0xff;
+    bytes[offset + 2] = number >>> 8 & 0xff;
+    bytes[offset + 3] = number & 0xff;
+  }
+
+  function readUint32(bytes, offset) {
+    return (
+      bytes[offset] * 0x1000000
+      + (bytes[offset + 1] << 16)
+      + (bytes[offset + 2] << 8)
+      + bytes[offset + 3]
+    ) >>> 0;
+  }
+
+  function encodeBase64Url(bytes) {
+    let binary = "";
+    for (let index = 0; index < bytes.length; index += 0x8000) {
+      binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000));
+    }
+    return btoa(binary)
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/g, "");
+  }
+
+  function decodeBase64Url(encoded) {
+    const input = String(encoded || "");
+    if (!input || !/^[A-Za-z0-9_-]+$/.test(input)) fail("invalid-short-code-encoding");
+    const normalized = input.replace(/-/g, "+").replace(/_/g, "/");
+    let binary;
+    try {
+      binary = atob(normalized + "=".repeat((4 - normalized.length % 4) % 4));
+    } catch {
+      fail("invalid-short-code-encoding");
+    }
+    const bytes = Uint8Array.from(binary, character => character.charCodeAt(0));
+    if (encodeBase64Url(bytes) !== input) fail("non-canonical-short-code");
+    return bytes;
+  }
+
+  function prepareCatalog({
+    catalog,
+    getVersionKey,
+    getPlayerKey,
+    getSlots,
+    tokenForKey
+  }) {
+    if (!Array.isArray(catalog)) fail("catalog-must-be-an-array");
+    const byVersionKey = new Map();
+    const byToken = new Map();
+    const records = [];
+
+    for (const card of catalog) {
+      const versionKey = normalizeKey(getVersionKey(card), "missing-card-version-key");
+      const playerKey = normalizePlayerKey(getPlayerKey(card));
+      const slots = getSlots(card);
+      if (!Array.isArray(slots) || slots.some(slot => !Number.isInteger(slot) || slot < 1 || slot > 5)) {
+        fail("invalid-card-position-slots", { versionKey });
+      }
+      if (byVersionKey.has(versionKey)) fail("duplicate-catalog-version-key", { versionKey });
+      const token = Number(tokenForKey(versionKey));
+      if (!Number.isInteger(token) || token < 0 || token > 0xffffffff) {
+        fail("invalid-version-token", { versionKey });
+      }
+      const unsignedToken = token >>> 0;
+      const existing = byToken.get(unsignedToken);
+      if (existing && existing.versionKey !== versionKey) {
+        fail("catalog-version-token-collision", {
+          token: unsignedToken,
+          versionKeys: [existing.versionKey, versionKey]
+        });
+      }
+      const record = Object.freeze({
+        card,
+        versionKey,
+        playerKey,
+        slots: Object.freeze([...slots]),
+        token: unsignedToken
+      });
+      byVersionKey.set(versionKey, record);
+      byToken.set(unsignedToken, record);
+      records.push(record);
+    }
+
+    return {
+      records: Object.freeze(records),
+      byVersionKey,
+      byToken
+    };
+  }
+
+  function validateAndResolveLineup(lineup, catalogState, getVersionKey) {
+    if (!Array.isArray(lineup) || lineup.length !== LINEUP_SIZE || lineup.some(card => !card)) {
+      fail("lineup-must-have-five-cards");
+    }
+    const resolved = lineup.map((card, index) => {
+      const versionKey = normalizeKey(getVersionKey(card), "missing-card-version-key");
+      const record = catalogState.byVersionKey.get(versionKey);
+      if (!record) fail("unknown-card-version", { versionKey });
+      if (!record.slots.includes(index + 1)) {
+        fail("ineligible-fixed-position", { versionKey, position: index + 1 });
+      }
+      return record;
+    });
+    if (new Set(resolved.map(record => record.versionKey)).size !== LINEUP_SIZE) {
+      fail("duplicate-card-version");
+    }
+    if (new Set(resolved.map(record => record.playerKey)).size !== LINEUP_SIZE) {
+      fail("duplicate-player-identity");
+    }
+    return resolved;
+  }
+
+  function createBattleLineupCodeCodec(options = {}) {
+    const getVersionKey = options.getVersionKey || defaultVersionKey;
+    const getPlayerKey = options.getPlayerKey || defaultPlayerKey;
+    const getSlots = options.getSlots || defaultSlots;
+    const tokenForKey = options.tokenForKey || stableVersionToken;
+    const legacyDecoder = options.legacyDecoder;
+    const catalogState = prepareCatalog({
+      catalog: options.catalog,
+      getVersionKey,
+      getPlayerKey,
+      getSlots,
+      tokenForKey
+    });
+
+    function validate(lineup) {
+      return validateAndResolveLineup(lineup, catalogState, getVersionKey)
+        .map(record => record.card);
+    }
+
+    function encode(lineup) {
+      const records = validateAndResolveLineup(lineup, catalogState, getVersionKey);
+      const bytes = new Uint8Array(ENCODED_BYTES);
+      bytes[0] = FORMAT_VERSION;
+      records.forEach((record, index) => {
+        writeUint32(bytes, 1 + index * TOKEN_BYTES, record.token);
+      });
+      writeUint32(bytes, PAYLOAD_BYTES, checksum32(bytes, PAYLOAD_BYTES));
+      return `${CODE_PREFIX}${encodeBase64Url(bytes)}`;
+    }
+
+    function decodeShort(input) {
+      const encoded = input.slice(CODE_PREFIX.length);
+      const bytes = decodeBase64Url(encoded);
+      if (bytes.length !== ENCODED_BYTES) fail("invalid-short-code-length");
+      if (bytes[0] !== FORMAT_VERSION) fail("unsupported-short-code-version");
+      const expectedChecksum = readUint32(bytes, PAYLOAD_BYTES);
+      if (checksum32(bytes, PAYLOAD_BYTES) !== expectedChecksum) fail("damaged-code");
+      const records = [];
+      for (let index = 0; index < LINEUP_SIZE; index += 1) {
+        const token = readUint32(bytes, 1 + index * TOKEN_BYTES);
+        const record = catalogState.byToken.get(token);
+        if (!record) fail("unknown-card-version-token", { token, position: index + 1 });
+        records.push(record);
+      }
+      return validateAndResolveLineup(
+        records.map(record => record.card),
+        catalogState,
+        getVersionKey
+      ).map(record => record.card);
+    }
+
+    function decode(code) {
+      const input = String(code || "").trim();
+      if (!input.startsWith(CODE_FAMILY_PREFIX) || input.length > MAX_INPUT_LENGTH) {
+        fail("invalid-code-prefix-or-length");
+      }
+      if (input.startsWith(CODE_PREFIX)) return decodeShort(input);
+      if (/^NBA5-S\d+-/.test(input)) fail("unsupported-short-code-version");
+      if (typeof legacyDecoder !== "function") fail("legacy-code-decoder-required");
+      let legacyLineup;
+      try {
+        legacyLineup = legacyDecoder(input, catalogState.records.map(record => record.card));
+      } catch (error) {
+        if (error instanceof BattleLineupCodeError) throw error;
+        fail("legacy-code-decode-failed", { cause: String(error?.message || error) });
+      }
+      return validate(legacyLineup);
+    }
+
+    return Object.freeze({
+      encode,
+      decode,
+      validate,
+      catalogSize: catalogState.records.length,
+      formatVersion: FORMAT_VERSION,
+      prefix: CODE_PREFIX
+    });
+  }
+
+  const api = Object.freeze({
+    schemaVersion: SCHEMA_VERSION,
+    prefix: CODE_PREFIX,
+    formatVersion: FORMAT_VERSION,
+    createBattleLineupCodeCodec,
+    stableVersionToken,
+    BattleLineupCodeError
+  });
+
+  globalScope.H5BattleLineupCodeCandidate = api;
+  if (typeof module !== "undefined" && module.exports) module.exports = api;
+})(typeof globalThis !== "undefined" ? globalThis : window);
+(function installH5BattleStructureCandidate(globalScope) {
+  "use strict";
+
+  const SCHEMA_VERSION = "battle-structure-candidate-1.0.0";
+  const RESULT_EFFECT = "explanationOnly";
+  const BOX_STAT_KEYS = Object.freeze([
+    "pts", "reb", "ast", "stl", "blk", "tov",
+    "fgm", "fga", "threePm", "threePa", "ftm", "fta"
+  ]);
+
+  function clamp(value, minimum, maximum) {
+    return Math.max(minimum, Math.min(maximum, Number(value) || 0));
+  }
+
+  function round(value, digits = 1) {
+    const scale = 10 ** digits;
+    return Math.round((Number(value) || 0) * scale) / scale;
+  }
+
+  function localize(locale, chinese, english) {
+    return String(locale || "zh-CN").toLowerCase().startsWith("en") ? english : chinese;
+  }
+
+  function cardKey(card) {
+    return String(card?.v34?.cardId || card?.eventProfile?.versionKey || card?.cardId
+      || card?.versionKey || `${card?.name || "unknown"}|${card?.version || "unknown"}`);
+  }
+
+  function cardName(card, locale) {
+    if (!card) return localize(locale, "未知球员", "Unknown player");
+    return localize(locale, card.displayName || card.name, card.name || card.displayName);
+  }
+
+  function numberAt(object, path, fallback = null) {
+    let value = object;
+    for (const key of path) value = value?.[key];
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : fallback;
+  }
+
+  function cardMetric(card, dimension, fallbackKey, fallback = null) {
+    const dimensionValue = numberAt(card, ["v34", "dimensions", dimension]);
+    if (Number.isFinite(dimensionValue)) return dimensionValue;
+    const direct = Number(card?.[fallbackKey]);
+    return Number.isFinite(direct) ? direct : fallback;
+  }
+
+  function boxForTeam(game, teamId) {
+    if (game?.teamABox?.teamId === teamId) return game.teamABox;
+    if (game?.teamBBox?.teamId === teamId) return game.teamBBox;
+    return null;
+  }
+
+  function opposingBox(game, teamId) {
+    if (game?.teamABox?.teamId === teamId) return game.teamBBox || null;
+    if (game?.teamBBox?.teamId === teamId) return game.teamABox || null;
+    return null;
+  }
+
+  function emptyTotals() {
+    return {
+      pts: 0, reb: 0, ast: 0, stl: 0, blk: 0, tov: 0,
+      fgm: 0, fga: 0, threePm: 0, threePa: 0, ftm: 0, fta: 0
+    };
+  }
+
+  function addTotals(target, source) {
+    for (const key of BOX_STAT_KEYS) target[key] += Number(source?.[key] || 0);
+  }
+
+  function aggregateBattleTeam({ series, team }) {
+    const games = Array.isArray(series?.games) ? series.games : [];
+    const lineup = Array.isArray(team?.lineup) ? team.lineup : [];
+    const cardsByKey = new Map(lineup.map(card => [cardKey(card), card]));
+    const playersByKey = new Map();
+    const totals = emptyTotals();
+    const opponentTotals = emptyTotals();
+    let coreScoringPoints = 0;
+    let opponentCoreScoringPoints = 0;
+    let boxesFound = 0;
+
+    for (const game of games) {
+      const box = boxForTeam(game, team?.id);
+      const opponentBox = opposingBox(game, team?.id);
+      if (!box) continue;
+      boxesFound += 1;
+      addTotals(totals, box.totals);
+      addTotals(opponentTotals, opponentBox?.totals);
+      coreScoringPoints += (box.players || []).reduce((sum, line) => sum + Number(line?.pts || 0), 0);
+      opponentCoreScoringPoints += (opponentBox?.players || []).reduce((sum, line) => sum + Number(line?.pts || 0), 0);
+      for (const line of box.players || []) {
+        const key = String(line.cardKey || "");
+        if (!key) continue;
+        if (!playersByKey.has(key)) {
+          playersByKey.set(key, {
+            cardKey: key,
+            card: cardsByKey.get(key) || null,
+            games: 0,
+            ...emptyTotals(),
+            minutes: 0
+          });
+        }
+        const aggregate = playersByKey.get(key);
+        aggregate.games += 1;
+        aggregate.minutes += Number(line.minutes || 0);
+        addTotals(aggregate, line);
+      }
+    }
+
+    const players = Array.from(playersByKey.values(), player => {
+      const gamesPlayed = Math.max(1, player.games);
+      const scoringShare = totals.pts > 0 ? player.pts / totals.pts : 0;
+      return {
+        cardKey: player.cardKey,
+        card: player.card,
+        games: player.games,
+        mpg: round(player.minutes / gamesPlayed),
+        ppg: round(player.pts / gamesPlayed),
+        rpg: round(player.reb / gamesPlayed),
+        apg: round(player.ast / gamesPlayed),
+        spg: round(player.stl / gamesPlayed),
+        bpg: round(player.blk / gamesPlayed),
+        tpg: round(player.tov / gamesPlayed),
+        scoringShare: round(scoringShare, 3),
+        fgPct: player.fga ? round(player.fgm / player.fga * 100) : 0,
+        threePct: player.threePa ? round(player.threePm / player.threePa * 100) : 0,
+        tsPct: player.fga || player.fta
+          ? round(player.pts / (2 * (player.fga + .44 * player.fta)) * 100)
+          : 0,
+        totals: {
+          pts: player.pts, reb: player.reb, ast: player.ast, stl: player.stl,
+          blk: player.blk, tov: player.tov, fgm: player.fgm, fga: player.fga,
+          threePm: player.threePm, threePa: player.threePa,
+          ftm: player.ftm, fta: player.fta
+        }
+      };
+    }).sort((left, right) =>
+      right.ppg - left.ppg
+      || right.apg - left.apg
+      || left.cardKey.localeCompare(right.cardKey));
+
+    const divisor = Math.max(1, boxesFound);
+    const teamTsPct = totals.fga || totals.fta
+      ? coreScoringPoints / (2 * (totals.fga + .44 * totals.fta)) * 100
+      : 0;
+    const opponentTsPct = opponentTotals.fga || opponentTotals.fta
+      ? opponentCoreScoringPoints / (2 * (opponentTotals.fga + .44 * opponentTotals.fta)) * 100
+      : 0;
+    return {
+      teamId: team?.id || null,
+      completeGames: boxesFound,
+      hasCompleteBoxScores: boxesFound === games.length && boxesFound > 0,
+      players,
+      totals,
+      opponentTotals,
+      coreScoringPoints,
+      averages: {
+        pts: round(totals.pts / divisor),
+        reb: round(totals.reb / divisor),
+        ast: round(totals.ast / divisor),
+        stl: round(totals.stl / divisor),
+        blk: round(totals.blk / divisor),
+        tov: round(totals.tov / divisor),
+        threePm: round(totals.threePm / divisor),
+        threePa: round(totals.threePa / divisor),
+        ftm: round(totals.ftm / divisor),
+        fta: round(totals.fta / divisor),
+        fgPct: totals.fga ? round(totals.fgm / totals.fga * 100) : 0,
+        threePct: totals.threePa ? round(totals.threePm / totals.threePa * 100) : 0,
+        tsPct: round(teamTsPct),
+        astTov: round(totals.ast / Math.max(1, totals.tov), 2),
+        opponentPts: round(opponentTotals.pts / divisor),
+        opponentReb: round(opponentTotals.reb / divisor),
+        opponentTov: round(opponentTotals.tov / divisor),
+        opponentFgPct: opponentTotals.fga ? round(opponentTotals.fgm / opponentTotals.fga * 100) : 0,
+        opponentTsPct: round(opponentTsPct)
+      }
+    };
+  }
+
+  function evidence(metric, value, comparison = null) {
+    return { metric, value, comparison };
+  }
+
+  function buildLabel({ id, locale, zh, en, zhDetail, enDetail, confidence, evidenceItems }) {
+    return {
+      id,
+      label: localize(locale, zh, en),
+      detail: localize(locale, zhDetail, enDetail),
+      confidence,
+      evidence: evidenceItems
+    };
+  }
+
+  function identifyOffenseStructures(summary, opponentSummary, locale, wonSeries) {
+    if (!summary?.hasCompleteBoxScores || !summary.players.length) {
+      return { primary: null, secondary: [], warnings: ["incomplete-box-scores"] };
+    }
+    const players = summary.players;
+    const top = players[0] || {};
+    const second = players[1] || {};
+    const third = players[2] || {};
+    const fourth = players[3] || {};
+    const topShare = Number(top.scoringShare || 0);
+    const secondShare = Number(second.scoringShare || 0);
+    const thirdShare = Number(third.scoringShare || 0);
+    const fourthShare = Number(fourth.scoringShare || 0);
+    const labels = [];
+
+    if ((topShare >= .32 && topShare - secondShare >= .09)
+      || (top.ppg >= 30 && top.ppg - second.ppg >= 9)) {
+      labels.push(buildLabel({
+        id: "single_core",
+        locale,
+        zh: "单核苦撑",
+        en: "Solo-star load",
+        zhDetail: `${cardName(top.card, locale)}承担了全队${round(topShare * 100)}%的得分，第二得分点落后${round(top.ppg - second.ppg)}分。`,
+        enDetail: `${cardName(top.card, locale)} supplied ${round(topShare * 100)}% of the team's scoring and outscored the second option by ${round(top.ppg - second.ppg)} points per game.`,
+        confidence: "high",
+        evidenceItems: [
+          evidence("leaderScoringShare", round(topShare * 100), "%"),
+          evidence("leaderPpg", top.ppg, "PPG"),
+          evidence("secondScorerPpg", second.ppg, "PPG")
+        ]
+      }));
+    } else if (topShare + secondShare >= .52 && secondShare >= .20
+      && secondShare - thirdShare >= .045) {
+      labels.push(buildLabel({
+        id: "dual_core",
+        locale,
+        zh: "双核驱动",
+        en: "Two-star engine",
+        zhDetail: `${cardName(top.card, locale)}与${cardName(second.card, locale)}合计承担全队${round((topShare + secondShare) * 100)}%的得分。`,
+        enDetail: `${cardName(top.card, locale)} and ${cardName(second.card, locale)} combined for ${round((topShare + secondShare) * 100)}% of the team's scoring.`,
+        confidence: "high",
+        evidenceItems: [
+          evidence("topTwoScoringShare", round((topShare + secondShare) * 100), "%"),
+          evidence("firstPpg", top.ppg, "PPG"),
+          evidence("secondPpg", second.ppg, "PPG")
+        ]
+      }));
+    } else if ((topShare <= .30 && thirdShare >= .155)
+      || (topShare <= .32 && fourthShare >= .12)) {
+      labels.push(buildLabel({
+        id: "balanced_scoring",
+        locale,
+        zh: "多点开花",
+        en: "Balanced scoring",
+        zhDetail: `前三得分点场均分别为${top.ppg}、${second.ppg}和${third.ppg}分，进攻没有被单一球员垄断。`,
+        enDetail: `The top three scorers averaged ${top.ppg}, ${second.ppg}, and ${third.ppg} points, keeping the offense distributed.`,
+        confidence: "high",
+        evidenceItems: [
+          evidence("leaderScoringShare", round(topShare * 100), "%"),
+          evidence("thirdScoringShare", round(thirdShare * 100), "%"),
+          evidence("fourthScoringShare", round(fourthShare * 100), "%")
+        ]
+      }));
+    }
+
+    const averages = summary.averages;
+    const threePointRate = summary.totals.fga
+      ? summary.totals.threePa / summary.totals.fga
+      : 0;
+    if (averages.threePm >= 11 && threePointRate >= .34 && averages.threePct >= 34) {
+      labels.push(buildLabel({
+        id: "spacing_shooting",
+        locale,
+        zh: "空间投射",
+        en: "Spacing and shooting",
+        zhDetail: `球队场均命中${averages.threePm}记三分，三分出手占全部投篮的${round(threePointRate * 100)}%。`,
+        enDetail: `The team made ${averages.threePm} threes per game, with threes accounting for ${round(threePointRate * 100)}% of all field-goal attempts.`,
+        confidence: "high",
+        evidenceItems: [
+          evidence("threePointersMadePerGame", averages.threePm),
+          evidence("threePointAttemptRate", round(threePointRate * 100), "%"),
+          evidence("threePointPercentage", averages.threePct, "%")
+        ]
+      }));
+    }
+
+    const reboundMargin = averages.reb - Number(opponentSummary?.averages?.reb || 0);
+    if (summary.completeGames > 0 && reboundMargin >= 4
+      && (averages.threePm <= 9 || threePointRate <= .29)) {
+      labels.push(buildLabel({
+        id: "interior_rebounding",
+        locale,
+        zh: "禁区/篮板",
+        en: "Interior and rebounding",
+        zhDetail: `球队场均篮板领先${round(reboundMargin)}个，在外线出手不多的情况下靠篮板和内线占住优势。`,
+        enDetail: `The team won the glass by ${round(reboundMargin)} rebounds per game and leaned on rebounding and interior play while taking fewer perimeter shots.`,
+        confidence: "medium",
+        evidenceItems: [
+          evidence("reboundMarginPerGame", round(reboundMargin)),
+          evidence("threePointersMadePerGame", averages.threePm),
+          evidence("threePointAttemptRate", round(threePointRate * 100), "%")
+        ]
+      }));
+    }
+
+    const turnoverMargin = Number(opponentSummary?.averages?.tov || 0) - averages.tov;
+    if ((averages.tov <= 12 && averages.astTov >= 2.1) || turnoverMargin >= 3) {
+      labels.push(buildLabel({
+        id: "turnover_control",
+        locale,
+        zh: "失误控制",
+        en: "Turnover control",
+        zhDetail: `球队场均${averages.ast}次助攻、${averages.tov}次失误，助攻失误比为${averages.astTov}。`,
+        enDetail: `The team averaged ${averages.ast} assists and ${averages.tov} turnovers, an assist-to-turnover ratio of ${averages.astTov}.`,
+        confidence: "high",
+        evidenceItems: [
+          evidence("turnoversPerGame", averages.tov),
+          evidence("assistTurnoverRatio", averages.astTov),
+          evidence("turnoverMarginPerGame", round(turnoverMargin))
+        ]
+      }));
+    }
+
+    const hierarchyIds = new Set(["single_core", "dual_core", "balanced_scoring"]);
+    const primary = labels.find(label => hierarchyIds.has(label.id))
+      || labels.find(label => label.id === "spacing_shooting")
+      || labels[0]
+      || null;
+    const secondary = labels.filter(label => label !== primary);
+    return {
+      primary: primary ? { ...primary, outcome: wonSeries ? "won" : "lost" } : null,
+      secondary,
+      warnings: []
+    };
+  }
+
+  function identifyDefensiveRoles(team, locale) {
+    const roles = [];
+    for (const card of team?.lineup || []) {
+      const perimeter = cardMetric(card, "perimeterDefense", null);
+      const helpSwitch = cardMetric(card, "helpSwitchDefense", null);
+      const interior = cardMetric(card, "interiorDefense", null);
+      const rim = cardMetric(card, "rimProtection", null);
+      const role = String(card?.v34?.role || "");
+      const position = String(card?.pos || "");
+      const text = [
+        card?.archetype,
+        card?.v34?.archetype,
+        card?.eventProfile?.positive,
+        ...(card?.tags || [])
+      ].join("|").toLowerCase();
+      const candidates = [];
+
+      if ((perimeter >= 86 && numberAt(card, ["def"], 0) >= 80)
+        || (/pointstopper|perimeterstopper|领防|外线防守/.test(text) && perimeter >= 82)) {
+        candidates.push({
+          type: "perimeter_stopper",
+          score: perimeter,
+          label: localize(locale, "外线铁闸", "Perimeter stopper"),
+          evidence: [
+            evidence("perimeterDefense", perimeter),
+            evidence("baseDefense", numberAt(card, ["def"], null))
+          ]
+        });
+      }
+      if (helpSwitch >= 86 && perimeter >= 82 && interior >= 78
+        && (/wing|forward/.test(role) || /SF|PF/.test(position))) {
+        candidates.push({
+          type: "switch_wing",
+          score: round(helpSwitch * .5 + perimeter * .3 + interior * .2),
+          label: localize(locale, "换防锋线", "Switchable wing"),
+          evidence: [
+            evidence("helpSwitchDefense", helpSwitch),
+            evidence("perimeterDefense", perimeter),
+            evidence("interiorDefense", interior)
+          ]
+        });
+      }
+      const observedBlocks = numberAt(card, ["seasonStats", "bpg"], numberAt(card, ["bpg"], 0));
+      if ((rim >= 87 && interior >= 82) || (observedBlocks >= 2 && rim >= 83)) {
+        candidates.push({
+          type: "rim_protector",
+          score: round(rim * .7 + interior * .3),
+          label: localize(locale, "护框点", "Rim protector"),
+          evidence: [
+            evidence("rimProtection", rim),
+            evidence("interiorDefense", interior),
+            evidence("seasonBlocksPerGame", round(observedBlocks))
+          ]
+        });
+      }
+
+      for (const candidate of candidates) {
+        roles.push({
+          ...candidate,
+          cardKey: cardKey(card),
+          playerName: cardName(card, locale)
+        });
+      }
+    }
+    return roles.sort((left, right) => right.score - left.score
+      || left.cardKey.localeCompare(right.cardKey)
+      || left.type.localeCompare(right.type));
+  }
+
+  function expectedScoringBaseline(card) {
+    return numberAt(card, ["seasonStats", "ppg"], numberAt(card, ["ppg"], null));
+  }
+
+  function roleFitsTarget(role, targetCard) {
+    const position = String(targetCard?.pos || "");
+    const targetRole = String(targetCard?.v34?.role || "");
+    const perimeterTarget = /PG|SG|SF/.test(position) || /guard|wing/.test(targetRole);
+    const interiorTarget = /PF|C/.test(position) || /forward|center/.test(targetRole);
+    if (role.type === "perimeter_stopper") return perimeterTarget;
+    if (role.type === "switch_wing") return perimeterTarget || interiorTarget;
+    if (role.type === "rim_protector") return interiorTarget;
+    return false;
+  }
+
+  function detectSuppressedTargets({ opponentSummary, defensiveRoles, locale }) {
+    if (!opponentSummary?.hasCompleteBoxScores || !defensiveRoles.length) return [];
+    const expectedCores = opponentSummary.players
+      .map(player => ({
+        ...player,
+        baselinePpg: expectedScoringBaseline(player.card)
+      }))
+      .filter(player => Number.isFinite(player.baselinePpg) && player.baselinePpg >= 17)
+      .sort((left, right) => right.baselinePpg - left.baselinePpg)
+      .slice(0, 2);
+    const suppressed = [];
+    for (const target of expectedCores) {
+      const drop = target.baselinePpg - target.ppg;
+      if (drop < 4 || target.ppg > target.baselinePpg * .82) continue;
+      const candidateRoles = defensiveRoles.filter(role => roleFitsTarget(role, target.card)).slice(0, 2);
+      if (!candidateRoles.length) continue;
+      suppressed.push({
+        targetCardKey: target.cardKey,
+        targetName: cardName(target.card, locale),
+        actualPpg: target.ppg,
+        baselinePpg: round(target.baselinePpg),
+        ppgDrop: round(drop),
+        confidence: drop >= 7 ? "high" : "medium",
+        possibleDefenders: candidateRoles.map(role => ({
+          cardKey: role.cardKey,
+          playerName: role.playerName,
+          role: role.type,
+          roleLabel: role.label
+        })),
+        detail: localize(
+          locale,
+          `${cardName(target.card, locale)}系列赛场均只有${target.ppg}分，比这个球员的常规赛场均少了${round(drop)}分。`,
+          `${cardName(target.card, locale)} averaged only ${target.ppg} points in the series, ${round(drop)} below the player's regular-season average.`
+        ),
+        evidence: [
+          evidence("seriesPointsPerGame", target.ppg, "PPG"),
+          evidence("cardRegularSeasonBaseline", round(target.baselinePpg), "PPG"),
+          evidence("difference", round(-drop), "PPG")
+        ]
+      });
+    }
+    return suppressed;
+  }
+
+  function identifyDefenseStructure({ summary, opponentSummary, team, locale }) {
+    const roles = identifyDefensiveRoles(team, locale);
+    const suppressedTargets = detectSuppressedTargets({
+      opponentSummary,
+      defensiveRoles: roles,
+      locale
+    });
+    if (!summary?.hasCompleteBoxScores || !opponentSummary?.hasCompleteBoxScores) {
+      return { primary: null, roles, suppressedTargets: [], warnings: ["incomplete-box-scores"] };
+    }
+
+    const averages = summary.averages;
+    const signals = [];
+    if (averages.opponentPts <= 106) signals.push(evidence("opponentPointsPerGame", averages.opponentPts, "<=106"));
+    if (averages.opponentFgPct > 0 && averages.opponentFgPct <= 44) {
+      signals.push(evidence("opponentFieldGoalPercentage", averages.opponentFgPct, "<=44%"));
+    }
+    if (averages.opponentTsPct > 0 && averages.opponentTsPct <= 54) {
+      signals.push(evidence("opponentTrueShootingPercentage", averages.opponentTsPct, "<=54%"));
+    }
+    if (averages.opponentTov >= 14 && averages.opponentTov - averages.tov >= 2) {
+      signals.push(evidence("opponentTurnoversPerGame", averages.opponentTov, ">=14"));
+    }
+    const distinctRoleTypes = new Set(roles.map(role => role.type));
+    const roleCoverage = distinctRoleTypes.size >= 2;
+    const qualifies = signals.length >= 2 && (roleCoverage || suppressedTargets.length > 0);
+    const primary = qualifies
+      ? buildLabel({
+        id: "defensive_shell",
+        locale,
+        zh: "防守铁桶",
+        en: "Defensive shell",
+        zhDetail: suppressedTargets.length
+          ? `球队在本轮同时覆盖了${[...distinctRoleTypes].length}类防守职责，并压低了${suppressedTargets[0].targetName}的核心产量。`
+          : `球队在本轮同时覆盖了${[...distinctRoleTypes].length}类防守职责，且至少两项实际防守结果达到门槛。`,
+        enDetail: suppressedTargets.length
+          ? `The lineup covered ${distinctRoleTypes.size} defensive roles and reduced ${suppressedTargets[0].targetName}'s primary scoring output.`
+          : `The lineup covered ${distinctRoleTypes.size} defensive roles and cleared at least two outcome-based defensive thresholds.`,
+        confidence: signals.length >= 3 ? "high" : "medium",
+        evidenceItems: [
+          ...signals,
+          evidence("defensiveRoleCoverage", [...distinctRoleTypes].sort())
+        ]
+      })
+      : null;
+    return { primary, roles, suppressedTargets, warnings: [] };
+  }
+
+  function analyzeTeamStructure({ series, team, opponent, locale = "zh-CN" }) {
+    const summary = aggregateBattleTeam({ series, team });
+    const opponentSummary = aggregateBattleTeam({ series, team: opponent });
+    const wonSeries = series?.winnerId === team?.id;
+    const offense = identifyOffenseStructures(summary, opponentSummary, locale, wonSeries);
+    const defense = identifyDefenseStructure({
+      summary,
+      opponentSummary,
+      team,
+      locale
+    });
+    const labels = [
+      ...(offense.primary ? [offense.primary] : []),
+      ...offense.secondary,
+      ...(defense.primary ? [defense.primary] : [])
+    ];
+    return {
+      teamId: team?.id || null,
+      outcome: wonSeries ? "won" : "lost",
+      resultEffect: RESULT_EFFECT,
+      summary,
+      offense,
+      defense,
+      labels,
+      warnings: [...new Set([...offense.warnings, ...defense.warnings])]
+    };
+  }
+
+  function analyzeBattleStructures({ series, teamA, teamB, locale = "zh-CN" }) {
+    if (!series || !teamA || !teamB) throw new Error("battle-structure-invalid-input");
+    if (teamA.id === teamB.id) throw new Error("battle-structure-duplicate-team-id");
+    const teams = [
+      analyzeTeamStructure({ series, team: teamA, opponent: teamB, locale }),
+      analyzeTeamStructure({ series, team: teamB, opponent: teamA, locale })
+    ];
+    return {
+      schemaVersion: SCHEMA_VERSION,
+      resultEffect: RESULT_EFFECT,
+      seriesWinnerId: series.winnerId || null,
+      locale,
+      teams
+    };
+  }
+
+  function validateBattleStructure(analysis, { series, teamA, teamB }) {
+    const errors = [];
+    if (analysis?.resultEffect !== RESULT_EFFECT) errors.push("structure-must-be-explanation-only");
+    if (analysis?.seriesWinnerId !== series?.winnerId) errors.push("winner-id-mismatch");
+    const expectedTeams = new Set([teamA?.id, teamB?.id]);
+    const analyzedTeams = new Set((analysis?.teams || []).map(team => team.teamId));
+    if (expectedTeams.size !== analyzedTeams.size
+      || [...expectedTeams].some(id => !analyzedTeams.has(id))) {
+      errors.push("team-set-mismatch");
+    }
+    const lineupKeys = new Set([...(teamA?.lineup || []), ...(teamB?.lineup || [])].map(cardKey));
+    for (const team of analysis?.teams || []) {
+      for (const role of team?.defense?.roles || []) {
+        if (!lineupKeys.has(role.cardKey)) errors.push(`unknown-role-card:${role.cardKey}`);
+      }
+      for (const target of team?.defense?.suppressedTargets || []) {
+        if (!lineupKeys.has(target.targetCardKey)) errors.push(`unknown-suppressed-card:${target.targetCardKey}`);
+      }
+    }
+    return { ok: errors.length === 0, errors };
+  }
+
+  const api = Object.freeze({
+    schemaVersion: SCHEMA_VERSION,
+    resultEffect: RESULT_EFFECT,
+    analyzeBattleStructures,
+    analyzeTeamStructure,
+    aggregateBattleTeam,
+    identifyOffenseStructures,
+    identifyDefensiveRoles,
+    identifyDefenseStructure,
+    detectSuppressedTargets,
+    validateBattleStructure
+  });
+
+  globalScope.H5BattleStructureCandidate = api;
+  if (typeof module !== "undefined" && module.exports) module.exports = api;
+})(typeof globalThis !== "undefined" ? globalThis : window);
 (function installH5BattleNarrativeCandidate(globalScope) {
   "use strict";
 
@@ -19824,12 +20702,12 @@ function renderV6Timeline(timeline = []) {
         zh: {
           openings: ["球权控制的核心是", "胜方把组织优势交给了", "助攻与失误的差别由", "本场进攻秩序最清楚地体现在"],
           actions: ["在传球和失误之间保持更好的平衡", "让球队以更低代价完成进攻发起", "把更多回合送到可靠的终结点", "减少了会直接送给对手的转换机会"],
-          consequences: ["有限回合因此没有被轻易浪费", "这让胜方在胶着阶段更稳定", "对手必须用更高难度的方式追分", "球权差最终累积成了比分差"]
+          consequences: ["球队没有白白送掉关键回合", "这让胜方在胶着阶段更稳定", "对手必须用更高难度的方式追分", "球权差最终累积成了比分差"]
         },
         en: {
           openings: ["Possession control centered on", "The winner trusted its organization to", "The assist-turnover difference was driven by", "The clearest sign of offensive order came from"],
           actions: ["balanced creation against turnovers", "initiated offense at a lower cost", "delivered more possessions to reliable finishers", "cut down the transition chances handed to the opponent"],
-          consequences: ["The winner wasted fewer limited possessions", "That stability mattered in a close game", "The opponent had to score through harder possessions", "The possession gap accumulated into the final margin"]
+          consequences: ["The team stopped giving away important possessions", "That stability mattered in a close game", "The opponent had to score through harder possessions", "The possession gap accumulated into the final margin"]
         }
       }
     },
@@ -19862,12 +20740,12 @@ function renderV6Timeline(timeline = []) {
         (b.stl * 2 + b.blk * 1.7 + b.reb * .35) - (a.stl * 2 + a.blk * 1.7 + a.reb * .35))[0],
       fragments: {
         zh: {
-          openings: ["防守端最可验证的结果来自", "胜方没有只靠得分，", "对手进攻被压低时，防守支点是", "本场限制效果集中在"],
+          openings: ["防守端最扎眼的贡献来自", "胜方没有只靠得分，", "对手进攻被压低时，防守支点是", "本场限制效果集中在"],
           actions: ["帮助球队压低了对手整体命中率", "让对手付出了更多失误代价", "通过防守参与维持了回合完整性", "把防守价值转成了对手真实的低效"],
           consequences: ["这项贡献不能只用个人得分衡量", "胜方因此不需要每回合都靠高难度进攻", "对手始终没有建立稳定效率", "防守核心的价值最终反映在对方数据上"]
         },
         en: {
-          openings: ["The clearest verifiable defensive result came through", "The winner did not rely on scoring alone;", "As the opponent's offense fell, the defensive anchor was", "The game's limiting effect centered on"],
+          openings: ["The most visible defensive contribution came through", "The winner did not rely on scoring alone;", "As the opponent's offense fell, the defensive anchor was", "The game's limiting effect centered on"],
           actions: ["helped suppress the opponent's overall shooting", "made the opponent pay a higher turnover cost", "preserved possessions through defensive involvement", "turned defensive value into actual opponent inefficiency"],
           consequences: ["That contribution cannot be measured by points alone", "The winner did not need a difficult shot every possession", "The opponent never established stable efficiency", "The defensive core's value appeared in the opponent's numbers"]
         }
@@ -19877,8 +20755,8 @@ function renderV6Timeline(timeline = []) {
 
   const STAGE_FRAGMENTS = Object.freeze({
     opening: {
-      zh: ["系列赛首战先由胜方建立样本", "第一场给出了双方的第一个明确答案", "系列赛开局先留下了一项可继续观察的差距"],
-      en: ["The opener gave the winner the first sample", "Game 1 supplied the matchup's first clear answer", "The series began with one measurable gap to track"]
+      zh: ["系列赛首战由胜方率先抢到主动", "第一场给出了双方的第一个答案", "系列赛开局已经拉开第一道差距"],
+      en: ["The winner seized the initiative in the opener", "Game 1 supplied the matchup's first clear answer", "The series opened with its first meaningful separation"]
     },
     response: {
       zh: ["上一场的失利没有延续，胜方在本场完成回应", "系列赛走势在这一场发生反转", "落后一方用一场胜利重新打开系列赛"],
@@ -20004,7 +20882,7 @@ function renderV6Timeline(timeline = []) {
     const first = seededPick(STAGE_FRAGMENTS[context][language], `${seed}|stage|${context}`);
     const score = `${evidence.scoreAfter[evidence.winnerId]}-${evidence.scoreAfter[evidence.loserId]}`;
     const text = localize(locale,
-      `${first}；本场结束后，胜方视角的系列赛比分为 ${score}。`,
+      `${first}；本场结束后，系列赛比分来到 ${score}。`,
       `${first}; after the game, the series stood ${score} from the winner's perspective.`);
     return {
       id: `series_stage-${context}-g${evidence.gameNumber}`,
@@ -20089,58 +20967,58 @@ function renderV6Timeline(timeline = []) {
   const TEAM_DYNAMIC_FRAGMENTS = Object.freeze({
     leadership_role_tension: {
       zh: {
-        openings: ["模拟剧情：高标准的队内沟通出现摩擦", "模拟剧情：球队在失利后重新讨论核心责任", "模拟剧情：训练强度与角色接受度发生碰撞"],
-        actions: ["要求全队提高执行标准", "推动录像复盘和防守沟通", "希望重新明确收官分工"],
-        responses: ["则需要适应更直接的沟通方式", "对角色边界给出了自己的回应", "在下一场前与队友重新确认职责"],
-        consequences: ["这只是基于性格字段生成的虚构球队剧情，不对应真实冲突", "该内容不代表现实人物关系，只用于本次模拟的系列赛氛围", "故事不会改变比分、球员数据或后续比赛结果"]
+        openings: ["训练场上出现了正面交锋", "输球后的录像课火药味很重", "球队重新讨论谁该承担最难的责任"],
+        actions: ["当面批评了队友的防守投入", "要求全队提高执行标准", "把收官阶段的问题直接摆上桌面"],
+        responses: ["接受了批评，并在下一场主动接下最难对位", "没有回避问题，随后重新确认自己的职责", "用更直接的沟通回应了队友的要求"],
+        consequences: ["这次碰撞反而让球队的分工更清楚", "更衣室没有冷处理，下一场的执行明显统一", "双方把争论落到了真实的比赛任务上"]
       },
       en: {
-        openings: ["Simulated storyline: high internal standards created friction", "Simulated storyline: the team revisited core responsibilities after a loss", "Simulated storyline: practice demands collided with role acceptance"],
-        actions: ["asked the team to raise its execution standard", "pushed a sharper film review and defensive dialogue", "wanted the closing roles clarified"],
-        responses: ["had to adapt to a more direct communication style", "responded by defining a clearer role boundary", "reconfirmed responsibilities before the next game"],
-        consequences: ["This is fictional team drama derived from personality fields, not a claim about a real conflict", "It describes only this simulation and not the real relationship between the players", "The storyline does not change scores, player statistics, or later results"]
+        openings: ["Practice produced a direct confrontation", "The film session after a loss became heated", "The team openly revisited who would take the hardest responsibility"],
+        actions: ["challenged a teammate's defensive commitment", "demanded a higher execution standard", "put the closing problems directly on the table"],
+        responses: ["accepted the criticism and took the hardest matchup next game", "did not avoid the issue and clarified the role", "answered the demand with more direct communication"],
+        consequences: ["The confrontation left the team's roles clearer", "The room addressed it directly and the next game's execution was more unified", "The argument ended in concrete basketball assignments"]
       }
     },
     coach_role_friction: {
       zh: {
-        openings: ["模拟剧情：教练组与球员对轮换职责出现分歧", "模拟剧情：一次失利引发了关于收官角色的讨论", "模拟剧情：球队重新划定临场决策边界"],
-        actions: ["希望保留更多自主处理空间", "对轮换安排提出不同意见", "要求在关键回合获得更明确的职责"],
-        responses: ["教练组用录像会议重新解释方案", "双方把分歧限制在战术层面", "球队在下一场前完成了角色确认"],
-        consequences: ["这是明确标注的虚构教练剧情，不对应现实冲突", "该剧情不涉及未经证实的严重场外指控", "故事只用于解释系列赛氛围，不改变模拟结果"]
+        openings: ["教练组和球员对收官阵容意见不一", "一次提前换人引发了战术争论", "赛后会议直接谈到了临场决策权"],
+        actions: ["争取了更多自主处理空间", "对轮换安排提出了不同意见", "要求在关键回合获得更明确的职责"],
+        responses: ["教练组用录像逐回合回应", "双方把争论留在战术层面", "球队在下一场前重新确认了收官顺序"],
+        consequences: ["下一场的换人和球权顺序因此更明确", "分歧没有被掩盖，反而形成了新的临场方案", "教练组最终给出了清楚的执行答案"]
       },
       en: {
-        openings: ["Simulated storyline: the coaching staff and a player disagreed over rotation duties", "Simulated storyline: a loss triggered a discussion about closing roles", "Simulated storyline: the team redrew its in-game decision boundaries"],
+        openings: ["The staff and a player disagreed over the closing lineup", "An early substitution triggered a tactical argument", "The postgame meeting directly addressed in-game authority"],
         actions: ["wanted more freedom to make reads", "offered a different view of the rotation", "asked for a clearer late-game responsibility"],
         responses: ["the staff used film review to explain the plan", "both sides kept the disagreement tactical", "the team clarified roles before the next game"],
-        consequences: ["This is explicitly fictional coaching drama and not a claim about a real conflict", "It contains no unsupported serious off-court allegation", "The story explains series atmosphere only and does not alter the simulation"]
+        consequences: ["The next game's substitution and possession order became clearer", "The disagreement produced a new in-game plan", "The staff finished with a concrete execution answer"]
       }
     },
     discipline_tension: {
       zh: {
-        openings: ["模拟剧情：比赛情绪让队内纪律承受压力", "模拟剧情：高强度对抗后球队强调情绪控制", "模拟剧情：教练组要求避免无谓的技术犯规风险"],
-        actions: ["在暂停期间被提醒保持专注", "接受了更明确的场上行为边界", "与队友重新确认了冲突后的处理方式"],
-        responses: ["球队把问题限制在比赛纪律范围", "后续沟通只围绕场上执行展开", "教练组没有让情绪问题扩大"],
-        consequences: ["这是虚构的模拟剧情，不声称现实中发生过任何违规行为", "该内容不生成未经证实的严重场外指控", "纪律剧情不会反向修改任何比赛结果"]
+        openings: ["比赛情绪一度压过了执行", "连续对抗让球队开始担心无谓犯规", "暂停期间，教练组先处理了场上情绪"],
+        actions: ["被当面提醒别再分散注意力", "接受了更明确的场上行为边界", "和队友重新约定了冲突后的处理方式"],
+        responses: ["球队随后把注意力拉回对位", "下一场的沟通明显更克制", "教练组及时把问题停在比赛层面"],
+        consequences: ["情绪没有继续吞掉关键回合", "球队避免了让同一问题连续出现", "纪律要求最终变成了更稳定的场上执行"]
       },
       en: {
-        openings: ["Simulated storyline: game emotion put pressure on team discipline", "Simulated storyline: the team emphasized emotional control after a physical game", "Simulated storyline: the staff wanted to avoid unnecessary technical-foul risk"],
+        openings: ["Game emotion briefly overtook execution", "Repeated physical play raised concern about unnecessary fouls", "The staff addressed on-court emotion during the timeout"],
         actions: ["was reminded to stay focused during a timeout", "accepted a clearer boundary for on-court conduct", "reconfirmed how the team would handle confrontation"],
         responses: ["the team kept the issue within basketball discipline", "the follow-up stayed focused on execution", "the staff prevented the emotion from expanding"],
-        consequences: ["This fictional storyline does not claim any real misconduct", "It generates no unsupported serious off-court allegation", "The discipline story never changes a game result"]
+        consequences: ["Emotion stopped consuming important possessions", "The team prevented the same issue from carrying into another game", "The discipline demand became steadier execution"]
       }
     },
     media_pressure: {
       zh: {
-        openings: ["模拟剧情：外界讨论放大了系列赛压力", "模拟剧情：连续赛果让赛后采访变得更尖锐", "模拟剧情：球队需要处理不断升高的舆论关注"],
-        actions: ["在采访中把焦点重新带回比赛", "避免公开讨论队内角色争议", "要求全队只回应可验证的场上问题"],
+        openings: ["外界讨论放大了系列赛压力", "连续赛果让赛后采访变得更尖锐", "球队开始面对不断升高的舆论关注"],
+        actions: ["在采访中把焦点重新带回比赛", "避免公开讨论队内角色争议", "要求全队只谈场上表现"],
         responses: ["队友随后用统一口径回应", "球队没有让外界讨论进入战术会议", "教练组把注意力留在下一场准备"],
-        consequences: ["这是虚构媒体剧情，不代表现实言论或真实争议", "该故事不生成严重无证据丑闻", "它只丰富展示，不会影响模拟状态"]
+        consequences: ["球队没有让采访成为新的比赛负担", "更衣室把话题重新拉回下一场", "外界压力最终没有打乱备战节奏"]
       },
       en: {
-        openings: ["Simulated storyline: outside discussion amplified the series pressure", "Simulated storyline: consecutive results sharpened the postgame questions", "Simulated storyline: the team had to manage rising public attention"],
-        actions: ["redirected the interview toward basketball", "avoided publicly debating internal roles", "asked the team to answer only verifiable on-court questions"],
+        openings: ["Outside discussion amplified the series pressure", "Consecutive results sharpened the postgame questions", "The team faced rising public attention"],
+        actions: ["redirected the interview toward basketball", "avoided publicly debating internal roles", "asked the team to focus only on its play"],
         responses: ["teammates then used a consistent message", "the team kept outside discussion out of tactical meetings", "the staff kept its focus on the next game"],
-        consequences: ["This is fictional media drama and not a claim about real comments or controversy", "It creates no unsupported serious scandal", "It enriches presentation only and does not affect simulation state"]
+        consequences: ["The team kept interviews from becoming another competitive burden", "The room redirected attention to the next game", "Outside pressure did not disrupt preparation"]
       }
     }
   });
@@ -20212,8 +21090,10 @@ function renderV6Timeline(timeline = []) {
       && playerKeys.has(String(event.stablePlayerKey)));
   }
 
-  function selectRepresentativeEvent(gameNarratives) {
-    const scored = (gameNarratives || []).flatMap(game => (game.beats || []).map(beat => {
+  function selectRepresentativeEvent(gameNarratives, { teamId = null } = {}) {
+    const scored = (gameNarratives || []).flatMap(game => (game.beats || [])
+      .filter(beat => !teamId || beat.teamId === teamId)
+      .map(beat => {
       const base = beat.family === "signature_deep_three" ? 100
         : beat.layer === "gameEvidence" ? 60
           : beat.continuity === "game7" || beat.continuity === "closeout" ? 45 : 20;
@@ -20222,6 +21102,261 @@ function renderV6Timeline(timeline = []) {
       return { beat, score: base + numericWeight + Number(game.gameNumber || 0) * .01 };
     })).sort((left, right) => right.score - left.score || left.beat.id.localeCompare(right.beat.id));
     return scored[0]?.beat || null;
+  }
+
+  function battleNarrativeDisclaimer(locale) {
+    return localize(locale,
+      "纯属虚构：球队关系、教练分歧、纪律与媒体段落均为本局模拟剧情；有可靠来源的历史事件会另行标注证据。",
+      "Fictional simulation: team dynamics, coaching friction, discipline and media passages are invented for this matchup. Verified historical events are labeled separately with evidence.");
+  }
+
+  function headlineTeamSummary(series, team, locale) {
+    const games = Array.isArray(series?.games) ? series.games : [];
+    const playerTotals = new Map();
+    const totals = { pts: 0, reb: 0, ast: 0, tov: 0, fgm: 0, fga: 0, threePm: 0, threePa: 0 };
+    const lineup = lineupMap(team);
+    for (const game of games) {
+      const box = game?.teamABox?.teamId === team?.id
+        ? game.teamABox
+        : game?.teamBBox?.teamId === team?.id
+          ? game.teamBBox
+          : team?.id === series?.teamAId ? game?.teamABox : game?.teamBBox;
+      if (!box) continue;
+      for (const key of Object.keys(totals)) totals[key] += Number(box?.totals?.[key] || 0);
+      for (const line of box.players || []) {
+        const current = playerTotals.get(line.cardKey) || { pts: 0, games: 0 };
+        current.pts += Number(line.pts || 0);
+        current.games += 1;
+        playerTotals.set(line.cardKey, current);
+      }
+    }
+    const count = Math.max(1, games.length);
+    const roundOne = value => Math.round(Number(value || 0) * 10) / 10;
+    const players = [...playerTotals.entries()].map(([key, value]) => ({
+      cardKey: key,
+      name: cardName(lineup.get(key), locale),
+      ppg: roundOne(value.pts / Math.max(1, value.games))
+    })).sort((left, right) => right.ppg - left.ppg);
+    return {
+      games: games.length,
+      averages: {
+        pts: roundOne(totals.pts / count),
+        reb: roundOne(totals.reb / count),
+        ast: roundOne(totals.ast / count),
+        tov: roundOne(totals.tov / count),
+        threePm: roundOne(totals.threePm / count),
+        fgPct: totals.fga ? roundOne(totals.fgm / totals.fga * 100) : 0,
+        threePct: totals.threePa ? roundOne(totals.threePm / totals.threePa * 100) : 0
+      },
+      players
+    };
+  }
+
+  function buildSeriesHeadline({ series, teamA, teamB, narrative, locale = "zh-CN" }) {
+    if (!series || !teamA || !teamB) throw new Error("battle-headline-invalid-series-input");
+    const winner = teamById(teamA, teamB, series.winnerId);
+    const loser = teamById(teamA, teamB, opponentId(teamA, teamB, series.winnerId));
+    const representative = narrative?.representativeEvent
+      && narrative.representativeEvent.teamId === series.winnerId
+      ? narrative.representativeEvent
+      : selectRepresentativeEvent(narrative?.games || [], { teamId: series.winnerId });
+    const teamName = team => {
+      const raw = String(team?.displayName || team?.name || "").trim();
+      if (raw && !/NBA5/i.test(raw)) return raw;
+      return localize(locale,
+        team?.id === teamA.id ? "你的阵容" : "对手",
+        team?.id === teamA.id ? "your lineup" : "the opponent");
+    };
+    const winnerName = teamName(winner);
+    const loserName = teamName(loser);
+    const scoreA = Number(series.scoreA || 0);
+    const scoreB = Number(series.scoreB || 0);
+    const winnerScore = series.winnerId === teamA.id ? scoreA : scoreB;
+    const loserScore = series.winnerId === teamA.id ? scoreB : scoreA;
+    const winnerSummary = headlineTeamSummary(series, winner, locale);
+    const loserSummary = headlineTeamSummary(series, loser, locale);
+    const threeEdge = winnerSummary.averages.threePm - loserSummary.averages.threePm;
+    const reboundEdge = winnerSummary.averages.reb - loserSummary.averages.reb;
+    const turnoverEdge = loserSummary.averages.tov - winnerSummary.averages.tov;
+    const first = winnerSummary.players[0];
+    const second = winnerSummary.players[1];
+    const third = winnerSummary.players[2];
+    const topScoringGap = first && second ? first.ppg - second.ppg : 0;
+    const topTwoPoints = first && second ? Math.round((first.ppg + second.ppg) * 10) / 10 : 0;
+    const doubleDigitScorers = winnerSummary.players.filter(player => player.ppg >= 10).length;
+    const powerGap = Number(winner?.power || 0) - Number(loser?.power || 0);
+    const actorCard = representative?.actorCardKey ? lineupMap(winner).get(representative.actorCardKey) : null;
+    const actor = actorCard ? cardName(actorCard, locale) : winnerName;
+    const specialStory = (narrative?.seriesStorylines || [])
+      .find(story => story?.layer === "scheduledSpecialEvent");
+    const specialTeam = specialStory?.teamId ? teamById(teamA, teamB, specialStory.teamId) : null;
+    const specialActorCard = specialStory?.actorCardKey
+      ? lineupMap(specialTeam).get(specialStory.actorCardKey)
+      : null;
+    const specialActor = specialActorCard ? cardName(specialActorCard, locale) : null;
+    const lastShotShock = representative?.family === "signature_deep_three"
+      && winnerScore === 4 && loserScore === 3;
+    const upset = powerGap < -3;
+    const ejectionShock = specialStory?.family === "ejection"
+      && specialStory?.continuity === "costly";
+    const breaking = upset || lastShotShock || ejectionShock;
+    let title;
+    if (ejectionShock && specialActor) {
+      title = localize(locale,
+        `${specialActor}被驱逐成为系列赛焦点，${winnerName}最终胜出`,
+        `${specialActor}'s ejection becomes the series flashpoint as ${winnerName} wins`);
+    } else if (lastShotShock) {
+      title = localize(locale,
+        `${actor}用超远三分结束抢七，${winnerName}惊险晋级`,
+        `${actor} ends Game 7 from deep as ${winnerName} advances`);
+    } else if (upset) {
+      title = localize(locale,
+        `${winnerName}完成爆冷，${winnerScore}-${loserScore}赢下系列赛`,
+        `${winnerName} pulls the upset and wins the series ${winnerScore}-${loserScore}`);
+    } else if (loserScore === 0) {
+      title = localize(locale,
+        `${winnerName}没有给对手机会，4-0横扫系列赛`,
+        `${winnerName} leaves no opening and sweeps the series 4-0`);
+    } else if (threeEdge >= 2) {
+      title = localize(locale,
+        `${winnerName}靠外线火力拉开差距，${winnerScore}-${loserScore}赢下系列赛`,
+        `${winnerName} creates separation from deep and wins ${winnerScore}-${loserScore}`);
+    } else if (reboundEdge >= 4) {
+      title = localize(locale,
+        `${winnerName}守住篮板和内线，${winnerScore}-${loserScore}赢下系列赛`,
+        `${winnerName} controls the paint and glass to win ${winnerScore}-${loserScore}`);
+    } else if (turnoverEdge >= 2) {
+      title = localize(locale,
+        `${winnerName}把球权握得更稳，${winnerScore}-${loserScore}赢下系列赛`,
+        `${winnerName} protects the ball and wins the series ${winnerScore}-${loserScore}`);
+    } else if (first && (first.ppg >= 30 || topScoringGap >= 8)) {
+      title = localize(locale,
+        `${first.name}扛起主攻，${winnerName}以${winnerScore}-${loserScore}赢下系列赛`,
+        `${first.name} carries the scoring load as ${winnerName} wins ${winnerScore}-${loserScore}`);
+    } else if (first && second && topTwoPoints >= 42) {
+      title = localize(locale,
+        `${first.name}和${second.name}组成双核，${winnerName}拿下系列赛`,
+        `${first.name} and ${second.name} form the winning engine for ${winnerName}`);
+    } else if (doubleDigitScorers >= 4) {
+      title = localize(locale,
+        `${winnerName}靠多点得分压住对手，${winnerScore}-${loserScore}赢下系列赛`,
+        `${winnerName} wins ${winnerScore}-${loserScore} with scoring from across the lineup`);
+    } else {
+      title = localize(locale,
+        `${winnerName}靠主要得分点连续回应，${winnerScore}-${loserScore}赢下系列赛`,
+        `${winnerName} wins ${winnerScore}-${loserScore} behind steadier production from its lead scorers`);
+    }
+    const resultSentence = localize(locale,
+      `${winnerName}以 ${winnerScore}-${loserScore} 击败${loserName}。`,
+      `${winnerName} defeated ${loserName} ${winnerScore}-${loserScore}.`);
+    let edgeSentence;
+    if (threeEdge >= 2) {
+      const lowerFg = winnerSummary.averages.fgPct < loserSummary.averages.fgPct;
+      edgeSentence = localize(locale,
+        `${winnerName}场均投进${winnerSummary.averages.threePm}记三分，比${loserName}多${Math.round(threeEdge * 10) / 10}记；${lowerFg ? "即使整体投篮命中率更低，外线产量仍持续拉开比分" : "外线产量和效率共同拉开了比分"}。`,
+        `${winnerName} made ${winnerSummary.averages.threePm} threes per game, ${Math.round(threeEdge * 10) / 10} more than ${loserName}; that perimeter volume kept creating separation.`);
+    } else if (reboundEdge >= 4) {
+      edgeSentence = localize(locale,
+        `${winnerName}场均多抢${Math.round(reboundEdge * 10) / 10}个篮板，靠更多二次机会和更稳的内线回合守住优势。`,
+        `${winnerName} won the glass by ${Math.round(reboundEdge * 10) / 10} rebounds per game and used the extra possessions to hold the edge.`);
+    } else if (turnoverEdge >= 2) {
+      edgeSentence = localize(locale,
+        `${winnerName}场均少${Math.round(turnoverEdge * 10) / 10}次失误，把更多回合留给了自己的主要得分点。`,
+        `${winnerName} committed ${Math.round(turnoverEdge * 10) / 10} fewer turnovers per game and gave its main scorers more usable possessions.`);
+    } else {
+      edgeSentence = localize(locale,
+        first && second
+          ? `${first.name}和${second.name}场均合计得到${topTwoPoints}分，主要得分点连续撑住了胜方进攻。`
+          : `${winnerName}的主要得分点在四场胜利里持续给出回应。`,
+        first && second
+          ? `${first.name} and ${second.name} combined for ${topTwoPoints} points per game and repeatedly stabilized the winning offense.`
+          : `${winnerName}'s lead scorer kept answering throughout the four wins.`);
+    }
+    const scoringSentence = specialStory?.text || (first && second
+      ? localize(locale,
+        third
+          ? `${third.name}场均再贡献${third.ppg}分，让对手无法只盯住前两个得分点。`
+          : `胜方没有把全部压力留给一个人。`,
+        third
+          ? `${third.name} added ${third.ppg} points per game, preventing the defense from loading up on only the top two scorers.`
+          : `The winner did not leave the entire scoring burden on one player.`)
+      : localize(locale,
+        `胜方在系列赛最重要的回合里给出了更稳定的回应。`,
+        `The winner supplied the steadier response in the series' most important possessions.`));
+    const body = localize(locale,
+      `${resultSentence}${edgeSentence}${scoringSentence}`,
+      `${resultSentence} ${edgeSentence} ${scoringSentence}`);
+    return {
+      schemaVersion: "battle-headline-candidate-1.0.0",
+      kind: "seriesHeadline",
+      resultEffect: RESULT_EFFECT,
+      winnerId: series.winnerId,
+      representativeEventId: representative?.id || null,
+      label: localize(locale, breaking ? "爆炸新闻" : "系列赛头条", breaking ? "BREAKING" : "SERIES HEADLINE"),
+      breaking,
+      title,
+      body,
+      disclaimer: battleNarrativeDisclaimer(locale)
+    };
+  }
+
+  function buildSeasonHeadline(options) {
+    const headline = buildSeriesHeadline(options);
+    return { ...headline, kind: "seasonHeadline" };
+  }
+
+  function renderScheduledSpecialEvent({ event, series, teamA, teamB, locale }) {
+    const team = teamById(teamA, teamB, event.teamId);
+    const cards = lineupMap(team);
+    const actor = cardName(cards.get(event.actorCardKey), locale);
+    const support = cardName(cards.get(event.supportCardKey), locale);
+    const game = (series.games || []).find(item => item.number === event.gameNumber);
+    const teamWonGame = game?.winnerId === event.teamId;
+    const outcome = teamWonGame
+      ? localize(locale, "球队赢下了这一场，风波没有影响场上节奏", "the team won the game, and the episode did not disrupt its rhythm")
+      : localize(locale, "球队输掉了这一场，这段插曲随即成为赛后焦点", "the team lost the game, turning the episode into a postgame focus");
+    const copy = {
+      practice_criticism: localize(locale,
+        `${actor}在 G${event.gameNumber} 前的训练中直接批评${support}的执行，${support}接受了批评；${outcome}。`,
+        `${actor} directly challenged ${support}'s execution in practice before Game ${event.gameNumber}; ${support} accepted the criticism, and ${outcome}.`),
+      coach_argument: localize(locale,
+        `${actor}在 G${event.gameNumber} 前和教练组争论轮换安排；${outcome}。`,
+        `${actor} argued with the coaching staff over the rotation before Game ${event.gameNumber}; ${outcome}.`),
+      nightlife_sighting: localize(locale,
+        `${actor}在 G${event.gameNumber} 前的休息日被拍到深夜外出；${outcome}。`,
+        `${actor} was photographed out late on the rest day before Game ${event.gameNumber}; ${outcome}.`),
+      media_pressure: localize(locale,
+        `${actor}在 G${event.gameNumber} 前公开谈到自己的角色和球权；${outcome}。`,
+        `${actor} publicly discussed role and touches before Game ${event.gameNumber}; ${outcome}.`),
+      technical_foul: localize(locale,
+        `${actor}在 G${event.gameNumber} 与裁判激烈争执并领到技术犯规；${outcome}。`,
+        `${actor} received a technical foul after a heated exchange with officials in Game ${event.gameNumber}; ${outcome}.`),
+      ejection: localize(locale,
+        `${actor}在 G${event.gameNumber} 因第二次技术犯规被驱逐，出场时间被压缩；${outcome}。`,
+        `${actor} was ejected after a second technical in Game ${event.gameNumber}, cutting the available minutes short; ${outcome}.`)
+    };
+    return {
+      id: `scheduled-${event.id}`,
+      family: event.type,
+      layer: "scheduledSpecialEvent",
+      resultEffect: RESULT_EFFECT,
+      sourceEventResultEffect: event.resultEffect,
+      simulatedStoryline: true,
+      gameNumber: event.gameNumber,
+      teamId: event.teamId,
+      actorCardKey: event.actorCardKey,
+      supportCardKey: event.supportCardKey,
+      targetCardKey: null,
+      continuity: teamWonGame ? "survived" : "costly",
+      evidence: {
+        sourceEventId: event.id,
+        gameWinnerId: game?.winnerId || null,
+        minutesCap: event.constraint?.minutesCap || null
+      },
+      text: copy[event.type] || localize(locale,
+        `${actor}卷入了 G${event.gameNumber} 前后的球队风波；${outcome}。`,
+        `${actor} became part of a team episode around Game ${event.gameNumber}; ${outcome}.`)
+    };
   }
 
   function buildBattleNarrative({ series, teamA, teamB, seed = null, locale = "zh-CN", enabled = true }) {
@@ -20233,7 +21368,8 @@ function renderV6Timeline(timeline = []) {
       games: [],
       seriesStorylines: [],
       historicalEvidenceEvents: [],
-      representativeEvent: null
+      representativeEvent: null,
+      disclaimer: battleNarrativeDisclaimer(locale)
     };
     if (!series || !Array.isArray(series.games) || !teamA || !teamB) throw new Error("battle-narrative-invalid-series-input");
     const resolvedSeed = String(seed ?? series.seed ?? "battle-narrative");
@@ -20285,7 +21421,13 @@ function renderV6Timeline(timeline = []) {
         }));
         familyCounts.set("game_highlight", (familyCounts.get("game_highlight") || 0) + 1);
       }
-      beats.push(renderStageBeat(evidence, previousGame, `${resolvedSeed}|g${game.number}`, locale));
+      const scheduledEvent = Array.isArray(series.specialEvents)
+        ? series.specialEvents.find(event => event.gameNumber === game.number)
+        : null;
+      if (scheduledEvent) {
+        beats.unshift(renderScheduledSpecialEvent({ event: scheduledEvent, series, teamA, teamB, locale }));
+      }
+      if (game.number > 1) beats.push(renderStageBeat(evidence, previousGame, `${resolvedSeed}|g${game.number}`, locale));
       gameNarratives.push({
         gameNumber: game.number,
         winnerId: evidence.winnerId,
@@ -20301,7 +21443,9 @@ function renderV6Timeline(timeline = []) {
       previousGame = game;
       previousPrimaryFamily = selected[0]?.family || deepThree?.family || "game_highlight";
     }
-    const seriesStorylines = buildTeamDynamicStorylines({ teamA, teamB, seed: resolvedSeed, locale });
+    const seriesStorylines = Array.isArray(series.specialEvents)
+      ? series.specialEvents.map(event => renderScheduledSpecialEvent({ event, series, teamA, teamB, locale }))
+      : buildTeamDynamicStorylines({ teamA, teamB, seed: resolvedSeed, locale });
     const historicalEvidenceEvents = historicalEvidenceEventsForLineups({ teamA, teamB });
     return {
       schemaVersion: SCHEMA_VERSION,
@@ -20312,7 +21456,8 @@ function renderV6Timeline(timeline = []) {
       games: gameNarratives,
       seriesStorylines,
       historicalEvidenceEvents,
-      representativeEvent: selectRepresentativeEvent(gameNarratives)
+      representativeEvent: selectRepresentativeEvent(gameNarratives, { teamId: series.winnerId }),
+      disclaimer: battleNarrativeDisclaimer(locale)
     };
   }
 
@@ -20375,6 +21520,9 @@ function renderV6Timeline(timeline = []) {
     extractBattleGameEvidence,
     buildTeamDynamicStorylines,
     selectRepresentativeEvent,
+    buildSeriesHeadline,
+    buildSeasonHeadline,
+    battleNarrativeDisclaimer,
     collectCardTraits,
     isQualifiedHighVolumeShooter,
     templateCombinationCapacity,
@@ -20494,8 +21642,10 @@ function renderV6Timeline(timeline = []) {
     }
 
     function h5BattleGameProbability(teamA, teamB, homeTeamId) {
-      const matchupA = teamA.power * .56 + teamA.offense * .25 + teamA.defense * .19;
-      const matchupB = teamB.power * .56 + teamB.offense * .25 + teamB.defense * .19;
+      const matchupA = teamA.power * .56 + teamA.offense * .25 + teamA.defense * .19
+        + h5BattleTeamPlayoffAdjustment(teamA);
+      const matchupB = teamB.power * .56 + teamB.offense * .25 + teamB.defense * .19
+        + h5BattleTeamPlayoffAdjustment(teamB);
       const homeEdge = homeTeamId === teamA.id ? 1.35 : homeTeamId === teamB.id ? -1.35 : 0;
       return h5BattleClamp(1 / (1 + Math.exp(-((matchupA - matchupB) + homeEdge) / 7.2)), .18, .82);
     }
@@ -20619,10 +21769,16 @@ function renderV6Timeline(timeline = []) {
       return Number.isFinite(value) ? value : fallback;
     }
 
-    function h5BattleRateCount(rate, rng, maximum = 8) {
-      const gameRate = h5BattleClamp(Number(rate) || 0, 0, maximum) * (.55 + rng() * .9);
-      const whole = Math.floor(gameRate);
-      return Math.min(maximum, whole + (rng() < gameRate - whole ? 1 : 0));
+    function h5BattleRateCount(rate, rng, maximum = 8, scale = 1) {
+      const expected = h5BattleClamp((Number(rate) || 0) * (Number(scale) || 1), 0, maximum);
+      const threshold = Math.exp(-expected);
+      let product = 1;
+      let count = 0;
+      while (count < maximum && product > threshold) {
+        count += 1;
+        product *= Math.max(Number.EPSILON, rng());
+      }
+      return Math.min(maximum, Math.max(0, count - 1));
     }
 
     function h5BattleAllocateBoundedWhole(total, weights, minimums, maximums) {
@@ -20716,46 +21872,182 @@ function renderV6Timeline(timeline = []) {
       };
     }
 
-    function buildH5BattleTeamBox(team, opponent, score, pace, rng, gameEvent = null) {
+    function h5BattlePlayoffScoringFactor(card) {
+      const tags = new Set([
+        ...(card?.v34?.lineupTags || []),
+        ...(card?.tags || []),
+        ...(card?.eventProfile?.specials || [])
+      ].map(value => String(value).toLowerCase()));
+      const text = [...tags].join("|");
+      let factor = 1;
+      if (/playoff-riser|playoff-proven|finals mvp|季后赛|总决赛/.test(text)) factor += .045;
+      if (/playoff-risk|playoff-drop|offensive drought|高波动/.test(text)) factor -= .055;
+      return h5BattleClamp(factor, .9, 1.08);
+    }
+
+    function h5BattleTeamPlayoffAdjustment(team) {
+      if (!Array.isArray(team?.lineup)) return 0;
+      return team.lineup.reduce((sum, card) => sum + (h5BattlePlayoffScoringFactor(card) - 1) * 12, 0);
+    }
+
+    function h5BattleScoringVolatility(card) {
+      const traits = [
+        ...(card?.eventProfile?.personalityTraits || []),
+        ...(card?.tags || []),
+        ...(card?.v34?.lineupTags || [])
+      ].map(value => String(value).toLowerCase()).join("|");
+      const roleVolatility = Number(card?.risk?.roleVolatility || card?.risk?.decisionVolatility || 0);
+      return h5BattleClamp(.31 + roleVolatility * .22
+        + (/highvariancescorer|高波动|microwave/.test(traits) ? .11 : 0), .28, .54);
+    }
+
+    function h5BattleSpecialEventCount(rng) {
+      const roll = rng();
+      return roll < .45 ? 0 : roll < .80 ? 1 : roll < .95 ? 2 : 3;
+    }
+
+    function h5BattleSpecialEventActor(team, type, rng) {
+      const lineup = Array.isArray(team?.lineup) ? team.lineup : [];
+      if (!lineup.length) return null;
+      const scored = lineup.map(card => {
+        const profile = card?.personalityV1 || {};
+        const traits = [
+          ...(card?.eventProfile?.personalityTraits || []),
+          ...(card?.eventProfile?.disciplineTraits || []),
+          ...(card?.eventProfile?.leadershipTraits || []),
+          ...(card?.eventProfile?.mediaTraits || [])
+        ].join("|").toLowerCase();
+        let score = .5 + rng();
+        if (type === "practice_criticism") score += Number(profile.trainingDemand || 0) * 3.5
+          + (/demandingleader|practicepressure|standardssetter/.test(traits) ? 3 : 0);
+        if (type === "coach_argument") score += (1 - Number(profile.coachCompliance ?? .7)) * 3
+          + Number(profile.roleSensitivity || 0) * 2;
+        if (type === "nightlife_sighting" || type === "media_pressure") score += Number(profile.mediaHeat || 0) * 3
+          + Number(profile.disciplineRisk || 0) * 2;
+        if (type === "technical_foul" || type === "ejection") score += Number(profile.emotionalVolatility || 0) * 3
+          + Number(profile.disciplineRisk || 0) * 3
+          + (/technicalrisk|flagrant|volatile|suspensionrisk/.test(traits) ? 2 : 0);
+        return { card, score };
+      }).sort((left, right) => right.score - left.score || h5BattleCardKey(left.card).localeCompare(h5BattleCardKey(right.card)));
+      return scored[0]?.card || null;
+    }
+
+    function buildH5BattleSpecialEvents({ teamA, teamB, games, seed }) {
+      if (!Array.isArray(teamA?.lineup) || !Array.isArray(teamB?.lineup) || !games?.length) return [];
+      const rng = h5BattleRng(h5BattleSeedNumber(seed, teamA.id, teamB.id, "nba5-special-events-v1"));
+      const count = Math.min(h5BattleSpecialEventCount(rng), games.length);
+      if (!count) return [];
+      const availableGames = games.map(game => game.number);
+      const events = [];
+      let usedMajor = false;
+      for (let index = 0; index < count; index += 1) {
+        const gamePickIndex = Math.floor(rng() * availableGames.length);
+        const gameNumber = availableGames.splice(gamePickIndex, 1)[0];
+        const team = rng() < .5 ? teamA : teamB;
+        const roll = rng();
+        let type = roll < .22 ? "practice_criticism"
+          : roll < .40 ? "coach_argument"
+            : roll < .56 ? "nightlife_sighting"
+              : roll < .72 ? "media_pressure"
+                : roll < .95 ? "technical_foul"
+                  : "ejection";
+        if (type === "ejection" && usedMajor) type = "technical_foul";
+        const actor = h5BattleSpecialEventActor(team, type, rng);
+        const teammates = team.lineup.filter(card => h5BattleCardKey(card) !== h5BattleCardKey(actor));
+        const support = teammates.length ? teammates[Math.floor(rng() * teammates.length)] : null;
+        const major = type === "ejection";
+        if (major) usedMajor = true;
+        events.push({
+          schemaVersion: "battle-special-event-1.0.0",
+          id: `special-${gameNumber}-${index + 1}`,
+          gameNumber,
+          type,
+          teamId: team.id,
+          affectedTeamId: team.id,
+          actorCardKey: actor ? h5BattleCardKey(actor) : null,
+          supportCardKey: support ? h5BattleCardKey(support) : null,
+          major,
+          constraint: major ? { minutesCap: 24 } : null,
+          changesSeriesOutcome: false,
+          resultEffect: major ? "boxScoreConstraintOnly" : "explanationOnly"
+        });
+      }
+      return events.sort((left, right) => left.gameNumber - right.gameNumber || left.id.localeCompare(right.id));
+    }
+
+    function buildH5BattleTeamBox(team, opponent, score, pace, rng, gameEvent = null, specialEvent = null) {
       if (!Array.isArray(team?.lineup) || team.lineup.length !== 5) return null;
       const lineup = h5BattleValidateLineup(team.lineup);
       const benefitsEvent = gameEvent?.beneficiaryId === team.id;
       const affectedByEvent = gameEvent?.affectedTeamId === team.id;
+      const specialAffects = specialEvent?.affectedTeamId === team.id && specialEvent?.actorCardKey;
+      const specialMinutesCap = Number(specialEvent?.constraint?.minutesCap || 0);
       const coreMinuteTarget = 188 + Math.floor(rng() * 13);
-      const minuteMinimums = lineup.map(card => gameEvent?.type === "foul_pressure" && affectedByEvent
-        && h5BattleCardKey(card) === gameEvent.targetCardKey ? 24 : 30);
-      const minuteMaximums = lineup.map(card => gameEvent?.type === "foul_pressure" && affectedByEvent
-        && h5BattleCardKey(card) === gameEvent.targetCardKey ? 36 : 44);
+      const minuteMinimums = lineup.map(card => specialAffects && h5BattleCardKey(card) === specialEvent.actorCardKey
+        && specialMinutesCap ? Math.min(18, specialMinutesCap)
+        : gameEvent?.type === "foul_pressure" && affectedByEvent
+          && h5BattleCardKey(card) === gameEvent.targetCardKey ? 24 : 30);
+      const minuteMaximums = lineup.map(card => specialAffects && h5BattleCardKey(card) === specialEvent.actorCardKey
+        && specialMinutesCap ? specialMinutesCap
+        : gameEvent?.type === "foul_pressure" && affectedByEvent
+          && h5BattleCardKey(card) === gameEvent.targetCardKey ? 36 : 44);
       const minutes = h5BattleAllocateBoundedWhole(coreMinuteTarget, lineup.map(card => {
         const foulPenalty = gameEvent?.type === "foul_pressure" && affectedByEvent
           && h5BattleCardKey(card) === gameEvent.targetCardKey ? .68 : 1;
+        const specialPenalty = specialAffects && h5BattleCardKey(card) === specialEvent.actorCardKey
+          && specialMinutesCap ? .42 : 1;
         return Math.exp(
           (h5BattleCardNumber(card, "impact") - 80) / 22
           + (h5BattleCardNumber(card, "ovr") - 84) / 45
-        ) * (.9 + rng() * .2) * foulPenalty;
+        ) * (.9 + rng() * .2) * foulPenalty * specialPenalty;
       }), minuteMinimums, minuteMaximums);
-      const scoringProfiles = lineup.map(card => {
+      const scoringProfiles = lineup.map((card, index) => {
         const observedUsage = h5BattleSeasonNumber(card, "usage", h5BattleCardNumber(card, "usage") * .34);
         const observedPpg = h5BattleSeasonNumber(card, "ppg", Number(card?.ppg) || 12);
-        return .25
-          + Math.pow(h5BattleClamp(observedUsage, 8, 40) / 20, 1.25) * .5
-          + Math.pow(h5BattleClamp(observedPpg, 4, 38) / 20, 1.15) * .4
-          + h5BattleClamp((h5BattleCardNumber(card, "off") - 65) / 30, 0, .9) * .15;
+        const observedMinutes = h5BattleSeasonNumber(card, "mpg", 36);
+        const volatility = h5BattleScoringVolatility(card);
+        const gameFactor = 1 + (rng() - .5) * 2 * volatility;
+        return Math.pow(h5BattleClamp(observedPpg, 4, 38), .97)
+          * (.78 + h5BattleClamp(observedUsage, 8, 40) / 100)
+          * Math.pow(minutes[index] / h5BattleClamp(observedMinutes, 20, 42), .64)
+          * h5BattlePlayoffScoringFactor(card)
+          * gameFactor;
       });
       const scoringOrder = scoringProfiles
         .map((value, index) => ({ value, index }))
         .sort((left, right) => right.value - left.value || left.index - right.index);
-      const scoringRankMultiplier = [1.18, 1.07, .98, .9, .82];
+      const scoringRankMultiplier = [1.04, 1.02, 1, .98, .96];
       const rankMultiplierByIndex = Array(5).fill(1);
       scoringOrder.forEach((entry, rank) => { rankMultiplierByIndex[entry.index] = scoringRankMultiplier[rank]; });
-      const points = h5BattleAllocateWhole(score, lineup.map((card, index) => {
+      const scoringWeights = lineup.map((card, index) => {
         const actorBoost = benefitsEvent && h5BattleCardKey(card) === gameEvent.actorCardKey
-          && ["shotmaking_swing", "paint_pressure", "tactical_adjustment"].includes(gameEvent.type) ? 1.24 : 1;
+          && ["shotmaking_swing", "paint_pressure", "tactical_adjustment"].includes(gameEvent.type) ? 1.12 : 1;
         const foulPenalty = gameEvent?.type === "foul_pressure" && affectedByEvent
           && h5BattleCardKey(card) === gameEvent.targetCardKey ? .78 : 1;
-        return scoringProfiles[index] * rankMultiplierByIndex[index]
-          * (minutes[index] / 38) * (.78 + rng() * .44) * actorBoost * foulPenalty;
-      }));
+        return scoringProfiles[index] * rankMultiplierByIndex[index] * actorBoost * foulPenalty;
+      });
+      const benchMinutes = 240 - minutes.reduce((sum, value) => sum + value, 0);
+      const benchPoints = 0;
+      const coreScore = score;
+      const scoringCaps = lineup.map((card, index) => {
+        const observedUsage = h5BattleSeasonNumber(card, "usage", 20);
+        const observedPpg = h5BattleSeasonNumber(card, "ppg", 12);
+        const eventAllowance = benefitsEvent && h5BattleCardKey(card) === gameEvent.actorCardKey ? .02 : 0;
+        const outlierAllowance = rng() < .045 ? .025 : 0;
+        const maximumShare = h5BattleClamp(
+          .245 + Math.max(0, observedPpg - 12) * .0048 + Math.max(0, observedUsage - 22) * .0025
+          + eventAllowance + outlierAllowance,
+          .245,
+          .36
+        );
+        return Math.max(18, Math.round(score * maximumShare));
+      });
+      const points = h5BattleAllocateBoundedWhole(
+        coreScore,
+        scoringWeights,
+        Array(lineup.length).fill(0),
+        scoringCaps
+      );
       const shooting = points.map((value, index) => h5BattleShootingLine(value, lineup[index], rng, {
         efficiencyBoost: benefitsEvent && gameEvent.type === "shotmaking_swing"
           && h5BattleCardKey(lineup[index]) === gameEvent.actorCardKey ? .055 : 0
@@ -20769,10 +22061,10 @@ function renderV6Timeline(timeline = []) {
         - (affectedByEvent && gameEvent.type === "glass_control" ? 3 : 0)
       ), 31, 57);
       const teamAssists = h5BattleClamp(Math.round(
-        18 + (lineup.reduce((sum, card) => sum + h5BattleCardNumber(card, "pass"), 0) / 5 - 68) * .18
-        + rng() * 6
-        + (benefitsEvent && ["ball_security", "tactical_adjustment"].includes(gameEvent.type) ? 3 : 0)
-      ), 14, Math.max(14, totalFgm));
+        15.5 + (lineup.reduce((sum, card) => sum + h5BattleCardNumber(card, "pass"), 0) / 5 - 68) * .13
+        + rng() * 5
+        + (benefitsEvent && ["ball_security", "tactical_adjustment"].includes(gameEvent.type) ? 2 : 0)
+      ), 12, Math.max(12, Math.min(25, Math.round(totalFgm * .68))));
       const rebounds = h5BattleAllocateWhole(teamRebounds, lineup.map(card => {
         const observedRpg = h5BattleSeasonNumber(card, "rpg", Number(card?.rpg) || 4);
         return .12 + Math.pow(h5BattleClamp(observedRpg, .5, 16), 1.35)
@@ -20790,17 +22082,19 @@ function renderV6Timeline(timeline = []) {
         const observedSteals = h5BattleSeasonNumber(card, "spg", Number(card?.spg) || Math.max(0, (defense - 60) / 30));
         const observedBlocks = h5BattleSeasonNumber(card, "bpg", Number(card?.bpg) || Math.max(0, (defense + h5BattleCardNumber(card, "reb") - 140) / 45));
         const observedTurnovers = h5BattleSeasonNumber(card, "tov", usage / 38 + (82 - ballSecurity) / 28);
+        const observedMinutes = h5BattleSeasonNumber(card, "mpg", 36);
+        const rateScale = h5BattleClamp(minutes[index] / h5BattleClamp(observedMinutes, 20, 42), .65, 1.18);
         return {
           cardKey: h5BattleCardKey(card),
           minutes: minutes[index],
           pts: points[index],
           reb: rebounds[index],
           ast: assists[index],
-          stl: h5BattleRateCount(observedSteals, rng, 5)
+          stl: h5BattleRateCount(observedSteals, rng, 5, rateScale)
             + (benefitsEvent && gameEvent.type === "ball_security"
               && h5BattleCardKey(card) === gameEvent.actorCardKey ? 1 : 0),
-          blk: h5BattleRateCount(observedBlocks, rng, 7),
-          tov: h5BattleRateCount(observedTurnovers, rng, 7)
+          blk: h5BattleRateCount(observedBlocks, rng, 7, rateScale),
+          tov: h5BattleRateCount(observedTurnovers, rng, 7, rateScale)
             + (affectedByEvent && gameEvent.type === "ball_security"
               && h5BattleCardKey(card) === gameEvent.targetCardKey ? 1 : 0),
           ...shooting[index]
@@ -20816,8 +22110,10 @@ function renderV6Timeline(timeline = []) {
         fgm: 0, fga: 0, threePm: 0, threePa: 0, ftm: 0, fta: 0
       });
       const coreMinutes = totals.minutes;
-      const rotation = { coreMinutes, benchMinutes: 240 - coreMinutes };
+      const corePoints = totals.pts;
+      const rotation = { coreMinutes, benchMinutes: 240 - coreMinutes, points: score - corePoints };
       totals.minutes = 240;
+      totals.pts = score;
       return { teamId: team.id, opponentId: opponent.id, players, rotation, totals };
     }
 
@@ -20859,12 +22155,37 @@ function renderV6Timeline(timeline = []) {
       }));
     }
 
-    function simulateH5BattleSeries({ teamA, teamB, seed }) {
+    function h5BattleSeriesScoringEnvironment(rng) {
+      const roll = rng();
+      if (roll < .70) {
+        return { tier: "normal", factor: .94 + rng() * .12 };
+      }
+      const positive = rng() < .5;
+      if (roll < .94) {
+        const magnitude = .06 + rng() * .08;
+        return { tier: positive ? "hot" : "cold", factor: 1 + (positive ? magnitude : -magnitude) };
+      }
+      const magnitude = .14 + rng() * .08;
+      return { tier: positive ? "extreme-hot" : "extreme-cold", factor: 1 + (positive ? magnitude : -magnitude) };
+    }
+
+    function simulateH5BattleSeries({ teamA, teamB, seed, specialEventsEnabled = true }) {
       if (!teamA || !teamB || teamA.id === teamB.id) throw new Error("invalid-battle-teams");
       const resolvedSeed = String(seed || "");
       if (!resolvedSeed) throw new Error("missing-match-seed");
       const rng = h5BattleRng(h5BattleSeedNumber(resolvedSeed, teamA.id, teamB.id, "nba5-series-v1"));
-      const homePattern = [teamA.id, teamA.id, teamB.id, teamB.id, teamA.id, teamB.id, teamA.id];
+      const firstHomeTeamId = rng() < .5 ? teamA.id : teamB.id;
+      const secondHomeTeamId = firstHomeTeamId === teamA.id ? teamB.id : teamA.id;
+      const homePattern = [
+        firstHomeTeamId,
+        firstHomeTeamId,
+        secondHomeTeamId,
+        secondHomeTeamId,
+        firstHomeTeamId,
+        secondHomeTeamId,
+        firstHomeTeamId
+      ];
+      const scoringEnvironment = h5BattleSeriesScoringEnvironment(rng);
       const wins = { [teamA.id]: 0, [teamB.id]: 0 };
       const games = [];
       for (let gameIndex = 0; gameIndex < 7; gameIndex += 1) {
@@ -20885,14 +22206,14 @@ function renderV6Timeline(timeline = []) {
         );
         const winner = rng() < probabilityA ? teamA : teamB;
         const loser = winner.id === teamA.id ? teamB : teamA;
-        const pace = 101 + Math.round((rng() - .5) * 15);
-        const winnerScore = Math.max(86, Math.round(pace + winner.offense * .12 - loser.defense * .055 + 8 + rng() * 8));
-        const loserScore = Math.max(82, winnerScore - 2 - Math.floor(rng() * 14));
+        const pace = 94 + Math.round((rng() - .5) * 12);
+        const gameScoringFactor = 1 + (rng() - .5) * .12;
+        const rawWinnerScore = (pace + winner.offense * .10 - loser.defense * .055 + 7 + rng() * 7)
+          * scoringEnvironment.factor * gameScoringFactor;
+        const winnerScore = Math.max(78, Math.round(rawWinnerScore));
+        const loserScore = Math.max(70, winnerScore - 2 - Math.floor(rng() * 14));
         const teamAScore = winner.id === teamA.id ? winnerScore : loserScore;
         const teamBScore = winner.id === teamB.id ? winnerScore : loserScore;
-        const statsRng = h5BattleRng(h5BattleSeedNumber(
-          resolvedSeed, teamA.id, teamB.id, `game-${gameIndex + 1}`, "nba5-box-v2"
-        ));
         wins[winner.id] += 1;
         games.push({
           number: gameIndex + 1,
@@ -20903,20 +22224,41 @@ function renderV6Timeline(timeline = []) {
           teamBScore,
           baseProbabilityTeamA: Number(baseProbabilityA.toFixed(6)),
           probabilityTeamA: Number(probabilityA.toFixed(6)),
-          event: gameEvent,
-          teamABox: buildH5BattleTeamBox(teamA, teamB, teamAScore, pace, statsRng, gameEvent),
-          teamBBox: buildH5BattleTeamBox(teamB, teamA, teamBScore, pace, statsRng, gameEvent)
+          event: gameEvent
         });
       }
       const winnerId = wins[teamA.id] === 4 ? teamA.id : teamB.id;
+      const specialEvents = specialEventsEnabled
+        ? buildH5BattleSpecialEvents({ teamA, teamB, games, seed: resolvedSeed })
+        : [];
+      const specialEventByGame = new Map(specialEvents.map(event => [event.gameNumber, event]));
+      games.forEach(game => {
+        const statsRng = h5BattleRng(h5BattleSeedNumber(
+          resolvedSeed, teamA.id, teamB.id, `game-${game.number}`, "nba5-box-v4"
+        ));
+        const specialEvent = specialEventByGame.get(game.number) || null;
+        game.specialEvent = specialEvent;
+        game.teamABox = buildH5BattleTeamBox(
+          teamA, teamB, game.teamAScore, game.pace, statsRng, game.event, specialEvent
+        );
+        game.teamBBox = buildH5BattleTeamBox(
+          teamB, teamA, game.teamBScore, game.pace, statsRng, game.event, specialEvent
+        );
+      });
       return {
-        schemaVersion: "battle-series-1.3.0",
+        schemaVersion: "battle-series-1.5.0",
         seed: resolvedSeed,
         teamAId: teamA.id,
         teamBId: teamB.id,
+        homeCourtAdvantageTeamId: firstHomeTeamId,
+        scoringEnvironment: {
+          tier: scoringEnvironment.tier,
+          factor: Number(scoringEnvironment.factor.toFixed(4))
+        },
         winnerId,
         scoreA: wins[teamA.id],
         scoreB: wins[teamB.id],
+        specialEvents,
         games
       };
     }
@@ -21003,6 +22345,26 @@ function renderV6Timeline(timeline = []) {
         return `${values[0].toString(36)}-${values[1].toString(36)}`;
       }
       return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+    }
+
+    let h5BattleLineupCodeCodec = null;
+    function h5BattleShareCodeCodec() {
+      if (h5BattleLineupCodeCodec) return h5BattleLineupCodeCodec;
+      const createCodec = globalThis.H5BattleLineupCodeCandidate?.createBattleLineupCodeCodec;
+      if (typeof createCodec !== "function") return null;
+      h5BattleLineupCodeCodec = createCodec({
+        catalog: cards,
+        legacyDecoder: (code, catalog) => decodeH5BattleLineup(code, catalog)
+      });
+      return h5BattleLineupCodeCodec;
+    }
+
+    function h5BattleEncodeShareLineup(lineup) {
+      return h5BattleShareCodeCodec()?.encode(lineup) || encodeH5BattleLineup(lineup);
+    }
+
+    function h5BattleDecodeShareLineup(code) {
+      return h5BattleShareCodeCodec()?.decode(code) || decodeH5BattleLineup(code, cards);
     }
 
     function h5BattleTeamFromLineup(id, lineup) {
@@ -21125,7 +22487,7 @@ function renderV6Timeline(timeline = []) {
       const copyButton = document.getElementById("battleCopyOwnCode");
       const ownPreview = document.getElementById("battleOwnPreview");
       if (ownLineup) {
-        codeInput.value = encodeH5BattleLineup(ownLineup);
+        codeInput.value = h5BattleEncodeShareLineup(ownLineup);
         copyButton.disabled = false;
         ownPreview.innerHTML = `<div class="battle-own-ready"><b>${english ? "Five-player lineup ready" : "五人阵容已就位"}</b>
           <span>${english ? "Copy the NBA5 code to share this exact lineup." : "复制 NBA5 即可分享这套具体阵容。"}</span></div>`;
@@ -21181,7 +22543,7 @@ function renderV6Timeline(timeline = []) {
       }
       document.getElementById("battleResultsTitle").textContent = english ? "Series result" : "系列赛结果";
       document.getElementById("battleOpenResult").textContent = english ? "Open result" : "打开结果";
-      document.getElementById("battleResultModalTitle").textContent = english ? "NBA5 series result" : "NBA5 系列赛结果";
+      document.getElementById("battleResultModalTitle").textContent = english ? "Series result" : "系列赛结果";
       if (justCompletedOwnLineup) {
         requestAnimationFrame(() => panel.scrollIntoView({ behavior: "smooth", block: "start" }));
       }
@@ -21203,9 +22565,8 @@ function renderV6Timeline(timeline = []) {
     function h5BattleImportOpponent() {
       const english = h5BattleEnglish();
       try {
-        h5BattleState.opponent = decodeH5BattleLineup(
-          document.getElementById("battleOpponentCode").value,
-          cards
+        h5BattleState.opponent = h5BattleDecodeShareLineup(
+          document.getElementById("battleOpponentCode").value
         );
         h5BattleState.opponentSource = "friend";
         h5BattleState.opponentTier = null;
@@ -21249,6 +22610,13 @@ function renderV6Timeline(timeline = []) {
       return lineup.find(card => h5BattleCardKey(card) === cardKey);
     }
 
+    function h5BattlePlayerVersion(card) {
+      if (!card) return "";
+      return String(h5BattleEnglish()
+        ? (card.version || card.displayVersion || "")
+        : (card.displayVersion || card.version || ""));
+    }
+
     function h5BattleStatTable(title, summary, lineup) {
       const english = h5BattleEnglish();
       return `
@@ -21257,15 +22625,17 @@ function renderV6Timeline(timeline = []) {
           <div class="battle-table-scroll">
             <table class="battle-stat-table">
               <thead><tr>
-                <th>${english ? "Player" : "球员"}</th><th>MIN</th><th>PTS</th><th>REB</th><th>AST</th>
-                <th>STL</th><th>BLK</th><th>TO</th><th>FG%</th><th>3P%</th><th>FT%</th><th>TS%</th>
+                <th>${english ? "Player" : "球员"}</th><th>PTS</th><th>REB</th><th>AST</th>
+                <th>STL</th><th>BLK</th><th>TO</th><th>FG%</th><th>3P%</th><th>FT%</th><th>TS%</th><th>MIN</th>
               </tr></thead>
               <tbody>${summary.map(player => {
                 const card = h5BattleFindCard(lineup, player.cardKey);
-                return `<tr><th>${h5BattlePlayerName(card)}</th><td>${player.mpg}</td><td>${player.ppg}</td>
-                  <td>${player.rpg}</td><td>${player.apg}</td><td>${player.spg}</td><td>${player.bpg}</td>
+                return `<tr><th><span class="battle-player-name">${h5BattlePlayerName(card)}</span>
+                  <small class="battle-player-version">${h5BattlePlayerVersion(card)}</small></th>
+                  <td>${player.ppg}</td><td>${player.rpg}</td>
+                  <td>${player.apg}</td><td>${player.spg}</td><td>${player.bpg}</td>
                   <td>${player.tpg}</td><td>${player.fgPct}</td><td>${player.threePct}</td>
-                  <td>${player.ftPct}</td><td>${player.tsPct}</td></tr>`;
+                  <td>${player.ftPct}</td><td>${player.tsPct}</td><td>${player.mpg}</td></tr>`;
               }).join("")}</tbody>
             </table>
           </div>
@@ -21280,24 +22650,37 @@ function renderV6Timeline(timeline = []) {
           <div class="battle-table-scroll">
             <table class="battle-stat-table compact">
               <thead><tr>
-                <th>${english ? "Player" : "球员"}</th><th>MIN</th><th>PTS</th><th>REB</th><th>AST</th>
-                <th>STL</th><th>BLK</th><th>TO</th><th>FG</th><th>3P</th>
+                <th>${english ? "Player" : "球员"}</th><th>PTS</th><th>REB</th><th>AST</th>
+                <th>STL</th><th>BLK</th><th>TO</th><th>FG</th><th>3P</th><th>FT</th><th>MIN</th>
               </tr></thead>
               <tbody>${box.players.map(player => {
                 const card = h5BattleFindCard(lineup, player.cardKey);
-                return `<tr><th>${h5BattlePlayerName(card)}</th><td>${player.minutes}</td><td>${player.pts}</td>
-                  <td>${player.reb}</td><td>${player.ast}</td><td>${player.stl}</td><td>${player.blk}</td>
+                return `<tr><th>${h5BattlePlayerName(card)}</th><td>${player.pts}</td><td>${player.reb}</td>
+                  <td>${player.ast}</td><td>${player.stl}</td><td>${player.blk}</td>
                   <td>${player.tov}</td><td>${player.fgm}-${player.fga}</td>
-                  <td>${player.threePm}-${player.threePa}</td></tr>`;
+                  <td>${player.threePm}-${player.threePa}</td><td>${player.ftm}-${player.fta}</td><td>${player.minutes}</td></tr>`;
               }).join("")}</tbody>
             </table>
           </div>
         </section>`;
     }
 
-    function h5BattlePlayerSeriesValue(player) {
-      return player.ppg + player.rpg * .7 + player.apg * 1.12 + player.spg * 2.4
-        + player.bpg * 2.2 - player.tpg * .8 + (player.fgPct - 50) * .12;
+    function h5BattlePlayerSeriesValue(player, card = null) {
+      const dimensions = card?.v34?.dimensions || {};
+      const defensiveDimensions = [
+        dimensions.perimeterDefense,
+        dimensions.helpSwitchDefense,
+        dimensions.interiorDefense,
+        dimensions.rimProtection
+      ].map(Number).filter(Number.isFinite);
+      const defenseBaseline = defensiveDimensions.length
+        ? defensiveDimensions.reduce((sum, value) => sum + value, 0) / defensiveDimensions.length
+        : Number(card?.def || 75);
+      const defenseImpactBonus = h5BattleClamp((defenseBaseline - 75) * .1, -1.5, 3);
+      const overallImpactBonus = h5BattleClamp((Number(card?.impact || 80) - 80) * .045, -.5, 1);
+      return player.ppg + player.rpg * .36 + player.apg * .78 + player.spg * 1.45
+        + player.bpg * 1.2 - player.tpg * .82 + (player.tsPct - 55) * .16
+        + defenseImpactBonus + overallImpactBonus;
     }
 
     function h5BattleGameTopPlayer(box) {
@@ -21331,6 +22714,22 @@ function renderV6Timeline(timeline = []) {
       const winnerBox = boxById(game.winnerId);
       const winnerTop = h5BattleGameTopPlayer(winnerBox);
       const winnerTopCard = h5BattleFindCard(winnerTeam.lineup, winnerTop.cardKey);
+      const loserId = game.winnerId === ownTeam.id ? opponentTeam.id : ownTeam.id;
+      const loserTeam = teamById(loserId);
+      const loserBox = boxById(loserId);
+      const loserTop = h5BattleGameTopPlayer(loserBox);
+      const loserTopCard = h5BattleFindCard(loserTeam.lineup, loserTop.cardKey);
+      const winnerLead = winnerTop.threePm >= 5
+        ? (english
+          ? `${h5BattlePlayerName(winnerTopCard)} hit ${winnerTop.threePm} threes and scored ${winnerTop.pts} points`
+          : `${h5BattlePlayerName(winnerTopCard)}投进${winnerTop.threePm}记三分并拿到${winnerTop.pts}分`)
+        : winnerTop.pts >= 30
+          ? (english
+            ? `${h5BattlePlayerName(winnerTopCard)} erupted for ${winnerTop.pts} points`
+            : `${h5BattlePlayerName(winnerTopCard)}砍下${winnerTop.pts}分`)
+          : (english
+            ? `${h5BattlePlayerName(winnerTopCard)} led the winner with ${winnerTop.pts} points`
+            : `${h5BattlePlayerName(winnerTopCard)}以${winnerTop.pts}分领衔获胜方`);
       const beneficiaryWon = game.winnerId === event.beneficiaryId;
       const labels = english ? {
         shotmaking_swing: "Shotmaking swing",
@@ -21348,39 +22747,337 @@ function renderV6Timeline(timeline = []) {
         tactical_adjustment: "战术调整"
       };
       let evidence;
+      let label = labels[event.type];
+      let advantageSupported = true;
       if (event.type === "shotmaking_swing") {
-        evidence = english
-          ? `${h5BattlePlayerName(actorCard)} scored ${actorLine.pts} on ${actorLine.fgm}-${actorLine.fga} shooting.`
-          : `${h5BattlePlayerName(actorCard)}拿到 ${actorLine.pts} 分，投篮 ${actorLine.fgm}-${actorLine.fga}。`;
+        const shootingPct = actorLine.fga ? actorLine.fgm / actorLine.fga : 0;
+        advantageSupported = actorLine.pts >= 20 && shootingPct >= .44;
+        label = advantageSupported ? label : (english ? "Cold shooting" : "手感未开");
+        evidence = advantageSupported
+          ? (english
+            ? `${h5BattlePlayerName(actorCard)} scored ${actorLine.pts} on ${actorLine.fgm}-${actorLine.fga} shooting.`
+            : `${h5BattlePlayerName(actorCard)}拿到${actorLine.pts}分，投篮${actorLine.fgm}-${actorLine.fga}。`)
+          : (english
+            ? `${h5BattlePlayerName(actorCard)} never found the shooting touch, finishing with ${actorLine.pts} points on ${actorLine.fgm}-${actorLine.fga}.`
+            : `${h5BattlePlayerName(actorCard)}本场手感没有打开，投篮${actorLine.fgm}-${actorLine.fga}，只得到${actorLine.pts}分。`);
       } else if (event.type === "paint_pressure") {
-        evidence = english
-          ? `${h5BattlePlayerName(actorCard)} turned rim pressure into ${actorLine.pts} points.`
-          : `${h5BattlePlayerName(actorCard)}持续冲击篮下并得到 ${actorLine.pts} 分。`;
+        advantageSupported = actorLine.pts >= 20;
+        label = advantageSupported ? label : (english ? "Paint attack stalled" : "篮下冲击未兑现");
+        evidence = advantageSupported
+          ? (english
+            ? `${h5BattlePlayerName(actorCard)} turned rim pressure into ${actorLine.pts} points.`
+            : `${h5BattlePlayerName(actorCard)}持续冲击篮下并得到${actorLine.pts}分。`)
+          : (english
+            ? `${h5BattlePlayerName(actorCard)} kept attacking the paint but produced only ${actorLine.pts} points.`
+            : `${h5BattlePlayerName(actorCard)}不断尝试冲击篮下，但最终只得到${actorLine.pts}分。`);
       } else if (event.type === "ball_security") {
-        evidence = english
-          ? `The advantaged lineup posted ${beneficiaryBox.totals.ast} assists against ${beneficiaryBox.totals.tov} turnovers.`
-          : `占优一方送出 ${beneficiaryBox.totals.ast} 次助攻，同时只有 ${beneficiaryBox.totals.tov} 次失误。`;
+        const assists = Number(beneficiaryBox.totals.ast || 0);
+        const turnovers = Number(beneficiaryBox.totals.tov || 0);
+        const opponentTurnovers = Number(affectedBox.totals.tov || 0);
+        const turnoverEdge = opponentTurnovers - turnovers;
+        if (turnovers <= 13 && (assists / Math.max(1, turnovers) >= 1.5 || turnoverEdge >= 2)) {
+          evidence = english
+            ? `The lineup paired ${assists} assists with just ${turnovers} turnovers.`
+            : `这一方送出${assists}次助攻，并把失误控制在${turnovers}次。`;
+        } else if (turnoverEdge >= 2) {
+          evidence = english
+            ? `The lineup committed ${turnovers} turnovers, but still finished with ${turnoverEdge} fewer than the opponent.`
+            : `这一方虽然出现${turnovers}次失误，但仍比对手少${turnoverEdge}次。`;
+        } else {
+          advantageSupported = false;
+          label = english ? "Possession battle" : "球权拉锯";
+          evidence = english
+            ? `The lineup finished with ${assists} assists and ${turnovers} turnovers, without creating a clear possession edge.`
+            : `这一方送出${assists}次助攻并出现${turnovers}次失误，球权上没有拉开明显优势。`;
+        }
       } else if (event.type === "glass_control") {
-        evidence = english
-          ? `The rebounding count finished ${beneficiaryBox.totals.reb}-${affectedBox.totals.reb}.`
-          : `双方篮板数为 ${beneficiaryBox.totals.reb}-${affectedBox.totals.reb}。`;
+        const reboundEdge = Number(beneficiaryBox.totals.reb || 0) - Number(affectedBox.totals.reb || 0);
+        advantageSupported = reboundEdge >= 3;
+        label = advantageSupported ? label : (english ? "Battle on the glass" : "篮板拉锯");
+        evidence = advantageSupported
+          ? (english
+            ? `The lineup won the rebounding count ${beneficiaryBox.totals.reb}-${affectedBox.totals.reb}.`
+            : `这一方以${beneficiaryBox.totals.reb}-${affectedBox.totals.reb}赢下篮板争夺。`)
+          : (english
+            ? `The rebounding count finished ${beneficiaryBox.totals.reb}-${affectedBox.totals.reb}, without a clear edge.`
+            : `双方篮板数为${beneficiaryBox.totals.reb}-${affectedBox.totals.reb}，没有形成明显优势。`);
       } else if (event.type === "foul_pressure") {
         evidence = english
           ? `${h5BattlePlayerName(targetCard)} was held to ${targetLine.minutes} minutes under foul pressure.`
           : `${h5BattlePlayerName(targetCard)}受到犯规压力，出场时间被压缩到 ${targetLine.minutes} 分钟。`;
       } else {
-        evidence = english
-          ? `The adjustment produced ${beneficiaryBox.totals.ast} assists and changed the matchup rhythm.`
-          : `这次调整带来了 ${beneficiaryBox.totals.ast} 次助攻，并改变了对位节奏。`;
+        advantageSupported = Number(beneficiaryBox.totals.ast || 0) >= 18;
+        label = advantageSupported ? label : (english ? "Adjustment stalled" : "调整未能奏效");
+        evidence = advantageSupported
+          ? (english
+            ? `The adjustment produced ${beneficiaryBox.totals.ast} assists and changed the matchup rhythm.`
+            : `这次调整带来了${beneficiaryBox.totals.ast}次助攻，并改变了对位节奏。`)
+          : (english
+            ? `The adjustment produced only ${beneficiaryBox.totals.ast} assists and never changed the matchup.`
+            : `这次调整只带来${beneficiaryBox.totals.ast}次助攻，没有真正改变比赛。`);
       }
-      const outcome = beneficiaryWon
+      let outcome = event.type === "foul_pressure"
+        ? (beneficiaryWon
+          ? (english
+            ? `${h5BattlePlayerName(targetCard)}'s foul trouble disrupted the opposing rotation, and ${winnerLead} to capitalize.`
+            : `${h5BattlePlayerName(targetCard)}的犯规麻烦打乱了对手轮换，${winnerLead}并抓住了机会。`)
+          : (english
+            ? `${h5BattlePlayerName(targetCard)} battled foul trouble, but that lineup still won as ${winnerLead}.`
+            : `${h5BattlePlayerName(targetCard)}虽然受困犯规，但他所在的阵容仍靠${winnerLead}赢下比赛。`))
+        : !advantageSupported
         ? (english
-          ? `That edge became a direct part of the win; ${h5BattlePlayerName(winnerTopCard)} led the winner with ${winnerTop.pts} points.`
-          : `这一优势直接转化为胜利；${h5BattlePlayerName(winnerTopCard)}以 ${winnerTop.pts} 分领衔获胜方。`)
+          ? `${winnerLead} and decided the game.`
+          : `${winnerLead}，成为本场更直接的胜负手。`)
+        : beneficiaryWon
+        ? (english
+          ? `That edge became a direct part of the win; ${winnerLead}.`
+          : `这一优势直接转化为胜利；${winnerLead}。`)
         : (english
-          ? `The other lineup survived that edge because ${h5BattlePlayerName(winnerTopCard)} answered with ${winnerTop.pts} points.`
-          : `但另一方顶住了这项优势，${h5BattlePlayerName(winnerTopCard)}用 ${winnerTop.pts} 分完成回应。`);
-      return { label: labels[event.type], evidence, outcome };
+          ? `The other lineup survived that edge because ${winnerLead}.`
+          : `但另一方顶住了这项优势，${winnerLead}并完成回应。`);
+      const losingStarSurge = event.type !== "foul_pressure"
+        && (loserTop.threePm >= 5 || loserTop.pts >= 30);
+      if (losingStarSurge) {
+        label = loserTop.threePm >= 5
+          ? (english ? "Three-point barrage" : "三分爆发")
+          : (english ? "One-star resistance" : "核心苦撑");
+        evidence = loserTop.threePm >= 5
+          ? (english
+            ? `${h5BattlePlayerName(loserTopCard)} hit ${loserTop.threePm} threes and scored ${loserTop.pts}, repeatedly breaking the winning defense from outside.`
+            : `${h5BattlePlayerName(loserTopCard)}投进${loserTop.threePm}记三分并拿到${loserTop.pts}分，一度用外线火力打穿胜方防线。`)
+          : (english
+            ? `${h5BattlePlayerName(loserTopCard)} carried the losing side with ${loserTop.pts} points.`
+            : `${h5BattlePlayerName(loserTopCard)}砍下${loserTop.pts}分，几乎独自撑住败方进攻。`);
+        outcome = english
+          ? `${winnerLead}, and the winner's broader scoring support survived that individual burst.`
+          : `${winnerLead}，胜方靠更完整的整体得分顶住了这次爆发。`;
+      }
+      return { label, evidence, outcome };
+    }
+
+    function h5BattleSeriesOutcomeExplanation(series, ownTeam, opponentTeam, english = h5BattleEnglish()) {
+      const ownWon = series.winnerId === ownTeam.id;
+      const winner = ownWon ? ownTeam : opponentTeam;
+      const loser = ownWon ? opponentTeam : ownTeam;
+      const winnerPower = Number(winner?.power || 0);
+      const loserPower = Number(loser?.power || 0);
+      const powerGap = winnerPower - loserPower;
+      if (powerGap < -1.5) {
+        return {
+          type: "upset",
+          label: english ? "UPSET" : "爆冷",
+          text: english
+            ? `The lower-rated lineup won the games that mattered and completed a ${ownWon ? `${series.scoreA}-${series.scoreB}` : `${series.scoreB}-${series.scoreA}`} upset.`
+            : `纸面处于下风的一方赢下了更关键的比赛，以 ${ownWon ? `${series.scoreA}-${series.scoreB}` : `${series.scoreB}-${series.scoreA}`} 完成爆冷。`
+        };
+      }
+      if (Math.abs(winnerPower - loserPower) <= 1.5) {
+        return {
+          type: "close",
+          label: english ? "CLOSE MATCHUP" : "势均力敌",
+          text: english
+            ? "The two lineups were close enough that execution, single-game swings and home-court order decided the series."
+            : "双方纸面强度非常接近，临场执行、单场波动和主客场次序共同决定了系列赛。"
+        };
+      }
+      return {
+        type: "favored-winner",
+        label: english ? "FAVORITE DELIVERED" : "优势兑现",
+        text: english
+          ? `${ownWon ? "Your lineup" : "The opponent"} converted its stronger combined offense, defense, fit and impact profile into the series win.`
+          : `${ownWon ? "你的阵容" : "对手"}把进攻、防守、兼容性和高阶影响上的综合优势兑现成了系列赛胜利。`
+      };
+    }
+
+    function h5BattleScoringBaseline(card) {
+      const value = Number(card?.seasonStats?.ppg ?? card?.ppg);
+      return Number.isFinite(value) ? value : 0;
+    }
+
+    function h5BattleSeriesScoringInsight(structureAnalysis, series, ownTeam, opponentTeam, english) {
+      if (!structureAnalysis) return "";
+      const winnerStructure = structureAnalysis.teams?.find(team => team.teamId === series.winnerId);
+      const suppressed = winnerStructure?.defense?.suppressedTargets?.[0] || null;
+      if (suppressed?.possibleDefenders?.length) {
+        const defender = suppressed.possibleDefenders[0].playerName;
+        const crushed = suppressed.confidence === "high"
+          && suppressed.actualPpg <= suppressed.baselinePpg * .68;
+        return english
+          ? `${defender} ${crushed ? "shut down" : "contained"} ${suppressed.targetName}, holding the scorer to ${suppressed.actualPpg} points per game for the series.`
+          : `${defender}在本轮${crushed ? "防死了" : "限制住了"}${suppressed.targetName}，让后者系列赛场均只得到${suppressed.actualPpg}分。`;
+      }
+      const loserId = series.winnerId === ownTeam.id ? opponentTeam.id : ownTeam.id;
+      const loserStructure = structureAnalysis.teams?.find(team => team.teamId === loserId);
+      const slump = (loserStructure?.summary?.players || []).map(player => {
+        const baseline = h5BattleScoringBaseline(player.card);
+        return { ...player, baseline, drop: baseline - Number(player.ppg || 0) };
+      }).filter(player => player.baseline >= 17 && player.drop >= 5
+        && player.ppg <= player.baseline * .82)
+        .sort((left, right) => right.drop - left.drop)[0];
+      if (!slump) return "";
+      const name = h5BattlePlayerName(slump.card);
+      return english
+        ? `${name} struggled with the shot throughout the series, averaging ${slump.ppg} points after a ${slump.baseline.toFixed(1)}-point regular-season baseline.`
+        : `${name}本轮手感低迷，系列赛场均只有${slump.ppg}分；这个球员常规赛场均能得到${slump.baseline.toFixed(1)}分。`;
+    }
+
+    function h5BattleGameScoringInsight(game, ownTeam, opponentTeam, structureAnalysis, english) {
+      const candidates = [];
+      for (const [team, opponent, box] of [
+        [ownTeam, opponentTeam, game.teamABox],
+        [opponentTeam, ownTeam, game.teamBBox]
+      ]) {
+        for (const line of box?.players || []) {
+          if (game.specialEvent?.actorCardKey === line.cardKey
+            && game.specialEvent?.constraint?.minutesCap) continue;
+          const card = h5BattleFindCard(team.lineup, line.cardKey);
+          const baseline = h5BattleScoringBaseline(card);
+          const drop = baseline - Number(line.pts || 0);
+          if (baseline < 17 || drop < 8 || line.pts > baseline * .55) continue;
+          const opponentStructure = structureAnalysis?.teams?.find(item => item.teamId === opponent.id);
+          const suppression = opponentStructure?.defense?.suppressedTargets
+            ?.find(target => target.targetCardKey === line.cardKey);
+          candidates.push({ card, line, baseline, drop, suppression });
+        }
+      }
+      const candidate = candidates.sort((left, right) => right.drop - left.drop)[0];
+      if (!candidate) return "";
+      const targetName = h5BattlePlayerName(candidate.card);
+      const defender = candidate.suppression?.possibleDefenders?.[0]?.playerName;
+      if (defender) {
+        return english
+          ? `${defender} contained ${targetName} in this game and held the scorer to ${candidate.line.pts} points.`
+          : `${defender}本场限制住了${targetName}，让后者只得到${candidate.line.pts}分。`;
+      }
+      return english
+        ? `${targetName} struggled with the shot in this game and finished with ${candidate.line.pts} points.`
+        : `${targetName}本场手感低迷，只得到${candidate.line.pts}分。`;
+    }
+
+    function h5BattleSeriesReviewCards(
+      structureAnalysis, series, ownTeam, opponentTeam, seriesScoringInsight,
+      representativeEvent, specialStorylines, english
+    ) {
+      const winnerId = series.winnerId;
+      const loserId = winnerId === ownTeam.id ? opponentTeam.id : ownTeam.id;
+      const winnerName = winnerId === ownTeam.id
+        ? (english ? "Your lineup" : "你的阵容")
+        : (english ? "The opponent" : "对手");
+      const loserName = loserId === ownTeam.id
+        ? (english ? "your lineup" : "你的阵容")
+        : (english ? "the opponent" : "对手");
+      const winnerStructure = structureAnalysis?.teams?.find(team => team.teamId === winnerId);
+      const loserStructure = structureAnalysis?.teams?.find(team => team.teamId === loserId);
+      const winnerPlayers = winnerStructure?.summary?.players || [];
+      const loserPlayers = loserStructure?.summary?.players || [];
+      const winnerAverage = winnerStructure?.summary?.averages || {};
+      const loserAverage = loserStructure?.summary?.averages || {};
+      const top = winnerPlayers[0];
+      const second = winnerPlayers[1];
+      const third = winnerPlayers[2];
+      const offenseId = winnerStructure?.offense?.primary?.id || "";
+      const spacing = [
+        winnerStructure?.offense?.primary,
+        ...(winnerStructure?.offense?.secondary || [])
+      ].some(item => item?.id === "spacing_shooting");
+      let offenseText;
+      if (offenseId === "single_core" && top) {
+        offenseText = english
+          ? `${h5BattlePlayerName(top.card)} carried the main scoring load at ${top.ppg} points per game, while ${second ? `${h5BattlePlayerName(second.card)} supplied ${second.ppg}` : "the rest of the lineup filled the gaps"}.`
+          : `${h5BattlePlayerName(top.card)}场均${top.ppg}分承担主攻，${second ? `${h5BattlePlayerName(second.card)}以${second.ppg}分提供第二支点` : "其余球员负责补上空缺"}。`;
+      } else if (offenseId === "dual_core" && top && second) {
+        offenseText = english
+          ? `${h5BattlePlayerName(top.card)} and ${h5BattlePlayerName(second.card)} averaged ${top.ppg} and ${second.ppg} points, giving ${winnerName.toLowerCase()} two stable scoring answers.`
+          : `${h5BattlePlayerName(top.card)}和${h5BattlePlayerName(second.card)}场均分别得到${top.ppg}分和${second.ppg}分，胜方始终有两个稳定的得分答案。`;
+      } else if (offenseId === "balanced_scoring" && top && second && third) {
+        offenseText = english
+          ? `${h5BattlePlayerName(top.card)}, ${h5BattlePlayerName(second.card)}, and ${h5BattlePlayerName(third.card)} averaged ${top.ppg}, ${second.ppg}, and ${third.ppg}, spreading the pressure across three scorers.`
+          : `${h5BattlePlayerName(top.card)}、${h5BattlePlayerName(second.card)}和${h5BattlePlayerName(third.card)}场均分别得到${top.ppg}分、${second.ppg}分和${third.ppg}分，进攻压力被三个人分担。`;
+      } else {
+        offenseText = english
+          ? `${winnerName} averaged ${winnerAverage.pts || 0} points and found the steadier scoring response in the games that mattered.`
+          : `${winnerName}场均得到${winnerAverage.pts || 0}分，并在决定系列赛走向的比赛里给出了更稳定的得分回应。`;
+      }
+      if (spacing) {
+        offenseText += english
+          ? ` The lineup also made ${winnerAverage.threePm || 0} threes per game.`
+          : ` 这套阵容场均还能投进${winnerAverage.threePm || 0}记三分。`;
+      }
+
+      const suppressed = winnerStructure?.defense?.suppressedTargets?.[0];
+      let defenseText;
+      if (suppressed?.possibleDefenders?.length) {
+        const defender = suppressed.possibleDefenders[0].playerName;
+        defenseText = english
+          ? `${defender} took the main assignment on ${suppressed.targetName} and held that scorer to ${suppressed.actualPpg} points per game.`
+          : `${defender}承担了限制${suppressed.targetName}的主要任务，让后者系列赛场均只有${suppressed.actualPpg}分。`;
+      } else if (winnerStructure?.defense?.primary) {
+        defenseText = english
+          ? `${winnerName} held ${loserName} to ${winnerAverage.opponentPts || 0} points and forced ${winnerAverage.opponentTov || 0} turnovers per game through collective coverage.`
+          : `${winnerName}让${loserName}场均得到${winnerAverage.opponentPts || 0}分并出现${winnerAverage.opponentTov || 0}次失误，防守价值来自整套轮转而不是某一个固定对位。`;
+      } else {
+        defenseText = english
+          ? `Neither side produced a single matchup that decided the series. ${winnerName} survived by keeping enough possessions intact for its offense.`
+          : `这轮没有出现某一个固定对位彻底锁死核心的场面；${winnerName}守住了足够多的回合，让进攻优势能够延续。`;
+      }
+
+      const threeGap = Number(winnerAverage.threePm || 0) - Number(loserAverage.threePm || 0);
+      const reboundGap = Number(winnerAverage.reb || 0) - Number(loserAverage.reb || 0);
+      const turnoverGap = Number(loserAverage.tov || 0) - Number(winnerAverage.tov || 0);
+      let loserText = seriesScoringInsight;
+      if (!loserText && threeGap >= 2) {
+        loserText = english
+          ? `${loserName} made ${Math.round(threeGap * 10) / 10} fewer threes per game and could not erase that perimeter gap often enough.`
+          : `${loserName}场均少投进${Math.round(threeGap * 10) / 10}记三分，外线产量不足让追分越来越困难。`;
+      } else if (!loserText && reboundGap >= 4) {
+        loserText = english
+          ? `${loserName} lost the rebounding count by ${Math.round(reboundGap * 10) / 10} per game and gave away too many second possessions.`
+          : `${loserName}场均少${Math.round(reboundGap * 10) / 10}个篮板，送出了太多二次进攻机会。`;
+      } else if (!loserText && turnoverGap >= 2) {
+        loserText = english
+          ? `${loserName} committed ${Math.round(turnoverGap * 10) / 10} more turnovers per game and repeatedly lost chances to answer.`
+          : `${loserName}场均多${Math.round(turnoverGap * 10) / 10}次失误，几次关键追分都断在球权处理上。`;
+      } else if (!loserText && loserPlayers[0]) {
+        loserText = english
+          ? `${h5BattlePlayerName(loserPlayers[0].card)} averaged ${loserPlayers[0].ppg} points, but the lineup did not produce enough consecutive answers around that scoring.`
+          : `${h5BattlePlayerName(loserPlayers[0].card)}场均得到${loserPlayers[0].ppg}分，但败方没有围绕这个得分点连续给出足够回应。`;
+      }
+
+      const closeout = series.games[series.games.length - 1];
+      const closeoutWinnerBox = closeout?.winnerId === ownTeam.id ? closeout?.teamABox : closeout?.teamBBox;
+      const closeoutWinnerTeam = closeout?.winnerId === ownTeam.id ? ownTeam : opponentTeam;
+      const closeoutTop = closeoutWinnerBox ? h5BattleGameTopPlayer(closeoutWinnerBox) : null;
+      const closeoutCard = closeoutTop
+        ? h5BattleFindCard(closeoutWinnerTeam.lineup, closeoutTop.cardKey)
+        : null;
+      const winnerScore = closeout?.winnerId === ownTeam.id ? closeout?.teamAScore : closeout?.teamBScore;
+      const loserScore = closeout?.winnerId === ownTeam.id ? closeout?.teamBScore : closeout?.teamAScore;
+      const closeoutText = closeoutTop
+        ? (english
+          ? `${winnerName} closed the series in Game ${closeout.number}, ${winnerScore}-${loserScore}. ${h5BattlePlayerName(closeoutCard)} finished with ${closeoutTop.pts} points${closeoutTop.threePm >= 5 ? ` and ${closeoutTop.threePm} threes` : ""}.`
+          : `${winnerName}在G${closeout.number}以${winnerScore}-${loserScore}结束系列赛。${h5BattlePlayerName(closeoutCard)}拿到${closeoutTop.pts}分${closeoutTop.threePm >= 5 ? `并投进${closeoutTop.threePm}记三分` : ""}，完成最后一场的收官。`)
+        : (english ? `${winnerName} closed the series in the final game.` : `${winnerName}在最后一场完成收官。`);
+      const cards = [
+        { label: english ? "Winning offense" : "胜方进攻", text: offenseText },
+        { label: english ? "How the defense held" : "防守方式", text: defenseText },
+        { label: english ? "What the loser lacked" : "败方问题", text: loserText || (english
+          ? `${loserName} did not find enough consecutive answers in the key games.`
+          : `${loserName}在关键比赛里没有连续给出足够回应。`) },
+        { label: english ? "Closeout game" : "收官比赛", text: closeoutText }
+      ];
+      if (representativeEvent?.text) {
+        cards.push({
+          label: english ? "Representative event" : "代表事件",
+          text: representativeEvent.text
+        });
+      }
+      if (specialStorylines?.length) {
+        cards.push({
+          label: english ? "Series flashpoint" : "系列赛插曲",
+          text: specialStorylines.slice(0, 2).map(story => story.text).join(english ? " " : "")
+        });
+      }
+      return cards;
     }
 
     function h5BattleResultMarkup(series, ownTeam, opponentTeam) {
@@ -21394,15 +23091,40 @@ function renderV6Timeline(timeline = []) {
       }) || null;
       const narrativeByGame = new Map((narrative?.games || []).map(game => [game.gameNumber, game]));
       const representativeEvent = narrative?.representativeEvent || null;
+      const seriesHeadline = narrative && globalThis.H5BattleNarrativeCandidate?.buildSeriesHeadline
+        ? globalThis.H5BattleNarrativeCandidate.buildSeriesHeadline({
+          series,
+          teamA: ownTeam,
+          teamB: opponentTeam,
+          narrative,
+          locale: english ? "en" : "zh-CN"
+        })
+        : null;
+      const structureAnalysis = globalThis.H5BattleStructureCandidate?.analyzeBattleStructures?.({
+        series,
+        teamA: ownTeam,
+        teamB: opponentTeam,
+        locale: english ? "en" : "zh-CN"
+      }) || null;
       const ownWon = series.winnerId === ownTeam.id;
       const ownSummary = summarizeH5BattleSeriesLineup(series, "A");
       const opponentSummary = summarizeH5BattleSeriesLineup(series, "B");
       const winnerSummary = ownWon ? ownSummary : opponentSummary;
       const winnerLineup = ownWon ? ownTeam.lineup : opponentTeam.lineup;
       const mvpSummary = [...winnerSummary].sort((left, right) =>
-        h5BattlePlayerSeriesValue(right) - h5BattlePlayerSeriesValue(left))[0];
+        h5BattlePlayerSeriesValue(right, h5BattleFindCard(winnerLineup, right.cardKey))
+        - h5BattlePlayerSeriesValue(left, h5BattleFindCard(winnerLineup, left.cardKey)))[0];
       const mvp = h5BattleFindCard(winnerLineup, mvpSummary.cardKey);
-      const edge = ownTeam.power - opponentTeam.power;
+      const outcomeExplanation = h5BattleSeriesOutcomeExplanation(series, ownTeam, opponentTeam, english);
+      const seriesScoringInsight = h5BattleSeriesScoringInsight(
+        structureAnalysis, series, ownTeam, opponentTeam, english
+      );
+      const specialStorylines = (narrative?.seriesStorylines || [])
+        .filter(story => story?.layer === "scheduledSpecialEvent");
+      const seriesReviewCards = h5BattleSeriesReviewCards(
+        structureAnalysis, series, ownTeam, opponentTeam, seriesScoringInsight,
+        representativeEvent, specialStorylines, english
+      );
       return `
         <div class="battle-result-hero ${ownWon ? "won" : "lost"}">
           <span>${english ? "BEST OF SEVEN" : "七场四胜"}</span>
@@ -21410,7 +23132,8 @@ function renderV6Timeline(timeline = []) {
           <div class="battle-series-score">${series.scoreA}–${series.scoreB}</div>
           <section class="battle-mvp-card">
             <div class="battle-mvp-identity"><span>${english ? "Series MVP" : "系列赛 MVP"}</span>
-              <strong>${h5BattlePlayerName(mvp)}</strong></div>
+              <div><strong>${h5BattlePlayerName(mvp)}</strong>
+                <small class="battle-mvp-version">${h5BattlePlayerVersion(mvp)}</small></div></div>
             <div class="battle-table-scroll"><table class="battle-mvp-table">
               <thead><tr><th>PTS</th><th>REB</th><th>AST</th><th>STL</th><th>BLK</th>
                 <th>FG%</th><th>3P%</th><th>FT%</th><th>TS%</th></tr></thead>
@@ -21420,6 +23143,11 @@ function renderV6Timeline(timeline = []) {
             </table></div>
           </section>
         </div>
+        ${seriesHeadline ? `<section class="battle-series-headline">
+          <span>${seriesHeadline.label || (english ? "SERIES HEADLINE" : "系列赛头条")}</span>
+          <h3>${seriesHeadline.title}</h3>
+          <p>${seriesHeadline.body}</p>
+        </section>` : ""}
         <section class="battle-series-stats">
           <h3>${english ? "Series averages" : "双方系列赛场均数据"}</h3>
           <div class="battle-stat-columns">
@@ -21435,6 +23163,9 @@ function renderV6Timeline(timeline = []) {
             const eventStory = h5BattleGameEventStory(game, ownTeam, opponentTeam);
             const narrativeGame = narrativeByGame.get(game.number);
             const narrativeBeats = (narrativeGame?.beats || []).slice(0, 3);
+            const scoringInsight = h5BattleGameScoringInsight(
+              game, ownTeam, opponentTeam, structureAnalysis, english
+            );
             const gameWinner = game.winnerId === ownTeam.id
               ? (english ? "Your win" : "你的阵容获胜")
               : (english ? "Opponent win" : "对手获胜");
@@ -21446,8 +23177,10 @@ function renderV6Timeline(timeline = []) {
               </summary>
               <div class="battle-game-story"><strong>${eventStory.label}</strong>
                 <p>${eventStory.evidence} ${eventStory.outcome}</p>
+                ${scoringInsight ? `<p class="battle-scoring-insight">${scoringInsight}</p>` : ""}
                 ${narrativeBeats.length ? `<div class="battle-narrative-beats">${narrativeBeats
-                  .map(beat => `<p>${beat.text}</p>`).join("")}</div>` : ""}</div>
+                  .map(beat => `<p>${beat.layer === "scheduledSpecialEvent"
+                    ? `<strong>${english ? "Series event" : "本场事件"}</strong> ` : ""}${beat.text}</p>`).join("")}</div>` : ""}</div>
               <div class="battle-game-boxes">
                 ${h5BattleGameTable(english ? "Your NBA5" : "你的 NBA5", game.teamABox, ownTeam.lineup)}
                 ${h5BattleGameTable(english ? "Opponent" : "对手", game.teamBBox, opponentTeam.lineup)}
@@ -21455,26 +23188,17 @@ function renderV6Timeline(timeline = []) {
             </details>`;
           }).join("")}
         </section>
-        ${(narrative?.seriesStorylines || []).length ? `<section class="battle-series-storylines">
-          <h3>${english ? "Series storylines" : "系列赛支线"}</h3>
-          ${(narrative.seriesStorylines || []).map(story => `<article><strong>${english
-            ? "Simulated team storyline"
-            : "模拟球队剧情"}</strong><p>${story.text}</p></article>`).join("")}
-        </section>` : ""}
-        <div class="battle-explanation">
-          <strong>${english ? "Why the series tilted" : "系列赛为什么倒向这一边"}</strong>
-          <p>${Math.abs(edge) < 1.5
-            ? (english ? "The two lineups were close enough that individual games and home court decided the series."
-              : "双方综合强度非常接近，单场波动和主客场次序决定了系列赛。")
-            : edge > 0
-              ? (english ? "Your lineup held the stronger combined offense, defense, fit and impact profile."
-                : "你的阵容在进攻、防守、兼容性和高阶影响的综合比较中占优。")
-              : (english ? "The opponent held the stronger combined offense, defense, fit and impact profile."
-                : "对手在进攻、防守、兼容性和高阶影响的综合比较中占优。")}</p>
-          ${representativeEvent ? `<div class="battle-representative-event"><b>${english
-            ? "Representative event"
-            : "代表事件"}</b><p>${representativeEvent.text}</p></div>` : ""}
-        </div>`;
+        <section class="battle-series-review">
+          <h3>${english ? "Full series review" : "系列赛整体复盘"}</h3>
+          <div class="battle-explanation">
+            <strong>${english ? "Why the series tilted" : "系列赛为什么倒向这一边"}</strong>
+            <b class="battle-outcome-label">${outcomeExplanation.label}</b>
+            <p>${outcomeExplanation.text}</p>
+          </div>
+          <div class="battle-review-grid">${seriesReviewCards.map(card => `
+            <article><strong>${card.label}</strong><p>${card.text}</p></article>`).join("")}</div>
+        </section>
+        ${narrative?.disclaimer ? `<small class="battle-fiction-disclaimer">${narrative.disclaimer}</small>` : ""}`;
     }
 
     async function h5BattleStartSeries(options = {}) {
@@ -21525,7 +23249,13 @@ function renderV6Timeline(timeline = []) {
         .battle-mode-switch{display:flex;gap:8px;padding:8px;background:#e8e1d7;border-radius:16px;margin:0 0 16px}.battle-mode-switch button{flex:1;border:0;border-radius:11px;padding:12px 16px;background:transparent;color:#5d564e;font-weight:900;font-size:15px;cursor:pointer}.battle-mode-switch button.active{background:#191714;color:#fff;box-shadow:0 6px 18px rgba(25,23,20,.18)}
         .battle-panel{margin:18px 0 26px;border:2px solid #191714;background:#fff}.battle-panel-head{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;margin-bottom:18px}.battle-panel-head h2{margin:0 0 6px}.battle-kicker{font-size:12px;font-weight:1000;letter-spacing:.12em;color:#d64032}.battle-columns{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;min-width:0}.battle-side{min-width:0;border:1px solid #d8d0c6;border-radius:16px;padding:16px;background:#f8f5f0}.battle-side h3{margin:0 0 5px}.battle-code-row{display:flex;gap:8px;margin:12px 0;min-width:0}.battle-code-row textarea,.battle-code-row input{box-sizing:border-box;width:100%;max-width:100%;flex:1;min-width:0;border:1px solid #aaa094;border-radius:10px;padding:10px;font:600 12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;background:#fff}.battle-code-row textarea{min-height:72px;resize:vertical}.battle-own-code-row{align-items:flex-start}.battle-own-code-row #battleCopyOwnCode{flex:0 0 auto;width:auto;max-width:132px;padding:8px 12px;white-space:nowrap}.battle-opponent-actions,.battle-final-actions{display:flex;gap:8px;flex-wrap:wrap}.battle-lineup-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-top:14px}.battle-player-card{position:relative;min-width:0;padding:8px;border-radius:12px;background:#201d19;color:#fff;text-align:center;overflow:hidden}.battle-player-position{position:absolute;top:5px;left:5px;z-index:2;background:#d64032;border-radius:99px;padding:2px 6px;font-size:10px;font-weight:1000}.battle-player-art{height:76px;display:grid;place-items:center;margin-bottom:5px;background:#39332d;border-radius:8px;overflow:hidden}.battle-player-art img{width:100%;height:100%;object-fit:contain}.battle-player-card strong,.battle-player-card small{display:block;overflow:hidden;text-overflow:ellipsis}.battle-player-card strong{font-size:11px;white-space:nowrap}.battle-player-card small{font-size:9px;color:#cfc7bd;height:26px}.battle-empty{min-height:78px;display:grid;place-items:center;text-align:center;color:#746c63}.battle-code-hidden{font-size:12px;font-weight:800;color:#8b3329}.battle-status{min-height:22px;margin:10px 0;font-weight:800;font-size:13px}.battle-status[data-tone=success]{color:#237a57}.battle-status[data-tone=error]{color:#b12d24}.battle-start{width:100%;margin-top:16px;padding:14px}.battle-result{margin-top:18px;border-top:1px solid #d8d0c6;padding-top:18px}.battle-result-hero{border-radius:16px;padding:20px;background:#191714;color:#fff;text-align:center}.battle-result-hero.won{background:#163f30}.battle-result-hero.lost{background:#4b211d}.battle-result-hero h3{margin:6px 0}.battle-series-score{font-size:54px;font-weight:1000}.battle-series-stats,.battle-game-log,.battle-series-storylines{margin-top:20px}.battle-stat-columns,.battle-game-boxes{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}.battle-stat-card,.battle-game-box{min-width:0;border:1px solid #d8d0c6;border-radius:12px;padding:12px;background:#fff}.battle-stat-card h4,.battle-game-box h5{margin:0 0 8px}.battle-table-scroll{max-width:100%;overflow-x:auto}.battle-stat-table{width:100%;min-width:650px;border-collapse:collapse;font-size:11px}.battle-stat-table th,.battle-stat-table td{padding:6px 5px;border-bottom:1px solid #e5ded5;text-align:right;white-space:nowrap}.battle-stat-table th:first-child,.battle-stat-table td:first-child{text-align:left}.battle-stat-table tbody th{max-width:150px;overflow:hidden;text-overflow:ellipsis}.battle-rotation-row{color:#746c63;background:#f4f0ea}.battle-rotation-row td[colspan]{text-align:center}.battle-game-detail{margin:10px 0;border:1px solid #d8d0c6;border-radius:12px;background:#f8f5f0;overflow:hidden}.battle-game-detail summary{display:grid;grid-template-columns:auto auto auto 1fr;gap:10px;align-items:center;padding:13px;cursor:pointer}.battle-game-detail summary span{font-size:20px;font-weight:1000}.battle-game-detail summary small{text-align:right;color:#746c63}.battle-game-story{margin:0 12px 12px;padding:12px;border-left:4px solid #d64032;background:#fff}.battle-game-story p{margin:5px 0 0}.battle-narrative-beats{margin-top:10px;padding-top:7px;border-top:1px solid #e5ded5}.battle-narrative-beats p{color:#4d463f}.battle-game-boxes{padding:0 12px 12px}.battle-series-storylines{display:grid;gap:10px}.battle-series-storylines h3{margin-bottom:0}.battle-series-storylines article{padding:13px;border:1px solid #d8d0c6;border-radius:12px;background:#fff8eb}.battle-series-storylines p{margin:5px 0 0}.battle-explanation{padding:14px;border-radius:12px;background:#eee8df}.battle-explanation p{margin:6px 0}.battle-representative-event{margin-top:10px;padding-top:10px;border-top:1px solid #cfc5b9}.battle-final-actions{margin-top:12px}.battle-mode-active .advanced-settings,.battle-mode-active #simulateBtnFloating,.battle-mode-active .layout>.side{display:none!important}.battle-mode-active .layout{grid-template-columns:minmax(0,1fr)}
         .battle-mode-active .battle-panel{border:0;border-radius:24px;padding:24px;background:linear-gradient(145deg,#fffaf2,#f2ebe1);box-shadow:0 18px 50px rgba(38,31,25,.12)}.battle-panel-head{max-width:760px}.battle-panel-head h2{font-size:clamp(28px,4vw,46px);line-height:1.05}.battle-kicker{margin-bottom:8px}.battle-columns{grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);gap:14px}.battle-side{border:0;border-radius:18px;padding:18px;background:rgba(255,255,255,.78);box-shadow:inset 0 0 0 1px rgba(109,96,81,.14)}.battle-own-ready{display:flex;flex-direction:column;gap:3px;margin:14px 0;padding:12px 14px;border-radius:12px;background:#e8f2ec;color:#174a36}.battle-own-ready span{font-size:12px;color:#527063}.battle-code-row input{min-height:44px}.battle-own-code-row input{color:#756c62;background:#f8f5f0}.battle-action-or{align-self:center;color:#8c8176;font-size:12px;font-weight:900}.battle-opponent-actions{align-items:center}.battle-opponent-actions .btn{flex:1}.battle-opponent-ready{min-height:88px;border:1px dashed #c9bcae;border-radius:14px;background:#fbf7f1}.battle-start{border-radius:14px;font-size:17px;letter-spacing:.02em}.battle-results-section{display:none;margin-top:28px;border:0;border-radius:22px;padding:22px;background:#fff}.battle-mode-active .battle-results-section:not([hidden]){display:block}.battle-results-head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:12px}.battle-results-head span{font-size:11px;font-weight:1000;letter-spacing:.14em;color:#d64032}.battle-results-head h2{margin:4px 0 0}.battle-result{margin-top:0;border-top:0;padding-top:0}.battle-mvp-card{width:min(900px,100%);margin:18px auto 0;border:1px solid rgba(255,255,255,.24);border-radius:14px;overflow:hidden;background:rgba(255,255,255,.1);text-align:left}.battle-mvp-identity{display:flex;align-items:baseline;gap:10px;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.18)}.battle-mvp-identity span{font-size:12px;font-weight:900;letter-spacing:.05em;opacity:.8}.battle-mvp-identity strong{font-size:20px}.battle-mvp-table{width:100%;min-width:620px;border-collapse:collapse;text-align:center}.battle-mvp-table th{padding:7px 10px 4px;font-size:10px;letter-spacing:.04em;opacity:.72}.battle-mvp-table td{padding:3px 10px 10px;font-size:16px;font-weight:1000}.battle-result-modal{position:fixed;inset:0;z-index:10050;display:grid;place-items:center;padding:18px}.battle-result-modal[hidden]{display:none!important}.battle-result-modal-backdrop{position:absolute;inset:0;border:0;background:rgba(17,15,13,.72);backdrop-filter:blur(6px)}.battle-result-dialog{position:relative;width:min(1240px,calc(100vw - 36px));max-height:92vh;overflow:auto;border-radius:22px;background:#f8f5f0;box-shadow:0 24px 80px rgba(0,0,0,.35)}.battle-result-dialog>header{position:sticky;top:0;z-index:3;display:flex;justify-content:space-between;align-items:center;padding:14px 18px;background:rgba(248,245,240,.96);border-bottom:1px solid #d8d0c6}.battle-result-dialog>header h2{margin:0;font-size:20px}.battle-result-dialog>header button{width:38px;height:38px;border:0;border-radius:50%;background:#191714;color:#fff;font-size:24px;cursor:pointer}.battle-result-modal-content{padding:18px}
-        @media(max-width:780px){.battle-columns,.battle-stat-columns,.battle-game-boxes{grid-template-columns:1fr}.battle-panel-head{display:block}.battle-lineup-grid{grid-template-columns:repeat(5,110px);overflow-x:auto;padding-bottom:8px}.battle-own-code-row{align-items:flex-start}.battle-own-code-row #battleCopyOwnCode{width:auto}.battle-game-detail summary{grid-template-columns:auto auto 1fr}.battle-game-detail summary small{grid-column:1/-1;text-align:left}.battle-mode-active .battle-panel{padding:16px;border-radius:18px}.battle-opponent-actions{display:grid;grid-template-columns:1fr}.battle-action-or{display:none}.battle-results-head{align-items:flex-start}.battle-result-dialog{width:calc(100vw - 16px);max-height:96vh;border-radius:16px}.battle-result-modal{padding:8px}.battle-result-modal-content{padding:10px}}
+        .battle-series-headline{margin-top:20px;padding:20px;border:1px solid #d64032;border-radius:16px;background:linear-gradient(135deg,#fff5ed,#fff)}.battle-series-headline span{font-size:11px;font-weight:1000;letter-spacing:.14em;color:#d64032}.battle-series-headline h3{margin:7px 0 8px;font-size:clamp(22px,3vw,34px);line-height:1.12}.battle-series-headline p{margin:0;color:#4d463f;line-height:1.7}.battle-series-review{margin-top:24px}.battle-series-review>h3{margin:0 0 12px}.battle-explanation{padding:14px;border-radius:12px;background:#eee8df}.battle-review-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:12px}.battle-review-grid article{padding:14px;border:1px solid #d8d0c6;border-radius:12px;background:#fff}.battle-review-grid article strong{display:block;margin-bottom:6px;color:#c2382d}.battle-review-grid article p{margin:0;line-height:1.65;color:#4d463f}.battle-outcome-label{display:inline-block;margin-top:8px;padding:3px 8px;border-radius:999px;background:#191714;color:#fff;font-size:11px;letter-spacing:.08em}.battle-fiction-disclaimer{display:block;margin:12px 2px 0;color:#8a8178;font-size:10px;line-height:1.5}
+        @media(max-width:780px){.battle-columns,.battle-stat-columns,.battle-game-boxes,.battle-review-grid{grid-template-columns:1fr}.battle-panel-head{display:block}.battle-lineup-grid{grid-template-columns:repeat(5,110px);overflow-x:auto;padding-bottom:8px}.battle-own-code-row{align-items:flex-start}.battle-own-code-row #battleCopyOwnCode{width:auto}.battle-game-detail summary{grid-template-columns:auto auto 1fr}.battle-game-detail summary small{grid-column:1/-1;text-align:left}.battle-mode-active .battle-panel{padding:16px;border-radius:18px}.battle-opponent-actions{display:grid;grid-template-columns:1fr}.battle-action-or{display:none}.battle-results-head{align-items:flex-start}.battle-result-dialog{width:calc(100vw - 16px);max-height:96vh;border-radius:16px}.battle-result-modal{padding:8px}.battle-result-modal-content{padding:10px}}
+      `;
+      style.textContent += `
+        .battle-structure-analysis{margin-top:20px}.battle-structure-columns{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}.battle-structure-team{padding:14px;border:1px solid #d8d0c6;border-radius:14px;background:#fff}.battle-structure-team h4{margin:0 0 10px}.battle-structure-item{padding:9px 0;border-top:1px solid #eee7de}.battle-structure-item:first-of-type{border-top:0}.battle-structure-item strong{color:#b5352b}.battle-structure-item p{margin:4px 0 0;color:#4d463f;line-height:1.55}
+        .battle-player-name,.battle-player-version,.battle-mvp-version{display:block}.battle-player-version{max-width:150px;margin-top:2px;color:#81776d;font-size:9px;font-weight:600;line-height:1.25;white-space:normal}.battle-mvp-identity>div{min-width:0}.battle-mvp-version{margin-top:2px;color:rgba(255,255,255,.72);font-size:10px;font-weight:600;line-height:1.3}
+        @media(max-width:780px){.battle-structure-columns{grid-template-columns:1fr}}
       `;
       document.head.appendChild(style);
       const switcher = document.createElement("nav");
@@ -21562,7 +23292,7 @@ function renderV6Timeline(timeline = []) {
       resultModal.setAttribute("aria-modal", "true");
       resultModal.setAttribute("aria-labelledby", "battleResultModalTitle");
       resultModal.hidden = true;
-      resultModal.innerHTML = `<button class="battle-result-modal-backdrop" id="battleResultModalBackdrop" type="button" aria-label="关闭结果"></button><div class="battle-result-dialog"><header><h2 id="battleResultModalTitle">NBA5 系列赛结果</h2><button id="battleResultModalClose" type="button" aria-label="关闭结果">×</button></header><div class="battle-result-modal-content" id="battleResultModalContent"></div></div>`;
+      resultModal.innerHTML = `<button class="battle-result-modal-backdrop" id="battleResultModalBackdrop" type="button" aria-label="关闭结果"></button><div class="battle-result-dialog"><header><h2 id="battleResultModalTitle">系列赛结果</h2><button id="battleResultModalClose" type="button" aria-label="关闭结果">×</button></header><div class="battle-result-modal-content" id="battleResultModalContent"></div></div>`;
       document.body.appendChild(resultModal);
       switcher.addEventListener("click", event => {
         const button = event.target.closest("[data-battle-mode]");
