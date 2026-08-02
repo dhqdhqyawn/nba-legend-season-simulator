@@ -4,6 +4,7 @@ import {
   BATTLE_ROOM_TTL_SECONDS,
   normalizeRoomCode,
 } from "./battle-rooms-validation.mjs";
+import { sha256Hex } from "./security.mjs";
 
 const ROOM_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
 
@@ -28,22 +29,25 @@ function iso(seconds) {
 export function publicRoom(row, nowSeconds) {
   if (!row) throw new ApiError(404, "room_not_found", "没有找到这个房间。");
   const expired = Number(row.expires_at) <= nowSeconds;
-  const ready = !expired && row.status === "ready";
+  const complete = !expired && row.status === "complete";
   return {
     code: row.room_code,
-    status: expired ? "expired" : ready ? "ready" : "waiting",
+    status: expired ? "expired" : row.status,
     protocolVersion: row.protocol_version,
     host: {
       name: row.host_name,
-      lineupCode: row.host_lineup_code,
+      ready: Boolean(row.host_lineup_code),
+      lineupCode: complete ? row.host_lineup_code : null,
     },
-    guest: ready ? {
+    guest: row.guest_name ? {
       name: row.guest_name,
-      lineupCode: row.guest_lineup_code,
+      ready: Boolean(row.guest_lineup_code),
+      lineupCode: complete ? row.guest_lineup_code : null,
     } : null,
-    seed: ready ? row.match_seed : null,
+    seed: complete ? row.match_seed : null,
     createdAt: iso(row.created_at),
-    joinedAt: ready ? iso(row.joined_at) : null,
+    joinedAt: row.joined_at ? iso(row.joined_at) : null,
+    startedAt: complete ? iso(row.started_at) : null,
     expiresAt: iso(row.expires_at),
   };
 }
@@ -78,23 +82,25 @@ export async function createBattleRoom(database, submission, nowSeconds) {
   const expiresAt = nowSeconds + BATTLE_ROOM_TTL_SECONDS;
   for (let attempt = 0; attempt < 6; attempt += 1) {
     const roomCode = randomToken(ROOM_ALPHABET, 8);
+    const sessionToken = randomToken(ROOM_ALPHABET, 32);
+    const tokenHash = await sha256Hex(sessionToken);
     if (!BATTLE_ROOM_CODE_PATTERN.test(roomCode)) continue;
     try {
       const row = await database.prepare(
-        `INSERT INTO battle_rooms (
-          room_code, status, host_name, host_lineup_code, protocol_version,
+        `INSERT INTO battle_rooms_v2 (
+          room_code, status, host_name, host_token_hash, protocol_version,
           created_at, expires_at
-        ) VALUES (?1, 'waiting', ?2, ?3, ?4, ?5, ?6)
+        ) VALUES (?1, 'waiting_guest', ?2, ?3, ?4, ?5, ?6)
         RETURNING *`,
       ).bind(
         roomCode,
         submission.name,
-        submission.lineupCode,
+        tokenHash,
         submission.protocolVersion,
         nowSeconds,
         expiresAt,
       ).first();
-      return publicRoom(row, nowSeconds);
+      return { room: publicRoom(row, nowSeconds), sessionToken };
     } catch (error) {
       if (!/unique|constraint/i.test(String(error?.message || error))) throw error;
     }
@@ -105,38 +111,37 @@ export async function createBattleRoom(database, submission, nowSeconds) {
 export async function getBattleRoom(database, code, nowSeconds) {
   const roomCode = normalizeRoomCode(code);
   const row = await database.prepare(
-    "SELECT * FROM battle_rooms WHERE room_code = ?1",
+    "SELECT * FROM battle_rooms_v2 WHERE room_code = ?1",
   ).bind(roomCode).first();
   return publicRoom(row, nowSeconds);
 }
 
 export async function joinBattleRoom(database, code, submission, nowSeconds) {
   const roomCode = normalizeRoomCode(code);
-  const seed = randomSeed();
+  const sessionToken = randomToken(ROOM_ALPHABET, 32);
+  const tokenHash = await sha256Hex(sessionToken);
   const updated = await database.prepare(
-    `UPDATE battle_rooms SET
-      status = 'ready',
+    `UPDATE battle_rooms_v2 SET
+      status = 'selecting',
       guest_name = ?1,
-      guest_lineup_code = ?2,
-      match_seed = ?3,
-      joined_at = ?4
-    WHERE room_code = ?5
-      AND status = 'waiting'
-      AND expires_at > ?4
-      AND protocol_version = ?6
+      guest_token_hash = ?2,
+      joined_at = ?3
+    WHERE room_code = ?4
+      AND status = 'waiting_guest'
+      AND expires_at > ?3
+      AND protocol_version = ?5
     RETURNING *`,
   ).bind(
     submission.name,
-    submission.lineupCode,
-    seed,
+    tokenHash,
     nowSeconds,
     roomCode,
     submission.protocolVersion,
   ).first();
-  if (updated) return publicRoom(updated, nowSeconds);
+  if (updated) return { room: publicRoom(updated, nowSeconds), sessionToken };
 
   const existing = await database.prepare(
-    "SELECT * FROM battle_rooms WHERE room_code = ?1",
+    "SELECT * FROM battle_rooms_v2 WHERE room_code = ?1",
   ).bind(roomCode).first();
   if (!existing) throw new ApiError(404, "room_not_found", "没有找到这个房间。");
   if (Number(existing.expires_at) <= nowSeconds) {
@@ -145,14 +150,85 @@ export async function joinBattleRoom(database, code, submission, nowSeconds) {
   if (existing.protocol_version !== submission.protocolVersion) {
     throw new ApiError(409, "protocol_mismatch", "房间版本不一致，请刷新后重新创建。");
   }
-  if (
-    existing.status === "ready"
-    && existing.guest_name === submission.name
-    && existing.guest_lineup_code === submission.lineupCode
-  ) {
-    return publicRoom(existing, nowSeconds);
-  }
   throw new ApiError(409, "room_already_joined", "这个房间已经有挑战者了。");
+}
+
+async function roomWithSession(database, code, sessionToken, nowSeconds) {
+  const roomCode = normalizeRoomCode(code);
+  const row = await database.prepare(
+    "SELECT * FROM battle_rooms_v2 WHERE room_code = ?1",
+  ).bind(roomCode).first();
+  if (!row) throw new ApiError(404, "room_not_found", "没有找到这个房间。");
+  if (Number(row.expires_at) <= nowSeconds) {
+    throw new ApiError(410, "room_expired", "这个房间已经过期，请重新创建。");
+  }
+  const tokenHash = await sha256Hex(sessionToken);
+  const role = tokenHash === row.host_token_hash
+    ? "host"
+    : tokenHash === row.guest_token_hash
+      ? "guest"
+      : null;
+  if (!role) throw new ApiError(401, "invalid_room_session", "房间身份已经失效，请重新进入房间。");
+  return { roomCode, row, role, tokenHash };
+}
+
+export async function submitBattleRoomLineup(database, code, submission, nowSeconds) {
+  const session = await roomWithSession(database, code, submission.sessionToken, nowSeconds);
+  if (!session.row.guest_name) {
+    throw new ApiError(409, "waiting_for_guest", "请等待挑战者进入房间后再选择阵容。");
+  }
+  if (session.row.status === "complete" || session.row.status === "ready") {
+    const locked = session.role === "host"
+      ? session.row.host_lineup_code
+      : session.row.guest_lineup_code;
+    if (locked === submission.lineupCode) return publicRoom(session.row, nowSeconds);
+    throw new ApiError(409, "lineup_locked", "阵容已经锁定，不能再次修改。");
+  }
+  const ownColumn = session.role === "host" ? "host_lineup_code" : "guest_lineup_code";
+  const readyColumn = session.role === "host" ? "host_ready_at" : "guest_ready_at";
+  const otherColumn = session.role === "host" ? "guest_lineup_code" : "host_lineup_code";
+  const updated = await database.prepare(
+    `UPDATE battle_rooms_v2 SET
+      ${ownColumn} = ?1,
+      ${readyColumn} = ?2,
+      status = CASE WHEN ${otherColumn} IS NOT NULL THEN 'ready' ELSE 'selecting' END
+    WHERE room_code = ?3
+      AND status = 'selecting'
+      AND ${ownColumn} IS NULL
+    RETURNING *`,
+  ).bind(submission.lineupCode, nowSeconds, session.roomCode).first();
+  if (updated) return publicRoom(updated, nowSeconds);
+  const latest = await database.prepare(
+    "SELECT * FROM battle_rooms_v2 WHERE room_code = ?1",
+  ).bind(session.roomCode).first();
+  const locked = session.role === "host" ? latest?.host_lineup_code : latest?.guest_lineup_code;
+  if (locked === submission.lineupCode) return publicRoom(latest, nowSeconds);
+  throw new ApiError(409, "lineup_locked", "阵容已经锁定，不能再次修改。");
+}
+
+export async function startBattleRoom(database, code, submission, nowSeconds) {
+  const session = await roomWithSession(database, code, submission.sessionToken, nowSeconds);
+  if (session.role !== "host") {
+    throw new ApiError(403, "host_only", "只有房主可以开始 PK。");
+  }
+  if (session.row.status === "complete") return publicRoom(session.row, nowSeconds);
+  if (session.row.status !== "ready") {
+    throw new ApiError(409, "players_not_ready", "双方阵容就绪后才能开始 PK。");
+  }
+  const updated = await database.prepare(
+    `UPDATE battle_rooms_v2 SET
+      status = 'complete',
+      match_seed = ?1,
+      started_at = ?2
+    WHERE room_code = ?3 AND status = 'ready' AND host_token_hash = ?4
+    RETURNING *`,
+  ).bind(randomSeed(), nowSeconds, session.roomCode, session.tokenHash).first();
+  if (updated) return publicRoom(updated, nowSeconds);
+  const latest = await database.prepare(
+    "SELECT * FROM battle_rooms_v2 WHERE room_code = ?1",
+  ).bind(session.roomCode).first();
+  if (latest?.status === "complete") return publicRoom(latest, nowSeconds);
+  throw new ApiError(409, "start_conflict", "房间状态已经变化，请刷新后重试。");
 }
 
 export function scheduleBattleRoomCleanup(context, database, nowSeconds) {
@@ -161,6 +237,7 @@ export function scheduleBattleRoomCleanup(context, database, nowSeconds) {
   const roomCutoff = nowSeconds - 7 * 24 * 60 * 60;
   context.waitUntil(database.batch([
     database.prepare("DELETE FROM battle_rooms WHERE expires_at < ?1").bind(roomCutoff),
+    database.prepare("DELETE FROM battle_rooms_v2 WHERE expires_at < ?1").bind(roomCutoff),
     database.prepare("DELETE FROM battle_room_rate_limits WHERE window_start < ?1")
       .bind(rateLimitCutoff),
   ]).catch(error => console.error("Battle room cleanup failed", error)));

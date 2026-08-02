@@ -117,6 +117,52 @@ CREATE TABLE IF NOT EXISTS battle_rooms (
 CREATE INDEX IF NOT EXISTS idx_battle_rooms_expires_at
   ON battle_rooms(expires_at);
 
+CREATE TABLE IF NOT EXISTS battle_rooms_v2 (
+  room_code TEXT PRIMARY KEY CHECK (
+    length(room_code) = 8
+    AND room_code NOT GLOB '*[^23456789ABCDEFGHJKMNPQRSTUVWXYZ]*'
+  ),
+  status TEXT NOT NULL DEFAULT 'waiting_guest' CHECK (
+    status IN ('waiting_guest', 'selecting', 'ready', 'complete')
+  ),
+  host_name TEXT NOT NULL CHECK (length(host_name) BETWEEN 1 AND 12),
+  host_token_hash TEXT NOT NULL CHECK (length(host_token_hash) = 64),
+  host_lineup_code TEXT CHECK (
+    host_lineup_code IS NULL
+    OR (length(host_lineup_code) = 42 AND host_lineup_code GLOB 'NBA5-S1-*')
+  ),
+  host_ready_at INTEGER,
+  guest_name TEXT CHECK (guest_name IS NULL OR length(guest_name) BETWEEN 1 AND 12),
+  guest_token_hash TEXT CHECK (guest_token_hash IS NULL OR length(guest_token_hash) = 64),
+  guest_lineup_code TEXT CHECK (
+    guest_lineup_code IS NULL
+    OR (length(guest_lineup_code) = 42 AND guest_lineup_code GLOB 'NBA5-S1-*')
+  ),
+  guest_ready_at INTEGER,
+  protocol_version TEXT NOT NULL CHECK (length(protocol_version) BETWEEN 1 AND 100),
+  match_seed TEXT CHECK (match_seed IS NULL OR length(match_seed) BETWEEN 16 AND 100),
+  created_at INTEGER NOT NULL,
+  joined_at INTEGER,
+  started_at INTEGER,
+  expires_at INTEGER NOT NULL,
+  CHECK (
+    (status = 'waiting_guest' AND guest_name IS NULL AND guest_token_hash IS NULL
+      AND host_lineup_code IS NULL AND guest_lineup_code IS NULL AND match_seed IS NULL)
+    OR
+    (status = 'selecting' AND guest_name IS NOT NULL AND guest_token_hash IS NOT NULL
+      AND (host_lineup_code IS NULL OR guest_lineup_code IS NULL) AND match_seed IS NULL)
+    OR
+    (status = 'ready' AND host_lineup_code IS NOT NULL AND guest_lineup_code IS NOT NULL
+      AND match_seed IS NULL)
+    OR
+    (status = 'complete' AND host_lineup_code IS NOT NULL AND guest_lineup_code IS NOT NULL
+      AND match_seed IS NOT NULL AND started_at IS NOT NULL)
+  )
+);
+
+CREATE INDEX IF NOT EXISTS idx_battle_rooms_v2_expires_at
+  ON battle_rooms_v2(expires_at);
+
 CREATE TABLE IF NOT EXISTS battle_room_rate_limits (
   client_hash TEXT NOT NULL CHECK (length(client_hash) = 64),
   action TEXT NOT NULL CHECK (action IN ('create', 'join')),

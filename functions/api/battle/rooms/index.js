@@ -22,9 +22,13 @@ async function handlePost(context) {
   );
   await enforceBattleRoomRateLimit(database, clientHash, "create", nowSeconds, env);
   const submission = normalizeRoomSubmission(await parseRoomJson(request), "host");
-  const room = await createBattleRoom(database, submission, nowSeconds);
+  const created = await createBattleRoom(database, submission, nowSeconds);
   scheduleBattleRoomCleanup(context, database, nowSeconds);
-  return jsonResponse(request, { ok: true, room }, 201);
+  return jsonResponse(request, {
+    ok: true,
+    room: created.room,
+    session: { role: "host", token: created.sessionToken },
+  }, 201);
 }
 
 export async function onRequest(context) {

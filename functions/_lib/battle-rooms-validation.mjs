@@ -1,6 +1,6 @@
 import { ApiError } from "./errors.mjs";
 
-export const BATTLE_ROOM_PROTOCOL = "nba5-room-v1.v35.6.battle-1.5";
+export const BATTLE_ROOM_PROTOCOL = "nba5-room-v2.v35.6.battle-1.5";
 export const BATTLE_ROOM_TTL_SECONDS = 72 * 60 * 60;
 export const BATTLE_ROOM_CODE_PATTERN = /^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{8}$/;
 
@@ -86,9 +86,40 @@ export function normalizeRoomSubmission(input, role) {
   }
   return {
     name: normalizeRoomName(input.name, role === "host" ? "房主" : "挑战者"),
+    protocolVersion: BATTLE_ROOM_PROTOCOL,
+  };
+}
+
+export function normalizeRoomLineupSubmission(input) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    throw new ApiError(400, "invalid_input", "请求内容必须是对象。");
+  }
+  if (input.protocolVersion !== BATTLE_ROOM_PROTOCOL) {
+    throw new ApiError(409, "protocol_mismatch", "游戏版本不一致，请刷新后重新创建房间。");
+  }
+  const sessionToken = String(input.sessionToken ?? "").trim();
+  if (!/^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{32}$/.test(sessionToken)) {
+    throw new ApiError(401, "invalid_room_session", "房间身份已经失效，请重新进入房间。");
+  }
+  return {
+    sessionToken,
     lineupCode: validateBattleLineupCode(input.lineupCode),
     protocolVersion: BATTLE_ROOM_PROTOCOL,
   };
+}
+
+export function normalizeRoomStartSubmission(input) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    throw new ApiError(400, "invalid_input", "请求内容必须是对象。");
+  }
+  if (input.protocolVersion !== BATTLE_ROOM_PROTOCOL) {
+    throw new ApiError(409, "protocol_mismatch", "游戏版本不一致，请刷新后重新创建房间。");
+  }
+  const sessionToken = String(input.sessionToken ?? "").trim();
+  if (!/^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{32}$/.test(sessionToken)) {
+    throw new ApiError(401, "invalid_room_session", "房间身份已经失效，请重新进入房间。");
+  }
+  return { sessionToken, protocolVersion: BATTLE_ROOM_PROTOCOL };
 }
 
 export async function parseRoomJson(request) {

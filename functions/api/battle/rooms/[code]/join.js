@@ -22,9 +22,13 @@ async function handlePost(context) {
   );
   await enforceBattleRoomRateLimit(database, clientHash, "join", nowSeconds, env);
   const submission = normalizeRoomSubmission(await parseRoomJson(request), "guest");
-  const room = await joinBattleRoom(database, context.params?.code, submission, nowSeconds);
+  const joined = await joinBattleRoom(database, context.params?.code, submission, nowSeconds);
   scheduleBattleRoomCleanup(context, database, nowSeconds);
-  return jsonResponse(request, { ok: true, room });
+  return jsonResponse(request, {
+    ok: true,
+    room: joined.room,
+    session: { role: "guest", token: joined.sessionToken },
+  });
 }
 
 export async function onRequest(context) {
