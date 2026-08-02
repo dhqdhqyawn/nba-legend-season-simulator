@@ -7,6 +7,8 @@ import {
   BATTLE_ROOM_PROTOCOL,
   normalizeRoomCode,
   normalizeRoomLineupSubmission,
+  normalizeRoomPackSubmission,
+  normalizeRoomRematchSubmission,
   normalizeRoomStartSubmission,
   normalizeRoomSubmission,
   validateBattleLineupCode,
@@ -44,6 +46,7 @@ test("accepts a current short NBA5 and normalizes room input", () => {
     protocolVersion: BATTLE_ROOM_PROTOCOL,
   }, "host"), {
     name: "小丁",
+    roomType: "fair_pack",
     protocolVersion: BATTLE_ROOM_PROTOCOL,
   });
   assert.deepEqual(normalizeRoomLineupSubmission({
@@ -55,6 +58,29 @@ test("accepts a current short NBA5 and normalizes room input", () => {
     lineupCode: code,
     protocolVersion: BATTLE_ROOM_PROTOCOL,
   });
+});
+
+test("normalizes room rules, pack requests and rematch choices", () => {
+  const sessionToken = "23456789234567892345678923456789";
+  assert.equal(normalizeRoomSubmission({
+    name: "自由房",
+    roomType: "open_lineup",
+    protocolVersion: BATTLE_ROOM_PROTOCOL,
+  }, "host").roomType, "open_lineup");
+  assert.deepEqual(normalizeRoomPackSubmission({
+    sessionToken,
+    protocolVersion: BATTLE_ROOM_PROTOCOL,
+  }), { sessionToken, protocolVersion: BATTLE_ROOM_PROTOCOL });
+  assert.deepEqual(normalizeRoomRematchSubmission({
+    sessionToken,
+    mode: "redraft",
+    protocolVersion: BATTLE_ROOM_PROTOCOL,
+  }), { sessionToken, mode: "redraft", protocolVersion: BATTLE_ROOM_PROTOCOL });
+  assert.throws(() => normalizeRoomRematchSubmission({
+    sessionToken,
+    mode: "anything",
+    protocolVersion: BATTLE_ROOM_PROTOCOL,
+  }), error => error instanceof ApiError && error.code === "invalid_rematch_mode");
 });
 
 test("rejects legacy, damaged and duplicate-token NBA5 codes", () => {
@@ -98,14 +124,20 @@ function roomRow(overrides = {}) {
   return {
     room_code: "ABCD2345",
     status: "complete",
+    room_type: "fair_pack",
+    round_number: 1,
     host_name: "房主",
     host_token_hash: "host-hash",
     host_lineup_code: lineupCode([1, 2, 3, 4, 5]),
     host_ready_at: 130,
+    host_pack_count: 2,
+    host_rematch_mode: null,
     guest_name: "挑战者",
     guest_token_hash: "guest-hash",
     guest_lineup_code: lineupCode([6, 7, 8, 9, 10]),
     guest_ready_at: 140,
+    guest_pack_count: 3,
+    guest_rematch_mode: null,
     protocol_version: BATTLE_ROOM_PROTOCOL,
     match_seed: "locked-seed",
     created_at: 100,
@@ -144,6 +176,10 @@ test("complete rooms expose one locked seed and both exact lineups", () => {
   const row = roomRow();
   const room = publicRoom(row, 160);
   assert.equal(room.status, "complete");
+  assert.equal(room.roomType, "fair_pack");
+  assert.equal(room.round, 1);
+  assert.equal(room.host.packsOpened, 2);
+  assert.equal(room.guest.packsOpened, 3);
   assert.equal(room.host.lineupCode, row.host_lineup_code);
   assert.equal(room.guest.lineupCode, row.guest_lineup_code);
   assert.equal(room.seed, "locked-seed");
