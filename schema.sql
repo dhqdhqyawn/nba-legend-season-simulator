@@ -80,3 +80,51 @@ CREATE TABLE IF NOT EXISTS feedback_rate_limits (
 
 CREATE INDEX IF NOT EXISTS idx_feedback_rate_limits_window
   ON feedback_rate_limits(window_start);
+
+CREATE TABLE IF NOT EXISTS battle_rooms (
+  room_code TEXT PRIMARY KEY CHECK (
+    length(room_code) = 8
+    AND room_code NOT GLOB '*[^23456789ABCDEFGHJKMNPQRSTUVWXYZ]*'
+  ),
+  status TEXT NOT NULL DEFAULT 'waiting' CHECK (status IN ('waiting', 'ready')),
+  host_name TEXT NOT NULL CHECK (length(host_name) BETWEEN 1 AND 12),
+  host_lineup_code TEXT NOT NULL CHECK (
+    length(host_lineup_code) = 42
+    AND host_lineup_code GLOB 'NBA5-S1-*'
+  ),
+  guest_name TEXT CHECK (guest_name IS NULL OR length(guest_name) BETWEEN 1 AND 12),
+  guest_lineup_code TEXT CHECK (
+    guest_lineup_code IS NULL
+    OR (
+      length(guest_lineup_code) = 42
+      AND guest_lineup_code GLOB 'NBA5-S1-*'
+    )
+  ),
+  protocol_version TEXT NOT NULL CHECK (length(protocol_version) BETWEEN 1 AND 100),
+  match_seed TEXT CHECK (match_seed IS NULL OR length(match_seed) BETWEEN 16 AND 100),
+  created_at INTEGER NOT NULL,
+  joined_at INTEGER,
+  expires_at INTEGER NOT NULL,
+  CHECK (
+    (status = 'waiting' AND guest_name IS NULL AND guest_lineup_code IS NULL
+      AND match_seed IS NULL AND joined_at IS NULL)
+    OR
+    (status = 'ready' AND guest_name IS NOT NULL AND guest_lineup_code IS NOT NULL
+      AND match_seed IS NOT NULL AND joined_at IS NOT NULL)
+  )
+);
+
+CREATE INDEX IF NOT EXISTS idx_battle_rooms_expires_at
+  ON battle_rooms(expires_at);
+
+CREATE TABLE IF NOT EXISTS battle_room_rate_limits (
+  client_hash TEXT NOT NULL CHECK (length(client_hash) = 64),
+  action TEXT NOT NULL CHECK (action IN ('create', 'join')),
+  window_start INTEGER NOT NULL,
+  request_count INTEGER NOT NULL CHECK (request_count >= 1),
+  last_seen_at INTEGER NOT NULL,
+  PRIMARY KEY (client_hash, action, window_start)
+);
+
+CREATE INDEX IF NOT EXISTS idx_battle_room_rate_limits_window
+  ON battle_room_rate_limits(window_start);
