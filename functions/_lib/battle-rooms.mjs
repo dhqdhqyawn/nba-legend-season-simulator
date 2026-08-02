@@ -35,6 +35,14 @@ export function publicRoom(row, nowSeconds) {
     status: expired ? "expired" : row.status,
     roomType: row.room_type,
     round: Number(row.round_number || 1),
+    score: {
+      host: Number(row.host_score || 0),
+      guest: Number(row.guest_score || 0),
+      scoredRound: Number(row.scored_round || 0),
+      lastWinner: /^(host|guest)$/.test(String(row.round_winner || ""))
+        ? row.round_winner
+        : null,
+    },
     protocolVersion: row.protocol_version,
     host: {
       name: row.host_name,
@@ -265,6 +273,9 @@ export async function requestBattleRoomRematch(database, code, submission, nowSe
   if (session.row.status !== "complete") {
     throw new ApiError(409, "series_not_complete", "本轮系列赛尚未完成。");
   }
+  if (Number(session.row.scored_round || 0) < Number(session.row.round_number || 1)) {
+    throw new ApiError(409, "series_score_pending", "本轮结果正在记分，请稍后再试。");
+  }
   const ownColumn = session.role === "host" ? "host_rematch_mode" : "guest_rematch_mode";
   await database.prepare(
     `UPDATE battle_rooms_v3 SET ${ownColumn} = ?1
@@ -316,6 +327,50 @@ export async function requestBattleRoomRematch(database, code, submission, nowSe
     "SELECT * FROM battle_rooms_v3 WHERE room_code = ?1",
   ).bind(session.roomCode).first();
   return publicRoom(latest, nowSeconds);
+}
+
+export async function scoreBattleRoomRound(database, code, submission, nowSeconds) {
+  const session = await roomWithSession(database, code, submission.sessionToken, nowSeconds);
+  if (session.row.status !== "complete") {
+    throw new ApiError(409, "series_not_complete", "本轮系列赛尚未完成。");
+  }
+  const currentRound = Number(session.row.round_number || 1);
+  if (submission.round !== currentRound) {
+    throw new ApiError(409, "score_round_mismatch", "记分轮次与当前房间不一致，请刷新后重试。");
+  }
+  const previousScoredRound = Number(session.row.scored_round || 0);
+  if (previousScoredRound === currentRound) {
+    if (session.row.round_winner === submission.winner) {
+      return publicRoom(session.row, nowSeconds);
+    }
+    throw new ApiError(409, "score_winner_conflict", "本轮胜方已经锁定，不能重复修改。");
+  }
+  if (previousScoredRound > currentRound) {
+    throw new ApiError(409, "score_round_conflict", "房间记分状态异常，请重新进入房间。");
+  }
+  const scoreColumn = submission.winner === "host" ? "host_score" : "guest_score";
+  const updated = await database.prepare(
+    `UPDATE battle_rooms_v3 SET
+      ${scoreColumn} = ${scoreColumn} + 1,
+      scored_round = ?1,
+      round_winner = ?2
+    WHERE room_code = ?3
+      AND status = 'complete'
+      AND round_number = ?1
+      AND scored_round < ?1
+      AND expires_at > ?4
+    RETURNING *`,
+  ).bind(currentRound, submission.winner, session.roomCode, nowSeconds).first();
+  if (updated) return publicRoom(updated, nowSeconds);
+
+  const latest = await database.prepare(
+    "SELECT * FROM battle_rooms_v3 WHERE room_code = ?1",
+  ).bind(session.roomCode).first();
+  if (Number(latest?.scored_round || 0) === currentRound) {
+    if (latest.round_winner === submission.winner) return publicRoom(latest, nowSeconds);
+    throw new ApiError(409, "score_winner_conflict", "本轮胜方已经锁定，不能重复修改。");
+  }
+  throw new ApiError(409, "score_round_conflict", "本轮记分未完成，请刷新后重试。");
 }
 
 export function scheduleBattleRoomCleanup(context, database, nowSeconds) {

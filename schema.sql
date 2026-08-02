@@ -173,6 +173,10 @@ CREATE TABLE IF NOT EXISTS battle_rooms_v3 (
   ),
   room_type TEXT NOT NULL CHECK (room_type IN ('fair_pack', 'open_lineup')),
   round_number INTEGER NOT NULL DEFAULT 1 CHECK (round_number >= 1),
+  host_score INTEGER NOT NULL DEFAULT 0 CHECK (host_score >= 0),
+  guest_score INTEGER NOT NULL DEFAULT 0 CHECK (guest_score >= 0),
+  scored_round INTEGER NOT NULL DEFAULT 0 CHECK (scored_round >= 0),
+  round_winner TEXT CHECK (round_winner IS NULL OR round_winner IN ('host', 'guest')),
   host_name TEXT NOT NULL CHECK (length(host_name) BETWEEN 1 AND 12),
   host_token_hash TEXT NOT NULL CHECK (length(host_token_hash) = 64),
   host_lineup_code TEXT CHECK (

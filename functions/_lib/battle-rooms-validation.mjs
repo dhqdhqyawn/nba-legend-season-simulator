@@ -161,6 +161,29 @@ export function normalizeRoomRematchSubmission(input) {
   };
 }
 
+export function normalizeRoomScoreSubmission(input) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    throw new ApiError(400, "invalid_input", "请求内容必须是对象。");
+  }
+  if (input.protocolVersion !== BATTLE_ROOM_PROTOCOL) {
+    throw new ApiError(409, "protocol_mismatch", "游戏版本不一致，请刷新后重新创建房间。");
+  }
+  const round = Number(input.round);
+  if (!Number.isSafeInteger(round) || round < 1) {
+    throw new ApiError(400, "invalid_score_round", "记分轮次无效。");
+  }
+  const winner = String(input.winner || "");
+  if (!/^(host|guest)$/.test(winner)) {
+    throw new ApiError(400, "invalid_score_winner", "系列赛胜方无效。");
+  }
+  return {
+    sessionToken: normalizeSessionToken(input),
+    round,
+    winner,
+    protocolVersion: BATTLE_ROOM_PROTOCOL,
+  };
+}
+
 export async function parseRoomJson(request) {
   const contentType = String(request.headers.get("Content-Type") || "").split(";", 1)[0].trim();
   if (contentType !== "application/json") {

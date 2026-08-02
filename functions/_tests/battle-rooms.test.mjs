@@ -2,17 +2,19 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { ApiError } from "../_lib/errors.mjs";
-import { publicRoom } from "../_lib/battle-rooms.mjs";
+import { publicRoom, scoreBattleRoomRound } from "../_lib/battle-rooms.mjs";
 import {
   BATTLE_ROOM_PROTOCOL,
   normalizeRoomCode,
   normalizeRoomLineupSubmission,
   normalizeRoomPackSubmission,
   normalizeRoomRematchSubmission,
+  normalizeRoomScoreSubmission,
   normalizeRoomStartSubmission,
   normalizeRoomSubmission,
   validateBattleLineupCode,
 } from "../_lib/battle-rooms-validation.mjs";
+import { sha256Hex } from "../_lib/security.mjs";
 
 function writeUint32(bytes, offset, value) {
   bytes[offset] = value >>> 24;
@@ -83,6 +85,33 @@ test("normalizes room rules, pack requests and rematch choices", () => {
   }), error => error instanceof ApiError && error.code === "invalid_rematch_mode");
 });
 
+test("normalizes one canonical winner for one room round", () => {
+  const sessionToken = "23456789234567892345678923456789";
+  assert.deepEqual(normalizeRoomScoreSubmission({
+    sessionToken,
+    round: 2,
+    winner: "guest",
+    protocolVersion: BATTLE_ROOM_PROTOCOL,
+  }), {
+    sessionToken,
+    round: 2,
+    winner: "guest",
+    protocolVersion: BATTLE_ROOM_PROTOCOL,
+  });
+  assert.throws(() => normalizeRoomScoreSubmission({
+    sessionToken,
+    round: 0,
+    winner: "host",
+    protocolVersion: BATTLE_ROOM_PROTOCOL,
+  }), error => error instanceof ApiError && error.code === "invalid_score_round");
+  assert.throws(() => normalizeRoomScoreSubmission({
+    sessionToken,
+    round: 1,
+    winner: "mine",
+    protocolVersion: BATTLE_ROOM_PROTOCOL,
+  }), error => error instanceof ApiError && error.code === "invalid_score_winner");
+});
+
 test("rejects legacy, damaged and duplicate-token NBA5 codes", () => {
   assert.throws(() => validateBattleLineupCode("NBA5-old"), ApiError);
   const damaged = `${lineupCode().slice(0, -1)}A`;
@@ -126,6 +155,10 @@ function roomRow(overrides = {}) {
     status: "complete",
     room_type: "fair_pack",
     round_number: 1,
+    host_score: 0,
+    guest_score: 0,
+    scored_round: 0,
+    round_winner: null,
     host_name: "房主",
     host_token_hash: "host-hash",
     host_lineup_code: lineupCode([1, 2, 3, 4, 5]),
@@ -184,4 +217,63 @@ test("complete rooms expose one locked seed and both exact lineups", () => {
   assert.equal(room.guest.lineupCode, row.guest_lineup_code);
   assert.equal(room.seed, "locked-seed");
   assert.equal(room.startedAt, new Date(150000).toISOString());
+  assert.deepEqual(room.score, {
+    host: 0,
+    guest: 0,
+    scoredRound: 0,
+    lastWinner: null,
+  });
+});
+
+function scoreDatabase(row) {
+  return {
+    prepare(sql) {
+      return {
+        bind(...args) {
+          return {
+            async first() {
+              if (sql.startsWith("SELECT")) return { ...row };
+              if (!sql.includes("UPDATE battle_rooms_v3 SET")) throw new Error(`unexpected-sql:${sql}`);
+              const [round, winner, roomCode, nowSeconds] = args;
+              if (row.room_code !== roomCode || row.status !== "complete"
+                || Number(row.round_number) !== Number(round)
+                || Number(row.scored_round) >= Number(round)
+                || Number(row.expires_at) <= Number(nowSeconds)) return null;
+              row[winner === "host" ? "host_score" : "guest_score"] += 1;
+              row.scored_round = Number(round);
+              row.round_winner = winner;
+              return { ...row };
+            },
+          };
+        },
+      };
+    },
+  };
+}
+
+test("concurrent score reports count one round once and reject a conflicting winner", async () => {
+  const sessionToken = "23456789234567892345678923456789";
+  const row = roomRow({
+    host_token_hash: await sha256Hex(sessionToken),
+    expires_at: 1_000,
+  });
+  const database = scoreDatabase(row);
+  const submission = {
+    sessionToken,
+    round: 1,
+    winner: "host",
+    protocolVersion: BATTLE_ROOM_PROTOCOL,
+  };
+  const [first, second] = await Promise.all([
+    scoreBattleRoomRound(database, row.room_code, submission, 200),
+    scoreBattleRoomRound(database, row.room_code, submission, 200),
+  ]);
+  assert.equal(first.score.host, 1);
+  assert.equal(second.score.host, 1);
+  assert.equal(row.host_score, 1);
+  assert.equal(row.scored_round, 1);
+  await assert.rejects(() => scoreBattleRoomRound(database, row.room_code, {
+    ...submission,
+    winner: "guest",
+  }, 200), error => error instanceof ApiError && error.code === "score_winner_conflict");
 });
