@@ -1,4 +1,4 @@
-export const ENGINE_VERSION = "nba5-2016-finals-1.2.0";
+export const ENGINE_VERSION = "nba5-2016-finals-1.2.1";
 
 export const TEAM_IDS = Object.freeze({
   WARRIORS: "warriors",
@@ -42,35 +42,35 @@ export const TEAMS = Object.freeze({
 export const PLAYERS = Object.freeze({
   curry: Object.freeze({
     id: "curry", teamId: TEAM_IDS.WARRIORS, slot: "PG", name: "斯蒂芬·库里",
-    englishName: "Stephen Curry", number: "30", scoringShare: .28,
+    englishName: "Stephen Curry", number: "30", scoringShare: .29,
     rebounds: 5.2, assists: 6.4, steals: 1.7, blocks: .2, threes: 4.2,
     topicVersion: "2015-16 全票 MVP", sourceVersion: "2015-16 Unanimous MVP",
     art: "assets/cards/2kdb-stephen-curry-warriors-2015-16-unanimous-mvp-2662687.png"
   }),
   klay: Object.freeze({
     id: "klay", teamId: TEAM_IDS.WARRIORS, slot: "SG", name: "克莱·汤普森",
-    englishName: "Klay Thompson", number: "11", scoringShare: .23,
+    englishName: "Klay Thompson", number: "11", scoringShare: .24,
     rebounds: 3.8, assists: 2.3, steals: 1.0, blocks: .5, threes: 3.4,
     topicVersion: "2015-16 水花侧翼", sourceVersion: "2015-16 Splash Wing",
     art: "assets/cards/2kdb-klay-thompson-warriors-2015-16-splash-wing-2662495.png"
   }),
   iguodala: Object.freeze({
     id: "iguodala", teamId: TEAM_IDS.WARRIORS, slot: "SF", name: "安德烈·伊戈达拉",
-    englishName: "Andre Iguodala", number: "9", scoringShare: .13,
+    englishName: "Andre Iguodala", number: "9", scoringShare: .15,
     rebounds: 4.7, assists: 3.8, steals: 1.4, blocks: .4, threes: 1.0,
     topicVersion: "2016 总决赛防守锋线", sourceVersion: "复用 2014-15 Finals Stopper 卡面",
     art: "assets/cards/2kdb-andre-iguodala-warriors-2014-15-finals-stopper-2461689.png"
   }),
   barnes: Object.freeze({
     id: "barnes", teamId: TEAM_IDS.WARRIORS, slot: "PF", name: "哈里森·巴恩斯",
-    englishName: "Harrison Barnes", number: "40", scoringShare: .15,
+    englishName: "Harrison Barnes", number: "40", scoringShare: .16,
     rebounds: 4.9, assists: 1.6, steals: .7, blocks: .2, threes: 1.5,
     topicVersion: "2016 总决赛空间锋线", sourceVersion: "用户提供勇士 Splash 卡面",
     art: "assets/harrison-barnes-warriors.png"
   }),
   draymond: Object.freeze({
     id: "draymond", teamId: TEAM_IDS.WARRIORS, slot: "C", name: "德雷蒙德·格林",
-    englishName: "Draymond Green", number: "23", scoringShare: .11,
+    englishName: "Draymond Green", number: "23", scoringShare: .16,
     rebounds: 8.8, assists: 7.1, steals: 1.6, blocks: 1.3, threes: 1.2,
     topicVersion: "2016 小球中轴", sourceVersion: "复用 2016-17 DPOY Connector 卡面",
     art: "assets/cards/2kdb-draymond-green-warriors-2016-17-dpoy-connector-2661923.png"
@@ -91,14 +91,14 @@ export const PLAYERS = Object.freeze({
   }),
   lebron: Object.freeze({
     id: "lebron", teamId: TEAM_IDS.CAVALIERS, slot: "SF", name: "勒布朗·詹姆斯",
-    englishName: "LeBron James", number: "23", scoringShare: .27,
+    englishName: "LeBron James", number: "23", scoringShare: .28,
     rebounds: 8.4, assists: 7.4, steals: 1.8, blocks: 1.1, threes: 1.4,
     topicVersion: "2015-16 克利夫兰之盾", sourceVersion: "2015-16 Cleveland Block",
     art: "assets/cards/lebron-james-2kdb.webp"
   }),
   love: Object.freeze({
     id: "love", teamId: TEAM_IDS.CAVALIERS, slot: "PF", name: "凯文·乐福",
-    englishName: "Kevin Love", number: "0", scoringShare: .16,
+    englishName: "Kevin Love", number: "0", scoringShare: .18,
     rebounds: 9.9, assists: 2.4, steals: .8, blocks: .5, threes: 2.1,
     topicVersion: "2015-16 冠军空间四号位", sourceVersion: "专题 V3.5 角色卡 · 用户提供骑士卡面",
     art: "assets/kevin-love-cavaliers.png",
@@ -110,7 +110,7 @@ export const PLAYERS = Object.freeze({
   }),
   tristan: Object.freeze({
     id: "tristan", teamId: TEAM_IDS.CAVALIERS, slot: "C", name: "特里斯坦·汤普森",
-    englishName: "Tristan Thompson", number: "13", scoringShare: .09,
+    englishName: "Tristan Thompson", number: "13", scoringShare: .15,
     rebounds: 9.2, assists: 1.1, steals: .5, blocks: .8, threes: 0,
     topicVersion: "2016 前场篮板中锋", sourceVersion: "复用 2019-20 Cavaliers Rim Runner 卡面",
     art: "assets/cards/2kdb-tristan-thompson-cleveland-cavaliers-2019-20-modern-rotation-219339.jpg"
@@ -436,29 +436,33 @@ function weightedPick(items, weightFor, rng) {
 
 const SERIES_SPOTLIGHT_OPTIONS = Object.freeze({
   [TEAM_IDS.WARRIORS]: Object.freeze([
-    Object.freeze({ playerId: "curry", weight: .38, scoringShare: .34 }),
-    Object.freeze({ playerId: "klay", weight: .25, scoringShare: .32 }),
-    Object.freeze({ playerId: "draymond", weight: .15, scoringShare: .28 }),
-    Object.freeze({ playerId: "iguodala", weight: .1, scoringShare: .3 }),
-    Object.freeze({ playerId: "barnes", weight: .12, scoringShare: .31 })
+    Object.freeze({ playerId: "curry", weight: .53, scoringShare: .32, mvpBonus: 0 }),
+    Object.freeze({ playerId: "klay", weight: .34, scoringShare: .28, mvpBonus: 4 }),
+    Object.freeze({ playerId: "draymond", weight: .1, scoringShare: .21, mvpBonus: 5 }),
+    Object.freeze({ playerId: "iguodala", weight: .025, scoringShare: .24, mvpBonus: 8 }),
+    Object.freeze({ playerId: "barnes", weight: .005, scoringShare: .27, mvpBonus: 8 })
   ]),
   [TEAM_IDS.CAVALIERS]: Object.freeze([
-    Object.freeze({ playerId: "lebron", weight: .36, scoringShare: .34 }),
-    Object.freeze({ playerId: "kyrie", weight: .27, scoringShare: .33 }),
-    Object.freeze({ playerId: "love", weight: .16, scoringShare: .3 }),
-    Object.freeze({ playerId: "jr", weight: .11, scoringShare: .31 }),
-    Object.freeze({ playerId: "tristan", weight: .1, scoringShare: .32 })
+    Object.freeze({ playerId: "lebron", weight: .52, scoringShare: .32, mvpBonus: 0 }),
+    Object.freeze({ playerId: "kyrie", weight: .36, scoringShare: .29, mvpBonus: 4 }),
+    Object.freeze({ playerId: "love", weight: .115, scoringShare: .25, mvpBonus: 5 }),
+    Object.freeze({ playerId: "jr", weight: .003, scoringShare: .27, mvpBonus: 10 }),
+    Object.freeze({ playerId: "tristan", weight: .002, scoringShare: .25, mvpBonus: 10 })
   ])
 });
 
 function createSeriesProfiles(rng) {
   const profiles = Object.fromEntries(Object.values(PLAYERS).map(player => [player.id, {
-    scoringShare: player.scoringShare
+    scoringShare: player.scoringShare,
+    mvpBonus: 0
   }]));
   const spotlights = {};
   for (const teamId of Object.values(TEAM_IDS)) {
     const selected = weightedPick(SERIES_SPOTLIGHT_OPTIONS[teamId], option => option.weight, rng);
-    profiles[selected.playerId] = { scoringShare: selected.scoringShare };
+    profiles[selected.playerId] = {
+      scoringShare: selected.scoringShare,
+      mvpBonus: selected.mvpBonus
+    };
     spotlights[teamId] = selected.playerId;
   }
   return { profiles, spotlights };
@@ -678,29 +682,75 @@ function aggregateStats(games) {
   }));
 }
 
-function selectSeriesMvp(stats, winnerId) {
+function selectSeriesMvp(stats, winnerId, seriesProfiles) {
   return stats.filter(row => PLAYERS[row.playerId].teamId === winnerId)
     .map(row => ({
       ...row,
       mvpScore: row.ppg + row.rpg * .52 + row.apg * .68 + row.spg * 1.45 + row.bpg * 1.45
         + row.threesPerGame * .28 + row.positiveEvents * .34 + row.clutchEvents * 1.3
+        + Number(seriesProfiles[row.playerId]?.mvpBonus || 0)
     }))
     .sort((left, right) => right.mvpScore - left.mvpScore)[0];
+}
+
+function selectSeriesTurningPoint(games, winnerId) {
+  return games.flatMap(game => game.events.map(event => ({
+    ...event,
+    gameNumber: game.number,
+    gameWinnerId: game.winnerId
+  })))
+    .filter(event => event.gameWinnerId === winnerId)
+    .map(event => ({
+      ...event,
+      favorableToWinner: (event.teamId === winnerId && event.momentum > 0)
+        || (event.teamId !== winnerId && event.momentum < 0),
+      narrativeScore: (((event.teamId === winnerId && event.momentum > 0)
+        || (event.teamId !== winnerId && event.momentum < 0)) ? 2 : 0)
+        + (event.resultConstraint ? 1 : 0)
+        + Math.abs(event.momentum) * 10
+        + (event.category === "clutch" ? .18 : 0)
+        + event.gameNumber * .01
+    }))
+    .sort((left, right) => right.narrativeScore - left.narrativeScore)[0] || null;
+}
+
+function buildTurningPointSentence(event, winner) {
+  if (!event) return `${winner.name}在攻防两端保持了更稳定的延续性。`;
+  if (event.teamId === winner.id) {
+    if (event.momentum > 0) {
+      const action = event.category === "defense" ? "这次防守" : event.category === "hustle" ? "这次拼抢" : "这一回合";
+      return `G${event.gameNumber} 的“${event.title}”成为代表性转折：${event.detail}${winner.name}把${action}带来的势头转化成了当场胜利。`;
+    }
+    return `G${event.gameNumber} 的“${event.title}”一度让局面变得被动：${event.detail}但${winner.name}随后稳住阵脚，仍然拿下了这场比赛。`;
+  }
+  if (event.momentum < 0) {
+    const opening = event.category === "mistake"
+      ? "抓住这次失误"
+      : event.category === "defense"
+        ? "抓住这个防守漏洞"
+        : event.category === "hustle"
+          ? "抓住对手篮板失守"
+          : "抓住对手错失机会";
+    return `G${event.gameNumber} 的“${event.title}”成为代表性转折：${event.detail}${winner.name}${opening}接管了比赛。`;
+  }
+  return `G${event.gameNumber}，对手曾靠“${event.title}”制造压力：${event.detail}但${winner.name}顶住这波攻势，最终收下比赛。`;
 }
 
 function buildHeadline({ winnerId, scoreA, scoreB, mvp, games }) {
   const winner = TEAMS[winnerId];
   const player = PLAYERS[mvp.playerId];
-  const topPositiveEvent = games.flatMap(game => game.events.map(event => ({ ...event, gameNumber: game.number })))
-    .filter(event => event.teamId === winnerId && event.momentum > 0)
-    .sort((left, right) => right.momentum - left.momentum)[0];
+  const turningPoint = selectSeriesTurningPoint(games, winnerId);
   const finalScore = winnerId === TEAM_IDS.WARRIORS ? `4-${scoreB}` : `4-${scoreA}`;
   return {
-    eyebrow: `${winner.name} · ${finalScore}`, 
+    eyebrow: `${winner.name} · ${finalScore}`,
     title: `${player.name}带走系列赛 MVP`,
-    summary: topPositiveEvent
-      ? `${player.name}场均 ${mvp.ppg.toFixed(1)} 分，${winner.name}凭借“${topPositiveEvent.title}”等关键回合拿下这轮对决。`
-      : `${player.name}场均 ${mvp.ppg.toFixed(1)} 分，帮助${winner.name}赢下这轮对决。`
+    summary: `${player.name}场均 ${mvp.ppg.toFixed(1)} 分，带领${winner.name}以 ${finalScore} 赢下系列赛。${buildTurningPointSentence(turningPoint, winner)}`,
+    turningPoint: turningPoint ? Object.freeze({
+      eventId: turningPoint.id,
+      gameNumber: turningPoint.gameNumber,
+      teamId: turningPoint.teamId,
+      momentum: turningPoint.momentum
+    }) : null
   };
 }
 
@@ -732,7 +782,7 @@ export function simulateSeries({ seed = seedFromEntropy() } = {}) {
   }
   const winnerId = scoreA === 4 ? TEAM_IDS.WARRIORS : TEAM_IDS.CAVALIERS;
   const stats = aggregateStats(games);
-  const mvp = selectSeriesMvp(stats, winnerId);
+  const mvp = selectSeriesMvp(stats, winnerId, seriesProfiles);
   const result = {
     schemaVersion: 1,
     engineVersion: ENGINE_VERSION,
