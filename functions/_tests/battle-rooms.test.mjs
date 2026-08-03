@@ -2,9 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { ApiError } from "../_lib/errors.mjs";
-import { publicRoom, scoreBattleRoomRound } from "../_lib/battle-rooms.mjs";
+import { publicRoom, scoreBattleRoomRound, startBattleRoom } from "../_lib/battle-rooms.mjs";
 import {
   BATTLE_ROOM_PROTOCOL,
+  BATTLE_ROOM_TTL_SECONDS,
   normalizeRoomCode,
   normalizeRoomLineupSubmission,
   normalizeRoomPackSubmission,
@@ -130,6 +131,10 @@ test("locks the exact online room protocol", () => {
   }, "guest"), error => error instanceof ApiError && error.code === "protocol_mismatch");
 });
 
+test("online rooms expire after thirty minutes without player activity", () => {
+  assert.equal(BATTLE_ROOM_TTL_SECONDS, 30 * 60);
+});
+
 test("rejects missing or malformed room session tokens", () => {
   assert.throws(() => normalizeRoomLineupSubmission({
     sessionToken: "too-short",
@@ -225,6 +230,37 @@ test("complete rooms expose one locked seed and both exact lineups", () => {
   });
 });
 
+test("opening a completed result renews the room for thirty minutes", async () => {
+  const sessionToken = "23456789234567892345678923456789";
+  const nowSeconds = 500;
+  const row = roomRow({
+    host_token_hash: await sha256Hex(sessionToken),
+    expires_at: 600,
+  });
+  const database = {
+    prepare(sql) {
+      return {
+        bind(...args) {
+          return {
+            async first() {
+              if (sql.startsWith("SELECT")) return { ...row };
+              assert.match(sql, /SET expires_at/);
+              const [expiresAt, roomCode] = args;
+              assert.equal(roomCode, row.room_code);
+              row.expires_at = Number(expiresAt);
+              return { ...row };
+            },
+          };
+        },
+      };
+    },
+  };
+
+  const room = await startBattleRoom(database, row.room_code, { sessionToken }, nowSeconds);
+  assert.equal(row.expires_at, nowSeconds + BATTLE_ROOM_TTL_SECONDS);
+  assert.equal(room.expiresAt, new Date((nowSeconds + BATTLE_ROOM_TTL_SECONDS) * 1000).toISOString());
+});
+
 function scoreDatabase(row) {
   return {
     prepare(sql) {
@@ -234,7 +270,7 @@ function scoreDatabase(row) {
             async first() {
               if (sql.startsWith("SELECT")) return { ...row };
               if (!sql.includes("UPDATE battle_rooms_v3 SET")) throw new Error(`unexpected-sql:${sql}`);
-              const [round, winner, roomCode, nowSeconds] = args;
+              const [round, winner, expiresAt, roomCode, nowSeconds] = args;
               if (row.room_code !== roomCode || row.status !== "complete"
                 || Number(row.round_number) !== Number(round)
                 || Number(row.scored_round) >= Number(round)
@@ -242,6 +278,7 @@ function scoreDatabase(row) {
               row[winner === "host" ? "host_score" : "guest_score"] += 1;
               row.scored_round = Number(round);
               row.round_winner = winner;
+              row.expires_at = Number(expiresAt);
               return { ...row };
             },
           };

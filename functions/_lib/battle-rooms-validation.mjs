@@ -1,7 +1,7 @@
 import { ApiError } from "./errors.mjs";
 
 export const BATTLE_ROOM_PROTOCOL = "nba5-room-v3.v35.6.battle-1.7";
-export const BATTLE_ROOM_TTL_SECONDS = 72 * 60 * 60;
+export const BATTLE_ROOM_TTL_SECONDS = 30 * 60;
 export const BATTLE_ROOM_CODE_PATTERN = /^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{8}$/;
 export const BATTLE_ROOM_TYPES = Object.freeze(["fair_pack", "open_lineup"]);
 

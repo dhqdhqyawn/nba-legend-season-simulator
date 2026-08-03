@@ -140,16 +140,18 @@ export async function joinBattleRoom(database, code, submission, nowSeconds) {
       status = 'selecting',
       guest_name = ?1,
       guest_token_hash = ?2,
-      joined_at = ?3
-    WHERE room_code = ?4
+      joined_at = ?3,
+      expires_at = ?4
+    WHERE room_code = ?5
       AND status = 'waiting_guest'
       AND expires_at > ?3
-      AND protocol_version = ?5
+      AND protocol_version = ?6
     RETURNING *`,
   ).bind(
     submission.name,
     tokenHash,
     nowSeconds,
+    nowSeconds + BATTLE_ROOM_TTL_SECONDS,
     roomCode,
     submission.protocolVersion,
   ).first();
@@ -220,12 +222,19 @@ export async function submitBattleRoomLineup(database, code, submission, nowSeco
       started_at = CASE
         WHEN guest_name IS NOT NULL AND ${otherColumn} IS NOT NULL THEN ?2
         ELSE started_at
-      END
-    WHERE room_code = ?4
+      END,
+      expires_at = ?4
+    WHERE room_code = ?5
       AND status IN ('waiting_guest', 'selecting')
       AND ${ownColumn} IS NULL
     RETURNING *`,
-  ).bind(submission.lineupCode, nowSeconds, seed, session.roomCode).first();
+  ).bind(
+    submission.lineupCode,
+    nowSeconds,
+    seed,
+    nowSeconds + BATTLE_ROOM_TTL_SECONDS,
+    session.roomCode,
+  ).first();
   if (updated) return publicRoom(updated, nowSeconds);
   const latest = await database.prepare(
     "SELECT * FROM battle_rooms_v3 WHERE room_code = ?1",
@@ -237,7 +246,12 @@ export async function submitBattleRoomLineup(database, code, submission, nowSeco
 
 export async function startBattleRoom(database, code, submission, nowSeconds) {
   const session = await roomWithSession(database, code, submission.sessionToken, nowSeconds);
-  if (session.row.status === "complete") return publicRoom(session.row, nowSeconds);
+  if (session.row.status === "complete") {
+    const updated = await database.prepare(
+      "UPDATE battle_rooms_v3 SET expires_at = ?1 WHERE room_code = ?2 RETURNING *",
+    ).bind(nowSeconds + BATTLE_ROOM_TTL_SECONDS, session.roomCode).first();
+    return publicRoom(updated || session.row, nowSeconds);
+  }
   throw new ApiError(409, "result_not_ready", "双方锁定阵容后才能查看结果。");
 }
 
@@ -246,13 +260,15 @@ export async function consumeBattleRoomPack(database, code, submission, nowSecon
   const ownColumn = session.role === "host" ? "host_pack_count" : "guest_pack_count";
   const lineupColumn = session.role === "host" ? "host_lineup_code" : "guest_lineup_code";
   const updated = await database.prepare(
-    `UPDATE battle_rooms_v3 SET ${ownColumn} = ${ownColumn} + 1
-    WHERE room_code = ?1
+    `UPDATE battle_rooms_v3 SET
+      ${ownColumn} = ${ownColumn} + 1,
+      expires_at = ?1
+    WHERE room_code = ?2
       AND status IN ('waiting_guest', 'selecting')
       AND ${lineupColumn} IS NULL
       AND (room_type = 'open_lineup' OR ${ownColumn} < 3)
     RETURNING *`,
-  ).bind(session.roomCode).first();
+  ).bind(nowSeconds + BATTLE_ROOM_TTL_SECONDS, session.roomCode).first();
   if (!updated) {
     if (session.row[lineupColumn]) {
       throw new ApiError(409, "lineup_locked", "阵容已经锁定，不能继续换包。");
@@ -278,10 +294,10 @@ export async function requestBattleRoomRematch(database, code, submission, nowSe
   }
   const ownColumn = session.role === "host" ? "host_rematch_mode" : "guest_rematch_mode";
   await database.prepare(
-    `UPDATE battle_rooms_v3 SET ${ownColumn} = ?1
-    WHERE room_code = ?2 AND status = 'complete'
+    `UPDATE battle_rooms_v3 SET ${ownColumn} = ?1, expires_at = ?2
+    WHERE room_code = ?3 AND status = 'complete'
     RETURNING room_code`,
-  ).bind(submission.mode, session.roomCode).first();
+  ).bind(submission.mode, nowSeconds + BATTLE_ROOM_TTL_SECONDS, session.roomCode).first();
   const proposed = await database.prepare(
     "SELECT * FROM battle_rooms_v3 WHERE room_code = ?1",
   ).bind(session.roomCode).first();
@@ -305,10 +321,11 @@ export async function requestBattleRoomRematch(database, code, submission, nowSe
       match_seed = CASE WHEN ?4 = 1 THEN NULL ELSE ?5 END,
       started_at = CASE WHEN ?4 = 1 THEN NULL ELSE ?6 END,
       host_rematch_mode = NULL,
-      guest_rematch_mode = NULL
-    WHERE room_code = ?7
+      guest_rematch_mode = NULL,
+      expires_at = ?7
+    WHERE room_code = ?8
       AND status = 'complete'
-      AND round_number = ?8
+      AND round_number = ?9
       AND host_rematch_mode IS NOT NULL
       AND guest_rematch_mode IS NOT NULL
     RETURNING *`,
@@ -319,6 +336,7 @@ export async function requestBattleRoomRematch(database, code, submission, nowSe
     anyRedraft ? 1 : 0,
     seed,
     nowSeconds,
+    nowSeconds + BATTLE_ROOM_TTL_SECONDS,
     session.roomCode,
     Number(proposed.round_number),
   ).first();
@@ -353,14 +371,21 @@ export async function scoreBattleRoomRound(database, code, submission, nowSecond
     `UPDATE battle_rooms_v3 SET
       ${scoreColumn} = ${scoreColumn} + 1,
       scored_round = ?1,
-      round_winner = ?2
-    WHERE room_code = ?3
+      round_winner = ?2,
+      expires_at = ?3
+    WHERE room_code = ?4
       AND status = 'complete'
       AND round_number = ?1
       AND scored_round < ?1
-      AND expires_at > ?4
+      AND expires_at > ?5
     RETURNING *`,
-  ).bind(currentRound, submission.winner, session.roomCode, nowSeconds).first();
+  ).bind(
+    currentRound,
+    submission.winner,
+    nowSeconds + BATTLE_ROOM_TTL_SECONDS,
+    session.roomCode,
+    nowSeconds,
+  ).first();
   if (updated) return publicRoom(updated, nowSeconds);
 
   const latest = await database.prepare(
@@ -376,7 +401,7 @@ export async function scoreBattleRoomRound(database, code, submission, nowSecond
 export function scheduleBattleRoomCleanup(context, database, nowSeconds) {
   if (!context || typeof context.waitUntil !== "function" || Math.random() >= 0.05) return;
   const rateLimitCutoff = nowSeconds - 2 * 24 * 60 * 60;
-  const roomCutoff = nowSeconds - 7 * 24 * 60 * 60;
+  const roomCutoff = nowSeconds;
   context.waitUntil(database.batch([
     database.prepare("DELETE FROM battle_rooms WHERE expires_at < ?1").bind(roomCutoff),
     database.prepare("DELETE FROM battle_rooms_v2 WHERE expires_at < ?1").bind(roomCutoff),
