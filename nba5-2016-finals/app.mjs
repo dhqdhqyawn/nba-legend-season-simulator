@@ -115,6 +115,10 @@ function renderGame(game) {
           <span>系列赛 ${game.seriesScoreAfter.warriors}-${game.seriesScoreAfter.cavaliers}</span>
           <span>${escapeHtml(top.name)} ${top.points}分</span>
         </div>
+        <div class="game-recap">
+          <span>整场总结</span>
+          <p>${escapeHtml(game.summary)}</p>
+        </div>
         <div class="event-stack">
           ${game.events.map(event => `
             <article class="event-item ${event.momentum > 0 ? "positive" : "negative"}">

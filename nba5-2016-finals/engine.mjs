@@ -1,4 +1,4 @@
-export const ENGINE_VERSION = "nba5-2016-finals-1.1.0";
+export const ENGINE_VERSION = "nba5-2016-finals-1.2.0";
 
 export const TEAM_IDS = Object.freeze({
   WARRIORS: "warriors",
@@ -117,7 +117,17 @@ export const PLAYERS = Object.freeze({
   })
 });
 
-function defineEvent(playerId, category, weight, momentum, title, detail, stats = {}, conflictGroup = null) {
+function defineEvent(
+  playerId,
+  category,
+  weight,
+  momentum,
+  title,
+  detail,
+  stats = {},
+  conflictGroup = null,
+  resultConstraint = null
+) {
   return Object.freeze({
     id: `${playerId}-${category}-${title}`,
     playerId,
@@ -128,14 +138,15 @@ function defineEvent(playerId, category, weight, momentum, title, detail, stats 
     title,
     detail,
     stats: Object.freeze({ ...stats }),
-    conflictGroup
+    conflictGroup: resultConstraint ? "decisive-outcome" : conflictGroup,
+    resultConstraint
   });
 }
 
 const SIGNATURE_EVENTS = Object.freeze([
   defineEvent("curry", "shooting", 1.5, .046, "库里把距离拉到中圈", "库里连续借掩护出手，两记超远三分把防线直接拉散。", { pts: 8, threes: 2 }),
-  defineEvent("curry", "clutch", 1.25, .055, "库里命中关键三分", "最后两分钟，库里在换防到来前完成后撤步，三分空心入网。", { pts: 6, threes: 1 }, "curry-clutch-shot"),
-  defineEvent("curry", "clutch", 1.05, -.046, "库里关键三分偏出", "库里迎着扑防出手制胜三分，篮球弹框而出。", { pts: -5, threes: -1 }, "curry-clutch-shot"),
+  defineEvent("curry", "clutch", 1.25, .055, "库里命中关键三分", "最后两分钟，库里在换防到来前完成后撤步，三分空心入网。", { pts: 6, threes: 1 }, "curry-clutch-shot", "actor_wins"),
+  defineEvent("curry", "clutch", 1.05, -.046, "库里关键三分偏出", "库里迎着扑防出手制胜三分，篮球弹框而出。", { pts: -5, threes: -1 }, "curry-clutch-shot", "actor_loses"),
   defineEvent("curry", "tactics", 1.1, .029, "库里连续吸引夹击", "骑士把两个人推向持球端，库里及时出球，让弱侧连续得到空位。", { ast: 4 }),
   defineEvent("curry", "mistake", .82, -.029, "库里被逼出连续失误", "骑士延误挡拆并堵住回传线路，库里连续两次丢掉球权。", { pts: -3, ast: -2 }),
   defineEvent("curry", "defense", .72, .021, "库里预判传球完成抢断", "库里提前站到传球线上，抢断后一路推进打成转换。", { pts: 3, stl: 2 }),
@@ -143,12 +154,12 @@ const SIGNATURE_EVENTS = Object.freeze([
   defineEvent("klay", "shooting", 1.6, .052, "汤普森进入佛祖模式", "汤普森不等球落地就再次出手，短时间内连中三记三分。", { pts: 11, threes: 3 }, "klay-form"),
   defineEvent("klay", "shooting", 1.3, -.047, "汤普森手感不佳", "汤普森连续得到熟悉的接球机会，却一次次砸在篮筐前沿。", { pts: -8, threes: -2 }, "klay-form"),
   defineEvent("klay", "defense", 1.0, .026, "汤普森接管外线领防", "汤普森贴住欧文的第一步，迫使骑士把进攻转向边线。", { stl: 1 }),
-  defineEvent("klay", "clutch", .94, .041, "汤普森底角一击命中", "勇士转移球找到底角，汤普森稳稳命中反超三分。", { pts: 5, threes: 1 }),
+  defineEvent("klay", "clutch", .94, .041, "汤普森底角一击命中", "勇士转移球找到底角，汤普森稳稳命中反超三分。", { pts: 5, threes: 1 }, null, "actor_wins"),
   defineEvent("klay", "mistake", .72, -.025, "汤普森强行出手被封住", "汤普森没有等到掩护完全落位，迎着两人出手被干扰。", { pts: -4, threes: -1 }),
   defineEvent("klay", "tactics", .82, .024, "汤普森无球跑动撕开缺口", "汤普森连续穿过两道掩护，让骑士的弱侧轮转出现空档。", { pts: 3 }),
 
   defineEvent("iguodala", "defense", 1.25, .034, "伊戈达拉切掉詹姆斯的突破", "伊戈达拉在詹姆斯合球瞬间下手，勇士顺势打出反击。", { stl: 2, pts: 2 }),
-  defineEvent("iguodala", "clutch", 1.2, -.042, "伊戈达拉上篮遭到大帽", "伊戈达拉冲向篮筐，詹姆斯从身后追上把球钉在篮板上。", { pts: -4 }, "lebron-iguodala-block"),
+  defineEvent("iguodala", "clutch", 1.2, -.042, "伊戈达拉上篮遭到大帽", "伊戈达拉冲向篮筐，詹姆斯从身后追上把球钉在篮板上。", { pts: -4 }, "lebron-iguodala-block", "actor_loses"),
   defineEvent("iguodala", "tactics", .98, .026, "伊戈达拉成为第二组织点", "伊戈达拉接管短挡拆出球，连续找到空切队友。", { ast: 4 }),
   defineEvent("iguodala", "shooting", .82, .025, "伊戈达拉回应放投", "骑士收缩禁区，伊戈达拉在弧顶连续惩罚空位。", { pts: 6, threes: 2 }),
   defineEvent("iguodala", "shooting", .68, -.026, "伊戈达拉空位三分失准", "骑士主动放空伊戈达拉，他的两次正面三分都没有命中。", { pts: -4, threes: -1 }),
@@ -168,8 +179,8 @@ const SIGNATURE_EVENTS = Object.freeze([
   defineEvent("draymond", "hustle", 1.0, .029, "格林抢下关键篮板", "格林卡住两名内线收下篮板，随后亲自推进完成转换助攻。", { reb: 4, ast: 2 }),
   defineEvent("draymond", "shooting", .78, .029, "格林在弧顶命中三分", "骑士选择收缩禁区，格林用正面三分回应放投。", { pts: 5, threes: 1 }),
 
-  defineEvent("kyrie", "clutch", 1.55, .058, "欧文命中决胜三分", "欧文在三分线外面对库里完成变向，后撤步出手稳稳命中。", { pts: 7, threes: 1 }, "kyrie-clutch-shot"),
-  defineEvent("kyrie", "clutch", 1.1, -.044, "欧文的决胜球弹框而出", "欧文面对汤普森拉开单打，后撤步三分稍稍偏长。", { pts: -5, threes: -1 }, "kyrie-clutch-shot"),
+  defineEvent("kyrie", "clutch", 1.55, .058, "欧文命中决胜三分", "欧文在三分线外面对库里完成变向，后撤步出手稳稳命中。", { pts: 7, threes: 1 }, "kyrie-clutch-shot", "actor_wins"),
+  defineEvent("kyrie", "clutch", 1.1, -.044, "欧文的决胜球弹框而出", "欧文面对汤普森拉开单打，后撤步三分稍稍偏长。", { pts: -5, threes: -1 }, "kyrie-clutch-shot", "actor_loses"),
   defineEvent("kyrie", "shooting", 1.35, .045, "欧文单打连续得手", "欧文用连续变向拆开防线，中距离和抛投接连命中。", { pts: 9 }),
   defineEvent("kyrie", "mistake", .84, -.031, "欧文突破后丢掉球权", "勇士收缩第二道防线，欧文在起步后被夹击切掉篮球。", { pts: -3, ast: -2 }),
   defineEvent("kyrie", "tactics", 1.0, .028, "欧文和詹姆斯轮流点名", "骑士连续寻找错位，让勇士无法只用一种换防方式解决回合。", { pts: 4, ast: 2 }),
@@ -179,11 +190,11 @@ const SIGNATURE_EVENTS = Object.freeze([
   defineEvent("jr", "shooting", 1.06, -.036, "JR的远投连续打铁", "JR连续选择高难度出手，三次投篮都没能落袋。", { pts: -7, threes: -2 }, "jr-shot"),
   defineEvent("jr", "mistake", 1.16, -.046, "JR抢到篮板却跑错方向", "JR控制住关键篮板后向后场运球，队友急忙提醒才避免更大的失误。", { pts: -3, reb: 2 }, "jr-direction"),
   defineEvent("jr", "defense", .8, .023, "JR绕过掩护完成干扰", "JR紧追汤普森的无球路线，在出手瞬间给到足够压力。", { stl: 1 }),
-  defineEvent("jr", "clutch", .78, .032, "JR命中压哨远投", "进攻时间即将耗尽，JR接球后直接拔起命中高难度三分。", { pts: 5, threes: 1 }),
+  defineEvent("jr", "clutch", .78, .032, "JR命中压哨远投", "进攻时间即将耗尽，JR接球后直接拔起命中高难度三分。", { pts: 5, threes: 1 }, null, "actor_wins"),
   defineEvent("jr", "mistake", .7, -.023, "JR转换进攻选择冒险", "JR没有等队友落位就提前出手，勇士抓住长篮板反击。", { pts: -3 }),
 
-  defineEvent("lebron", "defense", 1.6, .057, "詹姆斯追身大帽伊戈达拉", "伊戈达拉已经冲到篮下，詹姆斯从身后追上把球钉在篮板上。", { blk: 2, pts: 2 }, "lebron-iguodala-block"),
-  defineEvent("lebron", "clutch", 1.35, .052, "詹姆斯隔扣奠定胜局", "詹姆斯从弧顶加速突破，在协防到来前完成强硬隔扣。", { pts: 7 }),
+  defineEvent("lebron", "defense", 1.6, .057, "詹姆斯追身大帽伊戈达拉", "伊戈达拉已经冲到篮下，詹姆斯从身后追上把球钉在篮板上。", { blk: 2, pts: 2 }, "lebron-iguodala-block", "actor_wins"),
+  defineEvent("lebron", "clutch", 1.35, .052, "詹姆斯隔扣奠定胜局", "詹姆斯从弧顶加速突破，在协防到来前完成强硬隔扣。", { pts: 7 }, null, "actor_wins"),
   defineEvent("lebron", "tactics", 1.45, .044, "詹姆斯连续找到射手", "勇士把防线收向禁区，詹姆斯连续把球送到JR和乐福手中。", { ast: 5 }),
   defineEvent("lebron", "shooting", .94, -.036, "詹姆斯的外线手感降温", "勇士收缩一步等待出手，詹姆斯连续两次跳投偏出。", { pts: -7, threes: -1 }),
   defineEvent("lebron", "mistake", .76, -.027, "詹姆斯遭遇夹击失误", "格林提前协防封住传球角度，詹姆斯在包夹中丢掉球权。", { pts: -2, ast: -2 }),
@@ -194,7 +205,7 @@ const SIGNATURE_EVENTS = Object.freeze([
   defineEvent("love", "hustle", 1.25, .034, "乐福统治后场篮板", "乐福连续卡住勇士锋线，骑士守住篮板后立刻发动长传。", { reb: 5, ast: 1 }),
   defineEvent("love", "tactics", 1.04, .028, "乐福长传打穿退防", "乐福抢下篮板后直接送出四分卫长传，欧文在前场轻松得分。", { reb: 2, ast: 3 }),
   defineEvent("love", "defense", 1.18, -.041, "乐福被勇士连续点名", "勇士通过挡拆把乐福拉到外线，连续利用换防制造突破空间。", { pts: -4 }, "love-switch"),
-  defineEvent("love", "defense", .72, .026, "乐福守住最后一次换防", "乐福后退控制距离，迫使库里在终场前投出高难度三分。", { reb: 2 }, "love-switch"),
+  defineEvent("love", "defense", .72, .026, "乐福守住最后一次换防", "乐福后退控制距离，迫使库里在终场前投出高难度三分。", { reb: 2 }, "love-switch", "actor_wins"),
 
   defineEvent("tristan", "hustle", 1.55, .043, "特里斯坦连续冲下前场篮板", "特里斯坦在两名勇士球员之间连续点抢，骑士获得额外进攻机会。", { reb: 6, pts: 4 }),
   defineEvent("tristan", "defense", 1.02, .031, "特里斯坦守住篮下", "特里斯坦没有吃晃，连续干扰勇士的小个终结。", { blk: 2, reb: 2 }),
@@ -207,22 +218,22 @@ const SIGNATURE_EVENTS = Object.freeze([
   defineEvent("curry", "defense", .9, -.027, "库里换防后被强攻", "骑士连续把库里留在错位中，利用身材优势完成篮下终结。", { pts: -3 }),
   defineEvent("curry", "shooting", .82, .022, "库里绕过双掩护急停命中", "库里从底线连续穿过掩护，接球急停三分稳稳落袋。", { pts: 6, threes: 2 }),
   defineEvent("curry", "shooting", .82, -.022, "库里遭遇延误失去节奏", "骑士内线提高到三分线外，库里两次仓促出手都偏离篮筐。", { pts: -4, threes: -1 }),
-  defineEvent("curry", "clutch", .72, .018, "库里高抛越过补防", "决胜回合库里突破后送出高抛，篮球越过指尖轻轻入网。", { pts: 4 }),
+  defineEvent("curry", "clutch", .72, .018, "库里高抛越过补防", "决胜回合库里突破后送出高抛，篮球越过指尖轻轻入网。", { pts: 4 }, null, "actor_wins"),
   defineEvent("curry", "tactics", .72, -.018, "库里提前出球被识破", "骑士预判到库里的弱侧传球，截断线路后完成反击。", { ast: -2 }),
 
   defineEvent("klay", "hustle", .9, .027, "汤普森飞身救回边线球", "篮球即将出界时汤普森飞身把球拨回，勇士续上一次宝贵进攻。", { reb: 2, pts: 2 }),
   defineEvent("klay", "mistake", .9, -.027, "汤普森落地后踩出边线", "汤普森接球时脚步没有完全站稳，裁判判罚出界，勇士错失回合。", { pts: -3 }),
   defineEvent("klay", "tactics", .82, .022, "汤普森假掩护突然外弹", "汤普森佯装为库里掩护后快速外弹，接球获得完整出手空间。", { pts: 6, threes: 2 }),
   defineEvent("klay", "shooting", .82, -.022, "汤普森中距离连续偏短", "骑士把汤普森赶进两分区域，他的急停跳投连续落在篮筐前沿。", { pts: -4 }),
-  defineEvent("klay", "defense", .72, .018, "汤普森封住欧文右手", "汤普森用身体角度迫使欧文转向协防，勇士成功守住关键回合。", { stl: 1 }),
-  defineEvent("klay", "clutch", .72, -.018, "汤普森反超球涮筐而出", "汤普森获得底角反超机会，篮球在篮筐上转了一圈后滑出。", { pts: -3, threes: -1 }),
+  defineEvent("klay", "defense", .72, .018, "汤普森封住欧文右手", "汤普森用身体角度迫使欧文转向协防，勇士成功守住关键回合。", { stl: 1 }, null, "actor_wins"),
+  defineEvent("klay", "clutch", .72, -.018, "汤普森反超球涮筐而出", "汤普森获得底角反超机会，篮球在篮筐上转了一圈后滑出。", { pts: -3, threes: -1 }, null, "actor_loses"),
 
   defineEvent("iguodala", "defense", .9, .027, "伊戈达拉预判突破完成造犯规", "伊戈达拉提前站定位置，迫使骑士的强攻以进攻犯规结束。", { stl: 1 }),
   defineEvent("iguodala", "mistake", .9, -.027, "伊戈达拉传球直接出界", "伊戈达拉试图寻找底角射手，传球角度过大直接飞出边线。", { ast: -2 }),
   defineEvent("iguodala", "hustle", .82, .022, "伊戈达拉连续争到五五开球", "伊戈达拉两次抢先碰到地板球，把转换机会留给勇士。", { reb: 2, pts: 2 }),
   defineEvent("iguodala", "shooting", .82, -.022, "伊戈达拉罚球线急停失准", "骑士放出中距离空间，伊戈达拉的两次急停都没能命中。", { pts: -4 }),
   defineEvent("iguodala", "tactics", .72, .018, "伊戈达拉反跑接球助攻", "伊戈达拉佯装手递手后突然反跑，吸引防守再把球送到篮下。", { ast: 3 }),
-  defineEvent("iguodala", "clutch", .72, -.018, "伊戈达拉关键罚球偏出", "最后阶段伊戈达拉站上罚球线，却没能把领先优势继续扩大。", { pts: -2 }),
+  defineEvent("iguodala", "clutch", .72, -.018, "伊戈达拉关键罚球偏出", "最后阶段伊戈达拉站上罚球线，却没能把领先优势继续扩大。", { pts: -2 }, null, "actor_loses"),
 
   defineEvent("barnes", "shooting", .9, .027, "巴恩斯弧顶三分终于开张", "巴恩斯没有因前面的打铁犹豫，在弧顶果断出手命中三分。", { pts: 6, threes: 2 }),
   defineEvent("barnes", "shooting", .9, -.027, "巴恩斯底角空位再次偏出", "勇士的传导已经创造出完全空位，巴恩斯的底角三分仍然弹出。", { pts: -5, threes: -1 }),
@@ -242,7 +253,7 @@ const SIGNATURE_EVENTS = Object.freeze([
   defineEvent("kyrie", "mistake", .9, -.027, "欧文运球砸到脚面", "欧文准备连续变向时篮球碰到脚面，勇士趁机抢回球权。", { pts: -3, ast: -1 }),
   defineEvent("kyrie", "tactics", .82, .022, "欧文拒绝掩护突入腹地", "欧文突然从掩护反方向启动，打乱勇士预设的换防路线。", { pts: 5, ast: 1 }),
   defineEvent("kyrie", "defense", .82, -.022, "欧文追防中失去汤普森", "欧文收缩协防后没能及时找到汤普森，骑士付出一记空位三分。", { pts: -3 }),
-  defineEvent("kyrie", "clutch", .72, .018, "欧文突破后换手打进", "比赛进入最后一分钟，欧文空中换手避开格林封盖完成终结。", { pts: 4 }),
+  defineEvent("kyrie", "clutch", .72, .018, "欧文突破后换手打进", "比赛进入最后一分钟，欧文空中换手避开格林封盖完成终结。", { pts: 4 }, null, "actor_wins"),
   defineEvent("kyrie", "shooting", .72, -.018, "欧文急停中投连续偏长", "勇士退守封住篮下，欧文的两记罚球线急停都砸在后沿。", { pts: -4 }),
 
   defineEvent("jr", "shooting", .9, .027, "JR借掩护拔起命中", "JR只利用半步空间便直接起跳，三分穿过防守人的指尖落网。", { pts: 6, threes: 2 }),
@@ -250,13 +261,13 @@ const SIGNATURE_EVENTS = Object.freeze([
   defineEvent("jr", "defense", .82, .022, "JR提前换防切断传球", "JR读到勇士的无球掩护，提前换位切断汤普森的接球路线。", { stl: 2 }),
   defineEvent("jr", "shooting", .82, -.022, "JR超远三分选择失当", "骑士刚刚控制住节奏，JR却在进攻时间充足时投出超远三分。", { pts: -4, threes: -1 }),
   defineEvent("jr", "tactics", .72, .018, "JR假投真传找到顺下", "JR点起扑防后没有勉强出手，而是把球塞给顺下的特里斯坦。", { ast: 3 }),
-  defineEvent("jr", "clutch", .72, -.018, "JR最后一攻停球犹豫", "JR接到回传后短暂犹豫，勇士重新贴近并迫使他仓促出手。", { pts: -3 }),
+  defineEvent("jr", "clutch", .72, -.018, "JR最后一攻停球犹豫", "JR接到回传后短暂犹豫，勇士重新贴近并迫使他仓促出手。", { pts: -3 }, null, "actor_loses"),
 
   defineEvent("lebron", "tactics", .9, .027, "詹姆斯点名错位连续突破", "詹姆斯连续呼叫掩护寻找小个防守者，两次强突都直达篮下。", { pts: 7, ast: 1 }),
   defineEvent("lebron", "mistake", .9, -.027, "詹姆斯推进中被夹掉篮球", "勇士在边线突然形成包夹，詹姆斯转身时篮球被从身后捅走。", { pts: -3, ast: -1 }),
   defineEvent("lebron", "defense", .82, .022, "詹姆斯协防覆盖整个禁区", "詹姆斯连续从弱侧补位，先改变上篮，再控制住防守篮板。", { blk: 1, reb: 3 }),
   defineEvent("lebron", "shooting", .82, -.022, "詹姆斯罚球手感摇摆", "詹姆斯不断制造身体接触，却在罚球线上丢掉几次得分机会。", { pts: -4 }),
-  defineEvent("lebron", "clutch", .72, .018, "詹姆斯强突制造关键二加一", "决胜阶段詹姆斯顶着协防完成上篮，并获得一次加罚机会。", { pts: 5 }),
+  defineEvent("lebron", "clutch", .72, .018, "詹姆斯强突制造关键二加一", "决胜阶段詹姆斯顶着协防完成上篮，并获得一次加罚机会。", { pts: 5 }, null, "actor_wins"),
   defineEvent("lebron", "hustle", .72, -.018, "詹姆斯回防稍慢漏出侧翼", "詹姆斯向裁判示意后回防晚了一步，勇士快速找到侧翼空位。", { pts: -3 }),
 
   defineEvent("love", "shooting", .9, .027, "乐福底角连续惩罚收缩", "勇士把防线堆在禁区，乐福在底角连续接到分球并命中。", { pts: 7, threes: 2 }),
@@ -294,7 +305,17 @@ const PLAYER_EVENT_AFFINITIES = Object.freeze({
   tristan: Object.freeze({ shooting: .35, clutch: .78, defense: 1.22, hustle: 1.45, mistake: 1.02, tactics: 1.05 })
 });
 
-function defineSharedTemplate(id, category, playerIds, weight, momentum, titleSuffix, detailSuffix, stats = {}) {
+function defineSharedTemplate(
+  id,
+  category,
+  playerIds,
+  weight,
+  momentum,
+  titleSuffix,
+  detailSuffix,
+  stats = {},
+  resultConstraint = null
+) {
   return Object.freeze({
     id,
     category,
@@ -303,23 +324,24 @@ function defineSharedTemplate(id, category, playerIds, weight, momentum, titleSu
     momentum,
     titleSuffix,
     detailSuffix,
-    stats: Object.freeze({ ...stats })
+    stats: Object.freeze({ ...stats }),
+    resultConstraint
   });
 }
 
 export const SHARED_EVENT_TEMPLATES = Object.freeze([
-  defineSharedTemplate("key-three-make", "shooting", SHOOTER_IDS, 1.08, .035, "命中关键三分", "在防守扑到面前之前果断出手，关键三分稳稳命中。", { pts: 6, threes: 1 }),
-  defineSharedTemplate("key-three-miss", "shooting", SHOOTER_IDS, 1.03, -.032, "错失关键三分", "得到一记足以改变局势的三分机会，但篮球最终弹框而出。", { pts: -4, threes: -1 }),
+  defineSharedTemplate("key-three-make", "shooting", SHOOTER_IDS, 1.08, .035, "命中关键三分", "在防守扑到面前之前果断出手，关键三分稳稳命中。", { pts: 6, threes: 1 }, "actor_wins"),
+  defineSharedTemplate("key-three-miss", "shooting", SHOOTER_IDS, 1.03, -.032, "错失关键三分", "得到一记足以改变局势的三分机会，但篮球最终弹框而出。", { pts: -4, threes: -1 }, "actor_loses"),
   defineSharedTemplate("catch-shoot-run", "shooting", SHOOTER_IDS, .88, .026, "连续接球投进", "利用队友创造的空位连续完成接球投篮，迅速拉高进攻温度。", { pts: 6, threes: 2 }),
   defineSharedTemplate("open-shot-cold", "shooting", PERIMETER_IDS, .84, -.024, "空位投篮失去准星", "连续获得防守放出的投篮机会，却始终没能命中。", { pts: -4, threes: -1 }),
   defineSharedTemplate("midrange-answer", "shooting", SHOOTER_IDS, .72, .019, "用中距离回应防守", "面对退守防线连续急停，在罚球线附近把球投进。", { pts: 4 }),
   defineSharedTemplate("finish-closeout", "shooting", ALL_PLAYER_IDS, .7, .018, "突破扑防完成终结", "抓住对手扑防过猛的瞬间直杀篮下，顶着协防把球放进。", { pts: 4 }),
 
-  defineSharedTemplate("late-layup", "clutch", ALL_PLAYER_IDS, .86, .029, "打进反超上篮", "在最后阶段切入禁区，迎着身体对抗完成反超得分。", { pts: 4 }),
-  defineSharedTemplate("late-shot-miss", "clutch", ALL_PLAYER_IDS, .82, -.028, "错失反超机会", "获得最后阶段的反超出手，却没能越过防守把球送进篮筐。", { pts: -4 }),
-  defineSharedTemplate("late-free-throws", "clutch", ALL_PLAYER_IDS, .68, .02, "稳稳罚进关键球", "顶住现场压力站上罚球线，把关键罚球全部命中。", { pts: 3 }),
-  defineSharedTemplate("late-free-throw-miss", "clutch", ALL_PLAYER_IDS, .64, -.019, "关键罚球偏出", "最后阶段获得罚球机会，但其中一球在篮筐上弹出。", { pts: -2 }),
-  defineSharedTemplate("late-putback", "clutch", FRONTCOURT_IDS, .72, .025, "补进关键篮板", "从人群中抢到进攻篮板，第一时间补篮得手。", { pts: 4, reb: 3 }),
+  defineSharedTemplate("late-layup", "clutch", ALL_PLAYER_IDS, .86, .029, "打进反超上篮", "在最后阶段切入禁区，迎着身体对抗完成反超得分。", { pts: 4 }, "actor_wins"),
+  defineSharedTemplate("late-shot-miss", "clutch", ALL_PLAYER_IDS, .82, -.028, "错失反超机会", "获得最后阶段的反超出手，却没能越过防守把球送进篮筐。", { pts: -4 }, "actor_loses"),
+  defineSharedTemplate("late-free-throws", "clutch", ALL_PLAYER_IDS, .68, .02, "稳稳罚进关键球", "顶住现场压力站上罚球线，把关键罚球全部命中。", { pts: 3 }, "actor_wins"),
+  defineSharedTemplate("late-free-throw-miss", "clutch", ALL_PLAYER_IDS, .64, -.019, "关键罚球偏出", "最后阶段获得罚球机会，但其中一球在篮筐上弹出。", { pts: -2 }, "actor_loses"),
+  defineSharedTemplate("late-putback", "clutch", FRONTCOURT_IDS, .72, .025, "补进关键篮板", "从人群中抢到进攻篮板，第一时间补篮得手。", { pts: 4, reb: 3 }, "actor_wins"),
 
   defineSharedTemplate("chase-block", "defense", RIM_IDS, .76, .027, "送出追身封盖", "从身后追回禁区，在篮球离手后把上篮干扰下来。", { blk: 2 }),
   defineSharedTemplate("passing-lane-steal", "defense", PERIMETER_IDS, .82, .023, "抢断横传发动反击", "提前看穿横向传球，截球后直接带起转换进攻。", { stl: 2, pts: 2 }),
@@ -356,7 +378,9 @@ const SHARED_EVENTS = SHARED_EVENT_TEMPLATES.flatMap(template => template.player
     template.momentum,
     `${player.name}${template.titleSuffix}`,
     `${player.name}${template.detailSuffix}`,
-    template.stats
+    template.stats,
+    null,
+    template.resultConstraint
   );
 }));
 
@@ -440,6 +464,16 @@ function createSeriesProfiles(rng) {
   return { profiles, spotlights };
 }
 
+function oppositeTeamId(teamId) {
+  return teamId === TEAM_IDS.WARRIORS ? TEAM_IDS.CAVALIERS : TEAM_IDS.WARRIORS;
+}
+
+function eventWinnerId(event) {
+  if (event.resultConstraint === "actor_wins") return event.teamId;
+  if (event.resultConstraint === "actor_loses") return oppositeTeamId(event.teamId);
+  return null;
+}
+
 function selectGameEvents({ gameNumber, scoreA, scoreB, rng }) {
   const eventCount = 2 + (rng() < .44 ? 1 : 0);
   const picked = [];
@@ -449,13 +483,24 @@ function selectGameEvents({ gameNumber, scoreA, scoreB, rng }) {
   while (picked.length < eventCount) {
     const candidates = PLAYER_EVENTS.filter(event => !usedPlayers.has(event.playerId)
       && (!event.conflictGroup || !usedConflicts.has(event.conflictGroup)));
-    const selected = weightedPick(candidates, event => {
+    const weightedCandidates = candidates.map(event => {
       let weight = event.weight;
       if (lateSeries && event.category === "clutch") weight *= 1.75;
       if (gameNumber >= 3 && event.category === "tactics") weight *= 1.18;
       if (gameNumber === 7 && event.category === "mistake") weight *= .86;
-      return weight;
-    }, rng);
+      return { event, weight };
+    });
+    const decisiveTotals = weightedCandidates.reduce((totals, candidate) => {
+      const beneficiaryId = eventWinnerId(candidate.event);
+      if (beneficiaryId) totals[beneficiaryId] += candidate.weight;
+      return totals;
+    }, { [TEAM_IDS.WARRIORS]: 0, [TEAM_IDS.CAVALIERS]: 0 });
+    const decisiveAverage = (decisiveTotals[TEAM_IDS.WARRIORS] + decisiveTotals[TEAM_IDS.CAVALIERS]) / 2;
+    const selected = weightedPick(weightedCandidates, candidate => {
+      const beneficiaryId = eventWinnerId(candidate.event);
+      if (!beneficiaryId || decisiveTotals[beneficiaryId] <= 0) return candidate.weight;
+      return candidate.weight * decisiveAverage / decisiveTotals[beneficiaryId];
+    }, rng).event;
     picked.push(selected);
     usedPlayers.add(selected.playerId);
     if (selected.conflictGroup) usedConflicts.add(selected.conflictGroup);
@@ -535,7 +580,10 @@ function simulateGame({ gameNumber, scoreA, scoreB, homeTeamId, seriesProfiles, 
   const homeEdge = homeTeamId === TEAM_IDS.WARRIORS ? .027 : -.027;
   const baseProbabilityWarriors = clamp(.5 + teamEdge + homeEdge, .32, .68);
   const probabilityWarriors = clamp(baseProbabilityWarriors + eventMomentumA, .18, .82);
-  const winnerId = rng() < probabilityWarriors ? TEAM_IDS.WARRIORS : TEAM_IDS.CAVALIERS;
+  const decisiveEvent = events.find(event => event.resultConstraint);
+  const winnerId = decisiveEvent
+    ? eventWinnerId(decisiveEvent)
+    : (rng() < probabilityWarriors ? TEAM_IDS.WARRIORS : TEAM_IDS.CAVALIERS);
   const baseScore = 103 + normalish(rng) * 5.2;
   const homeScoreEdge = homeTeamId === TEAM_IDS.WARRIORS ? 1.4 : -1.4;
   let warriorsScore = Math.round(baseScore
@@ -554,6 +602,22 @@ function simulateGame({ gameNumber, scoreA, scoreB, homeTeamId, seriesProfiles, 
   }
   const warriorsBox = makeBoxScore(TEAM_IDS.WARRIORS, warriorsScore, events, seriesProfiles, rng);
   const cavaliersBox = makeBoxScore(TEAM_IDS.CAVALIERS, cavaliersScore, events, seriesProfiles, rng);
+  const winnerBox = winnerId === TEAM_IDS.WARRIORS ? warriorsBox : cavaliersBox;
+  const loserBox = winnerId === TEAM_IDS.WARRIORS ? cavaliersBox : warriorsBox;
+  const winnerTop = [...winnerBox.players].sort((left, right) => right.points - left.points || right.assists - left.assists)[0];
+  const loserTop = [...loserBox.players].sort((left, right) => right.points - left.points || right.assists - left.assists)[0];
+  const winnerTeam = TEAMS[winnerId];
+  const loserTeam = TEAMS[oppositeTeamId(winnerId)];
+  const winnerScore = winnerId === TEAM_IDS.WARRIORS ? warriorsScore : cavaliersScore;
+  const loserScore = winnerId === TEAM_IDS.WARRIORS ? cavaliersScore : warriorsScore;
+  const margin = winnerScore - loserScore;
+  const flow = margin <= 3 ? "鏖战到最后一个回合" : margin <= 8 ? "在末节拉开差距" : "凭借更稳定的攻防节奏掌控下半场";
+  const closingSentence = decisiveEvent
+    ? (decisiveEvent.resultConstraint === "actor_wins"
+        ? `最后阶段，${decisiveEvent.title}成为收下比赛的决定性回合。`
+        : `${decisiveEvent.title}后，${winnerTeam.name}把握住机会守住胜果。`)
+    : `${loserTop.name}为${loserTeam.name}拿到 ${loserTop.points} 分，但没能扭转比赛。`;
+  const summary = `${winnerTeam.name}${flow}，以 ${winnerScore}-${loserScore} 击败${loserTeam.name}。${winnerTop.name}贡献全队最高的 ${winnerTop.points} 分；${closingSentence}`;
   return {
     number: gameNumber,
     homeTeamId,
@@ -563,6 +627,7 @@ function simulateGame({ gameNumber, scoreA, scoreB, homeTeamId, seriesProfiles, 
     baseProbabilityWarriors,
     probabilityWarriors,
     eventMomentumWarriors: eventMomentumA,
+    summary,
     events: events.map(event => ({
       id: event.id,
       playerId: event.playerId,
@@ -570,6 +635,7 @@ function simulateGame({ gameNumber, scoreA, scoreB, homeTeamId, seriesProfiles, 
       category: event.category,
       categoryLabel: EVENT_CATEGORIES[event.category],
       momentum: event.momentum,
+      resultConstraint: event.resultConstraint,
       title: event.title,
       detail: event.detail
     })),
