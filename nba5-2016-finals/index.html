@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#19231f">
+  <meta name="description" content="16勇士与16骑士固定十人阵容，点击即重新模拟一轮七场四胜。">
+  <meta property="og:title" content="2016 总决赛重演 · NBA5 SERIES">
+  <meta property="og:description" content="16勇士 vs 16骑士，每次点击都是一轮全新的七场四胜。">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://dhqdhqyawn.github.io/nba-legend-season-simulator/nba5-2016-finals/">
+  <meta property="og:image" content="https://dhqdhqyawn.github.io/nba-legend-season-simulator/nba5-2016-finals/assets/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="2016 总决赛重演 · NBA5 SERIES">
+  <meta name="twitter:description" content="16勇士 vs 16骑士，每次点击都是一轮全新的七场四胜。">
+  <meta name="twitter:image" content="https://dhqdhqyawn.github.io/nba-legend-season-simulator/nba5-2016-finals/assets/og.png">
+  <link rel="canonical" href="https://dhqdhqyawn.github.io/nba-legend-season-simulator/nba5-2016-finals/">
+  <title>2016 总决赛重演 · NBA5 SERIES</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="page-grain" aria-hidden="true"></div>
+  <main class="site-shell">
+    <header class="site-header">
+      <a class="wordmark" href="#scoreboard" aria-label="返回记分牌">
+        <span class="wordmark-mark">NBA5</span>
+        <span class="wordmark-copy"><b>FINALS ROOM</b><small>2016 REMATCH</small></span>
+      </a>
+      <div class="room-chip"><span></span> ROOM · 2016 FINALS</div>
+    </header>
+
+    <section class="hero" id="scoreboard" aria-labelledby="heroTitle">
+      <div class="hero-copy">
+        <p class="eyebrow">NBA5 SERIES · 七场四胜</p>
+        <h1 id="heroTitle">2016 总决赛<br><em>重新开打</em></h1>
+        <p>固定十人、全新种子。每次点击都从 G1 重新开始，先拿到四胜的一方赢下本轮。</p>
+      </div>
+
+      <div class="scoreboard" aria-label="房间累计比分">
+        <div class="scoreboard-topline">
+          <span>房间记分牌</span>
+          <button id="resetScoreboard" type="button">清零</button>
+        </div>
+        <div class="scoreboard-main">
+          <div class="score-team warriors">
+            <span>WEST</span>
+            <strong>16勇士</strong>
+          </div>
+          <div class="score-total" aria-live="polite">
+            <b id="warriorsRoomScore">0</b>
+            <i>:</i>
+            <b id="cavaliersRoomScore">0</b>
+          </div>
+          <div class="score-team cavaliers">
+            <span>EAST</span>
+            <strong>16骑士</strong>
+          </div>
+        </div>
+        <div class="scoreboard-meta">
+          <span id="seriesCounter">尚未开赛</span>
+          <span>记分仅保存在当前设备</span>
+        </div>
+      </div>
+
+      <div class="hero-action">
+        <button class="simulate-button" id="simulateSeries" type="button">
+          <span>重新模拟一轮</span>
+          <small>生成全新的七场四胜</small>
+        </button>
+        <p id="lastResultSummary">第一轮正在等你开球。</p>
+      </div>
+    </section>
+
+    <section class="roster-section" aria-labelledby="rosterTitle">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">FIXED TEN</p>
+          <h2 id="rosterTitle">十人对局名单</h2>
+        </div>
+        <p>所有卡面统一进入 2016 专题角色；乐福使用独立的骑士冠军版本数据。</p>
+      </div>
+      <div class="roster-grid">
+        <section class="roster-column warriors-roster" aria-labelledby="warriorsRosterTitle">
+          <header><span>01</span><div><small>GOLDEN STATE</small><h3 id="warriorsRosterTitle">16勇士</h3></div></header>
+          <div class="player-row" id="warriorsRoster"></div>
+        </section>
+        <div class="roster-versus" aria-hidden="true"><span>V</span><span>S</span></div>
+        <section class="roster-column cavaliers-roster" aria-labelledby="cavaliersRosterTitle">
+          <header><span>02</span><div><small>CLEVELAND</small><h3 id="cavaliersRosterTitle">16骑士</h3></div></header>
+          <div class="player-row" id="cavaliersRoster"></div>
+        </section>
+      </div>
+    </section>
+
+    <section class="result-section" id="resultSection" aria-labelledby="resultTitle" hidden>
+      <div class="result-hero" id="resultHero">
+        <div>
+          <p class="eyebrow" id="resultEyebrow">系列赛结果</p>
+          <h2 id="resultTitle">等待比赛</h2>
+          <p id="resultSummary"></p>
+        </div>
+        <div class="series-score" aria-label="本轮系列赛比分">
+          <span id="resultWarriorsScore">0</span><i>—</i><span id="resultCavaliersScore">0</span>
+        </div>
+      </div>
+
+      <div class="result-layout">
+        <aside class="series-panel" aria-labelledby="mvpTitle">
+          <div class="panel-heading"><span>SERIES OVERVIEW</span><h3 id="mvpTitle">MVP 与两队数据</h3></div>
+          <div id="mvpCard"></div>
+          <div id="seriesStats" class="series-stats"></div>
+        </aside>
+        <section class="games-panel" aria-labelledby="gamesTitle">
+          <div class="panel-heading"><span>PLAY BY PLAY</span><h3 id="gamesTitle">逐场结果与事件</h3></div>
+          <div id="gamesList" class="games-list"></div>
+        </section>
+      </div>
+
+      <div class="result-footer">
+        <button class="simulate-button compact" id="simulateAgain" type="button">
+          <span>再来一轮</span><small>比分会计入房间记分牌</small>
+        </button>
+        <p>模拟事件仅供娱乐，不代表真实比赛中实际发生的情况。</p>
+      </div>
+    </section>
+  </main>
+
+  <div class="simulation-overlay" id="simulationOverlay" hidden aria-live="polite" aria-busy="true">
+    <div class="simulation-card">
+      <div class="court-loader" aria-hidden="true"><span></span></div>
+      <p>重新布置系列赛</p>
+      <strong id="simulationStatus">正在生成 G1…</strong>
+    </div>
+  </div>
+
+  <noscript>请启用 JavaScript 后开始模拟。</noscript>
+  <script type="module" src="./app.mjs"></script>
+</body>
+</html>
