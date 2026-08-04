@@ -39,10 +39,16 @@ function parseEnvironment(value) {
   return environment;
 }
 
+export function requireAnalyticsAdmin(request, env) {
+  requireAdmin(request, {
+    FEEDBACK_ADMIN_KEY: env?.ANALYTICS_ADMIN_KEY || env?.FEEDBACK_ADMIN_KEY,
+  });
+}
+
 async function handleGet(context) {
   const { request, env } = context;
   assertSameOrigin(request);
-  requireAdmin(request, env);
+  requireAnalyticsAdmin(request, env);
   const database = requireDatabase(env);
   const url = new URL(request.url);
   const window = parseWindow(url.searchParams.get("window"), url.searchParams.get("days"));

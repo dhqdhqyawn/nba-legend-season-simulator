@@ -10,7 +10,10 @@ import {
   scheduleAnalyticsCleanup,
 } from "../_lib/product-analytics.mjs";
 import { onRequest as analyticsEventsRequest } from "../api/analytics/events.js";
-import { onRequest as analyticsSummaryRequest } from "../api/analytics/summary.js";
+import {
+  onRequest as analyticsSummaryRequest,
+  requireAnalyticsAdmin,
+} from "../api/analytics/summary.js";
 
 const NOW = 1_785_816_000;
 
@@ -256,4 +259,23 @@ test("summary endpoint requires the existing administrator key", async () => {
   });
   assert.equal(response.status, 401);
   assert.equal((await response.json()).error.code, "unauthorized");
+});
+
+test("summary endpoint prefers an independent analytics administrator key", () => {
+  const request = new Request("https://game.example/api/analytics/summary", {
+    headers: { Authorization: "Bearer dashboard-secret" },
+  });
+  assert.doesNotThrow(() => requireAnalyticsAdmin(request, {
+    ANALYTICS_ADMIN_KEY: "dashboard-secret",
+    FEEDBACK_ADMIN_KEY: "feedback-secret",
+  }));
+  assert.throws(
+    () => requireAnalyticsAdmin(new Request(request.url, {
+      headers: { Authorization: "Bearer feedback-secret" },
+    }), {
+      ANALYTICS_ADMIN_KEY: "dashboard-secret",
+      FEEDBACK_ADMIN_KEY: "feedback-secret",
+    }),
+    (error) => error.code === "unauthorized",
+  );
 });
