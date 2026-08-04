@@ -131,6 +131,19 @@ export function normalizeRoomStartSubmission(input) {
   return { sessionToken, protocolVersion: BATTLE_ROOM_PROTOCOL };
 }
 
+export function normalizeRoomKickSubmission(input) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    throw new ApiError(400, "invalid_input", "请求内容必须是对象。");
+  }
+  if (input.protocolVersion !== BATTLE_ROOM_PROTOCOL) {
+    throw new ApiError(409, "protocol_mismatch", "游戏版本不一致，请刷新后重新创建房间。");
+  }
+  return {
+    sessionToken: normalizeSessionToken(input),
+    protocolVersion: BATTLE_ROOM_PROTOCOL,
+  };
+}
+
 export function normalizeRoomPackSubmission(input) {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
     throw new ApiError(400, "invalid_input", "请求内容必须是对象。");

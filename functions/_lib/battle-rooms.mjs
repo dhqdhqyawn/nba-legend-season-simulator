@@ -189,6 +189,49 @@ async function roomWithSession(database, code, sessionToken, nowSeconds) {
   return { roomCode, row, role, tokenHash };
 }
 
+export async function kickBattleRoomGuest(database, code, submission, nowSeconds) {
+  const session = await roomWithSession(database, code, submission.sessionToken, nowSeconds);
+  if (session.role !== "host") {
+    throw new ApiError(403, "host_only", "只有房主可以移出挑战者。");
+  }
+  const updated = await database.prepare(
+    `UPDATE battle_rooms_v3 SET
+      status = 'waiting_guest',
+      guest_name = NULL,
+      guest_token_hash = NULL,
+      guest_lineup_code = NULL,
+      guest_ready_at = NULL,
+      guest_pack_count = 0,
+      guest_rematch_mode = NULL,
+      joined_at = NULL,
+      match_seed = NULL,
+      started_at = NULL,
+      expires_at = ?1
+    WHERE room_code = ?2
+      AND host_token_hash = ?3
+      AND status = 'selecting'
+      AND guest_name IS NOT NULL
+      AND guest_lineup_code IS NULL
+    RETURNING *`,
+  ).bind(
+    nowSeconds + BATTLE_ROOM_TTL_SECONDS,
+    session.roomCode,
+    session.tokenHash,
+  ).first();
+  if (updated) return publicRoom(updated, nowSeconds);
+
+  const latest = await database.prepare(
+    "SELECT * FROM battle_rooms_v3 WHERE room_code = ?1",
+  ).bind(session.roomCode).first();
+  if (!latest?.guest_name) {
+    throw new ApiError(409, "guest_not_present", "当前没有可以移出的挑战者。");
+  }
+  if (latest.guest_lineup_code || latest.status === "complete") {
+    throw new ApiError(409, "guest_lineup_locked", "对方已经锁定阵容，不能再移出。");
+  }
+  throw new ApiError(409, "guest_kick_conflict", "房间状态已经变化，请刷新后重试。");
+}
+
 export async function submitBattleRoomLineup(database, code, submission, nowSeconds) {
   const session = await roomWithSession(database, code, submission.sessionToken, nowSeconds);
   if (session.row.status === "complete") {
@@ -202,6 +245,7 @@ export async function submitBattleRoomLineup(database, code, submission, nowSeco
   const readyColumn = session.role === "host" ? "host_ready_at" : "guest_ready_at";
   const otherColumn = session.role === "host" ? "guest_lineup_code" : "host_lineup_code";
   const packColumn = session.role === "host" ? "host_pack_count" : "guest_pack_count";
+  const sessionColumn = session.role === "host" ? "host_token_hash" : "guest_token_hash";
   if (session.row.room_type === "fair_pack" && Number(session.row[packColumn] || 0) < 1) {
     throw new ApiError(409, "pack_required", "请先打开至少一包候选卡。");
   }
@@ -227,6 +271,7 @@ export async function submitBattleRoomLineup(database, code, submission, nowSeco
     WHERE room_code = ?5
       AND status IN ('waiting_guest', 'selecting')
       AND ${ownColumn} IS NULL
+      AND ${sessionColumn} = ?6
     RETURNING *`,
   ).bind(
     submission.lineupCode,
@@ -234,6 +279,7 @@ export async function submitBattleRoomLineup(database, code, submission, nowSeco
     seed,
     nowSeconds + BATTLE_ROOM_TTL_SECONDS,
     session.roomCode,
+    session.tokenHash,
   ).first();
   if (updated) return publicRoom(updated, nowSeconds);
   const latest = await database.prepare(
@@ -259,6 +305,7 @@ export async function consumeBattleRoomPack(database, code, submission, nowSecon
   const session = await roomWithSession(database, code, submission.sessionToken, nowSeconds);
   const ownColumn = session.role === "host" ? "host_pack_count" : "guest_pack_count";
   const lineupColumn = session.role === "host" ? "host_lineup_code" : "guest_lineup_code";
+  const sessionColumn = session.role === "host" ? "host_token_hash" : "guest_token_hash";
   const updated = await database.prepare(
     `UPDATE battle_rooms_v3 SET
       ${ownColumn} = ${ownColumn} + 1,
@@ -266,9 +313,10 @@ export async function consumeBattleRoomPack(database, code, submission, nowSecon
     WHERE room_code = ?2
       AND status IN ('waiting_guest', 'selecting')
       AND ${lineupColumn} IS NULL
+      AND ${sessionColumn} = ?3
       AND (room_type = 'open_lineup' OR ${ownColumn} < 3)
     RETURNING *`,
-  ).bind(nowSeconds + BATTLE_ROOM_TTL_SECONDS, session.roomCode).first();
+  ).bind(nowSeconds + BATTLE_ROOM_TTL_SECONDS, session.roomCode, session.tokenHash).first();
   if (!updated) {
     if (session.row[lineupColumn]) {
       throw new ApiError(409, "lineup_locked", "阵容已经锁定，不能继续换包。");
