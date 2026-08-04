@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self'; img-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'self'">
+  <title>NBA 巨星赛季模拟器 · 老板看板</title>
+  <style>
+    :root{color-scheme:light;--page:#f4f1e9;--card:#fffdf8;--ink:#211e19;--muted:#716a60;--line:#ddd5c8;--accent:#9e3f2d;--green:#26705a;--gold:#b98732;--shadow:0 18px 50px rgba(70,54,35,.10);font-family:Inter,"PingFang SC","Microsoft YaHei",system-ui,sans-serif}
+    *{box-sizing:border-box}body{margin:0;min-width:320px;background:radial-gradient(circle at top right,#eadfca 0,transparent 34%),var(--page);color:var(--ink);font-size:14px;line-height:1.55}button,input,select{font:inherit}button,input,select{min-height:42px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink)}button{padding:8px 15px;cursor:pointer;font-weight:750}button.primary{border-color:var(--accent);background:var(--accent);color:#fff}button:disabled{cursor:wait;opacity:.55}input,select{width:100%;padding:8px 11px}header{border-bottom:1px solid var(--line);background:rgba(255,253,248,.92);backdrop-filter:blur(12px)}.header-inner,main{width:min(1180px,calc(100% - 32px));margin:0 auto}.header-inner{min-height:72px;display:flex;align-items:center;justify-content:space-between;gap:16px}.brand{margin:0;font-size:20px}.subtitle{color:var(--muted);font-size:12px}.pill{display:inline-flex;padding:5px 9px;border:1px solid #d6b990;border-radius:999px;background:#fff6e8;color:#805820;font-size:11px;font-weight:800}main{padding:24px 0 56px}.auth{width:min(520px,100%);margin:10vh auto 0;padding:24px;border:1px solid var(--line);border-radius:16px;background:var(--card);box-shadow:var(--shadow)}.auth h2{margin:0 0 4px}.auth p{margin:0 0 18px;color:var(--muted)}.auth-grid{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px}.auth-grid label{grid-column:1/-1;color:var(--muted);font-weight:700}.message{min-height:22px;margin:10px 0 0;color:var(--muted)}.message.error{color:#a12626}.dashboard[hidden],.auth[hidden]{display:none}.toolbar{display:grid;grid-template-columns:minmax(0,1fr) 150px 160px auto;gap:10px;align-items:end;margin-bottom:20px}.toolbar label{display:grid;gap:5px;color:var(--muted);font-size:12px;font-weight:700}.toolbar .status{align-self:center;color:var(--muted);font-size:12px}.cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.metric{padding:17px;border:1px solid var(--line);border-radius:14px;background:var(--card);box-shadow:0 8px 24px rgba(70,54,35,.06)}.metric span{display:block;color:var(--muted);font-size:12px}.metric strong{display:block;margin-top:4px;font-size:29px;line-height:1.1}.metric small{color:var(--muted)}.section-grid{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(300px,.7fr);gap:16px;margin-top:16px}.panel{min-width:0;padding:19px;border:1px solid var(--line);border-radius:14px;background:var(--card);box-shadow:0 8px 24px rgba(70,54,35,.06)}.panel h2{margin:0;font-size:17px}.panel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:15px}.panel-head p{margin:2px 0 0;color:var(--muted);font-size:12px}.funnel{display:grid;gap:9px}.funnel-row{display:grid;grid-template-columns:120px minmax(0,1fr) 58px;gap:9px;align-items:center}.funnel-label{font-size:12px;font-weight:700}.bar-track{height:23px;overflow:hidden;border-radius:7px;background:#eee9df}.bar{height:100%;min-width:2px;border-radius:7px;background:linear-gradient(90deg,var(--accent),#c87d49)}.funnel-value{text-align:right;font-variant-numeric:tabular-nums}.trend{display:grid;grid-template-columns:repeat(7,minmax(28px,1fr));gap:8px;align-items:end;min-height:190px;padding-top:15px}.trend-day{display:grid;grid-template-rows:1fr auto auto;gap:5px;align-items:end;min-width:0;text-align:center}.trend-column{width:100%;min-height:3px;border-radius:7px 7px 2px 2px;background:linear-gradient(180deg,var(--green),#63a58f)}.trend-day b{font-size:11px}.trend-day span{overflow:hidden;text-overflow:ellipsis;color:var(--muted);font-size:10px;white-space:nowrap}.table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}th,td{padding:9px 8px;border-bottom:1px solid #eee8de;text-align:right;white-space:nowrap}th:first-child,td:first-child{text-align:left}th{color:var(--muted);font-size:11px}.warning{padding:11px 13px;border:1px solid #e5cba2;border-radius:10px;background:#fff7e8;color:#76531e;font-size:12px}.empty{padding:28px 10px;color:var(--muted);text-align:center}.footer-note{margin-top:16px;color:var(--muted);font-size:12px}
+    @media(max-width:820px){.cards{grid-template-columns:repeat(2,minmax(0,1fr))}.section-grid{grid-template-columns:1fr}.toolbar{grid-template-columns:1fr 1fr}.toolbar .status{grid-column:1/-1}.header-inner{align-items:flex-start;padding:15px 0}.funnel-row{grid-template-columns:96px minmax(0,1fr) 48px}}
+    @media(max-width:480px){.header-inner,main{width:min(100% - 20px,1180px)}.cards{gap:8px}.metric{padding:14px}.metric strong{font-size:25px}.toolbar{grid-template-columns:1fr}.auth{padding:18px}.auth-grid{grid-template-columns:1fr}.panel{padding:15px}.funnel-row{grid-template-columns:88px minmax(0,1fr) 42px}}
+  </style>
+  <style>
+    .toolbar{grid-template-columns:minmax(0,1fr) 180px auto}
+    .mode-visual{display:grid;grid-template-columns:180px minmax(0,1fr);gap:22px;align-items:center}
+    .mode-ring{width:170px;aspect-ratio:1;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--accent) 0 33.3%,var(--green) 33.3% 66.6%,var(--gold) 66.6%);position:relative}
+    .mode-ring::after{content:"";position:absolute;inset:28px;border-radius:50%;background:var(--card)}
+    .mode-ring>div{position:relative;z-index:1;text-align:center}.mode-ring strong{display:block;font-size:28px}.mode-ring span{color:var(--muted);font-size:11px}
+    .mode-bars{display:grid;gap:13px}.mode-row{display:grid;grid-template-columns:90px minmax(0,1fr) 55px;gap:9px;align-items:center}.mode-name{font-weight:800}.mode-meta{grid-column:2/-1;color:var(--muted);font-size:11px;margin-top:-7px}.mode-swatch{height:24px;border-radius:7px}.mode-value{text-align:right;font-weight:800}.transitions{display:grid;gap:10px}.transition-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:12px;border:1px solid #e8e0d4;border-radius:10px}.transition-route{font-weight:850}.transition-route span{color:var(--accent);padding:0 8px}.transition-value{text-align:right}.transition-value small{display:block;color:var(--muted)}
+    .trend-chart{min-height:210px}.trend-chart svg{width:100%;height:185px;overflow:visible}.trend-area{fill:rgba(38,112,90,.12)}.trend-line{fill:none;stroke:var(--green);stroke-width:3;stroke-linejoin:round;stroke-linecap:round}.trend-dot{fill:var(--card);stroke:var(--green);stroke-width:2}.trend-axis{display:flex;justify-content:space-between;color:var(--muted);font-size:11px}.single-panel{margin-top:16px}
+    @media(max-width:820px){.toolbar{grid-template-columns:1fr 1fr}.toolbar .status{grid-column:1/-1}.mode-visual{grid-template-columns:150px minmax(0,1fr)}.mode-ring{width:145px}}
+    @media(max-width:480px){.toolbar{grid-template-columns:1fr}.mode-visual{grid-template-columns:1fr}.mode-ring{margin:0 auto}.mode-row{grid-template-columns:82px minmax(0,1fr) 48px}.transition-row{grid-template-columns:1fr}.transition-value{text-align:left}}
+  </style>
+</head>
+<body>
+  <header><div class="header-inner"><div><h1 class="brand">老板看板</h1><div class="subtitle">NBA 巨星赛季模拟器 · 只读产品监控</div></div><span class="pill">不含昵称、阵容与反馈正文</span></div></header>
+  <main>
+    <section class="auth" id="authPanel">
+      <h2>管理员验证</h2>
+      <p>密钥只保存在当前页面内存，关闭或刷新后需要重新输入。</p>
+      <div class="auth-grid"><label for="adminKey">管理员密钥</label><input id="adminKey" type="password" autocomplete="off"><button class="primary" id="loadDashboard" type="button">打开看板</button></div>
+      <div class="message" id="authMessage" aria-live="polite"></div>
+    </section>
+
+    <section class="dashboard" id="dashboard" hidden>
+      <div class="toolbar">
+        <div class="status" id="statusText">尚未加载</div>
+        <label>观察窗口<select id="window"><option value="12h">最近 12 小时</option><option value="24h">最近 24 小时</option><option value="3d">最近 3 天</option><option value="7d" selected>最近 7 天</option><option value="14d">最近 14 天</option><option value="30d">最近 30 天</option><option value="90d">最近 90 天</option></select></label>
+        <button id="refresh" type="button">立即刷新</button>
+      </div>
+
+      <div class="cards" id="metricCards"></div>
+
+      <div class="section-grid">
+        <section class="panel"><div class="panel-head"><div><h2>模式热度</h2><p>同一用户玩过多个模式时会分别计入各模式</p></div></div><div class="mode-visual"><div class="mode-ring" id="modeRing"><div><strong id="modeRingTotal">0</strong><span>模式用户覆盖</span></div></div><div class="mode-bars" id="modeBars"></div></div></section>
+        <section class="panel"><div class="panel-head"><div><h2>模式之间的转化</h2><p>按同一匿名用户实际进入模式的先后顺序统计</p></div></div><div class="transitions" id="transitions"></div></section>
+      </div>
+
+      <div class="section-grid">
+        <section class="panel"><div class="panel-head"><div><h2>核心漏斗</h2><p>按钮事件只作为底层原料，这里只展示业务结果</p></div></div><div class="funnel" id="funnel"></div></section>
+        <section class="panel"><div class="panel-head"><div><h2>活跃趋势</h2><p id="trendCaption">按北京时间展示</p></div></div><div class="trend-chart" id="trend"></div></section>
+      </div>
+
+      <div class="section-grid">
+        <section class="panel"><div class="panel-head"><div><h2>时段明细</h2><p>12 小时至 3 天按小时；其余窗口按天</p></div></div><div class="table-wrap" id="dailyTable"></div></section>
+        <section class="panel"><div class="panel-head"><div><h2>在线房间历史参考</h2><p>沿用旧表，可能包含过去的验收流量</p></div></div><div class="warning">这组数字不是完整 DAU，只是在线房间创建与完成记录。</div><div class="table-wrap" id="roomTable"></div></section>
+      </div>
+
+      <section class="panel single-panel"><div class="panel-head"><div><h2>正式版本分布</h2><p>用于确认发布后新旧版本没有混写</p></div></div><div class="table-wrap" id="versionTable"></div></section>
+      <p class="footer-note">看板只展示正式环境；每 3 小时自动刷新一次，也可手动刷新。访问统计、产品行为和在线房间是不同口径。</p>
+    </section>
+  </main>
+  <script>
+  (()=>{
+    const labels={session_start:"进入游戏",pack_opened:"完成开包",lineup_completed:"选满五人",nba82_started:"开始 NBA82",nba82_completed:"完成 NBA82",nba5_started:"开始 NBA5",nba5_completed:"完成 NBA5",result_shared:"生成分享图"};
+    const funnelOrder=["session_start","pack_opened","lineup_completed","nba82_started","nba82_completed","nba5_started","nba5_completed","result_shared"];
+    const modeOrder=["nba82","nba5","online"],modeNames={nba82:"NBA82",nba5:"NBA5 离线",online:"在线房间"},modeColors={nba82:"#9e3f2d",nba5:"#26705a",online:"#b98732"};
+    const windowNames={"12h":"12 小时","24h":"24 小时","3d":"3 天","7d":"7 天","14d":"14 天","30d":"30 天","90d":"90 天"};
+    let adminKey="";
+    let refreshTimer=null;
+    const $=id=>document.getElementById(id);
+    const number=value=>Number(value||0).toLocaleString("zh-CN");
+    const percent=(part,total)=>total?`${(part*100/total).toFixed(1)}%`:"—";
+    function table(headers,rows){if(!rows.length)return '<div class="empty">暂无数据</div>';return `<table><thead><tr>${headers.map(x=>`<th>${x}</th>`).join("")}</tr></thead><tbody>${rows.map(row=>`<tr>${row.map(x=>`<td>${x}</td>`).join("")}</tr>`).join("")}</tbody></table>`}
+    function trend(daily){
+      if(!daily.length)return '<div class="empty">暂无趋势数据</div>';
+      const width=600,height=150,padding=12,max=Math.max(1,...daily.map(x=>x.activeVisitors||0));
+      const points=daily.map((item,index)=>{const x=daily.length===1?padding:padding+index*(width-padding*2)/(daily.length-1);const y=height-padding-(item.activeVisitors||0)*(height-padding*2)/max;return {x,y,value:item.activeVisitors||0,label:item.day}});
+      const line=points.map(x=>`${x.x.toFixed(1)},${x.y.toFixed(1)}`).join(" "),area=`${padding},${height-padding} ${line} ${width-padding},${height-padding}`;
+      return `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="活跃用户趋势"><polygon class="trend-area" points="${area}"></polygon><polyline class="trend-line" points="${line}"></polyline>${points.map((x,index)=>index===0||index===points.length-1||points.length<12?`<circle class="trend-dot" cx="${x.x}" cy="${x.y}" r="4"><title>${x.label}：${x.value}</title></circle>`:"").join("")}</svg><div class="trend-axis"><span>${daily[0].day}</span><span>峰值 ${number(max)}</span><span>${daily[daily.length-1].day}</span></div>`;
+    }
+    function render(summary){
+      const daily=summary.daily||[],totals=summary.totals||{};
+      const events=new Map((summary.events||[]).map(item=>[item.eventName,item]));
+      const modes=new Map((summary.modes||[]).map(item=>[item.mode,item])),modeRows=modeOrder.map(mode=>({mode,...(modes.get(mode)||{})}));
+      const leader=modeRows.slice().sort((a,b)=>(b.visitors||0)-(a.visitors||0))[0];
+      const cards=[
+        ["窗口活跃用户",number(totals.activeVisitors),`最近 ${windowNames[summary.windowKey]||summary.windowKey}`],
+        ["会话数",number(totals.sessions),`老访客 ${number(totals.returningVisitors)}`],
+        ["最受欢迎模式",leader?.visitors?modeNames[leader.mode]:"—",leader?.visitors?`${number(leader.visitors)} 位用户`:"暂无数据"],
+        ["跨模式用户",number(totals.crossModeVisitors),percent(totals.crossModeVisitors,totals.activeVisitors)],
+      ];
+      $("metricCards").innerHTML=cards.map(x=>`<article class="metric"><span>${x[0]}</span><strong>${x[1]}</strong><small>${x[2]}</small></article>`).join("");
+      const modeTotal=modeRows.reduce((sum,x)=>sum+Number(x.visitors||0),0),modeMax=Math.max(1,...modeRows.map(x=>x.visitors||0));let cursor=0;
+      const stops=modeRows.map(x=>{const start=cursor;cursor+=modeTotal?(x.visitors||0)*100/modeTotal:0;return `${modeColors[x.mode]} ${start}% ${cursor}%`});
+      $("modeRing").style.background=modeTotal?`conic-gradient(${stops.join(",")})`:`#e9e3d9`;$("modeRingTotal").textContent=number(totals.activeVisitors);
+      $("modeBars").innerHTML=modeRows.map(x=>`<div class="mode-row"><span class="mode-name">${modeNames[x.mode]}</span><div class="bar-track"><div class="mode-swatch" style="width:${Math.max(x.visitors?3:0,(x.visitors||0)*100/modeMax)}%;background:${modeColors[x.mode]}"></div></div><span class="mode-value">${number(x.visitors)}</span><span class="mode-meta">${number(x.sessions)} 次会话 · 完成率 ${percent(x.completers,x.starters)}</span></div>`).join("");
+      $("transitions").innerHTML=(summary.transitions||[]).length?(summary.transitions||[]).map(x=>`<div class="transition-row"><div class="transition-route">${modeNames[x.fromMode]}<span>→</span>${modeNames[x.toMode]}</div><div class="transition-value"><b>${number(x.visitors)} 人</b><small>${number(x.transitions)} 次切换 · ${percent(x.visitors,modes.get(x.fromMode)?.visitors)}</small></div></div>`).join(""):'<div class="empty">当前窗口暂无跨模式流动</div>';
+      const max=Math.max(1,...funnelOrder.map(name=>events.get(name)?.visitors||0));
+      $("funnel").innerHTML=funnelOrder.map(name=>{const value=events.get(name)?.visitors||0;return `<div class="funnel-row"><span class="funnel-label">${labels[name]}</span><div class="bar-track"><div class="bar" style="width:${Math.max(value?2:0,value*100/max)}%"></div></div><span class="funnel-value">${number(value)}</span></div>`}).join("");
+      $("trend").innerHTML=trend(daily);$("trendCaption").textContent=summary.bucketUnit==="hour"?"按小时 · 北京时间":"按天 · 北京时间";
+      $("dailyTable").innerHTML=table([summary.bucketUnit==="hour"?"小时":"日期","活跃","回访","会话"],daily.slice().reverse().map(x=>[x.day,number(x.activeVisitors),`${number(x.returningVisitors)} · ${percent(x.returningVisitors,x.activeVisitors)}`,number(x.sessions)]));
+      $("roomTable").innerHTML=table(["日期","创建","完成","完成率"],(summary.legacyRooms||[]).slice().reverse().map(x=>[x.day,number(x.roomsCreated),number(x.roomsComplete),percent(x.roomsComplete,x.roomsCreated)]));
+      $("versionTable").innerHTML=table(["版本","访客","事件"],(summary.versions||[]).map(x=>[x.releaseVersion,number(x.visitors),number(x.events)]));
+      const next=new Date(Date.now()+3*60*60*1000);$("statusText").textContent=`正式数据 · 更新于 ${new Date(summary.generatedAt).toLocaleString("zh-CN")} · 下次自动刷新 ${next.toLocaleTimeString("zh-CN",{hour:"2-digit",minute:"2-digit"})}`;
+    }
+    function scheduleRefresh(){if(refreshTimer)clearTimeout(refreshTimer);refreshTimer=setTimeout(()=>{if(adminKey)load()},3*60*60*1000)}
+    async function load(){
+      const button=$("refresh");button.disabled=true;$("statusText").style.color="";$("statusText").textContent="正在读取…";
+      try{
+        const params=new URLSearchParams({window:$("window").value});
+        const response=await fetch(`/api/analytics/summary?${params}`,{headers:{Authorization:`Bearer ${adminKey}`},cache:"no-store"});
+        const data=await response.json().catch(()=>null);
+        if(response.status===401){adminKey="";$("dashboard").hidden=true;$("authPanel").hidden=false;$("authMessage").textContent=data?.error?.message||"管理员密钥无效。";$("authMessage").className="message error";$("adminKey").focus();return}
+        if(!response.ok||!data?.ok)throw new Error(data?.error?.message||`读取失败（${response.status}）`);
+        render(data.summary);scheduleRefresh();
+      }catch(error){$("statusText").textContent=error.message;$("statusText").style.color="#a12626"}finally{button.disabled=false}
+    }
+    $("loadDashboard").addEventListener("click",async()=>{const value=$("adminKey").value.trim();if(!value){$("authMessage").textContent="请输入管理员密钥。";$("authMessage").className="message error";return}adminKey=value;$("adminKey").value="";$("authPanel").hidden=true;$("dashboard").hidden=false;await load()});
+    $("adminKey").addEventListener("keydown",event=>{if(event.key==="Enter")$("loadDashboard").click()});
+    $("refresh").addEventListener("click",load);$("window").addEventListener("change",load);
+  })();
+  </script>
+</body>
+</html>
