@@ -54,7 +54,7 @@
       </div>
 
       <div class="section-grid">
-        <section class="panel"><div class="panel-head"><div><h2>时段明细</h2><p>12 小时至 3 天按小时；其余窗口按天</p></div></div><div class="table-wrap" id="dailyTable"></div></section>
+        <section class="panel"><div class="panel-head"><div><h2>时段玩法明细</h2><p>按匿名用户去重；12 小时至 3 天按小时，其余窗口按天。开始/完成是本时段分别计数，不是同批用户转化率。</p></div></div><div class="table-wrap" id="dailyTable"></div></section>
         <section class="panel"><div class="panel-head"><div><h2>在线房间历史参考</h2><p>沿用旧表，可能包含过去的验收流量</p></div></div><div class="warning">这组数字不是完整 DAU，只是在线房间创建与完成记录。</div><div class="table-wrap" id="roomTable"></div></section>
       </div>
 
@@ -101,7 +101,25 @@
       const max=Math.max(1,...funnelOrder.map(name=>events.get(name)?.visitors||0));
       $("funnel").innerHTML=funnelOrder.map(name=>{const value=events.get(name)?.visitors||0;return `<div class="funnel-row"><span class="funnel-label">${labels[name]}</span><div class="bar-track"><div class="bar" style="width:${Math.max(value?2:0,value*100/max)}%"></div></div><span class="funnel-value">${number(value)}</span></div>`}).join("");
       $("trend").innerHTML=trend(daily);$("trendCaption").textContent=summary.bucketUnit==="hour"?"按小时 · 北京时间":"按天 · 北京时间";
-      $("dailyTable").innerHTML=table([summary.bucketUnit==="hour"?"小时":"日期","活跃","回访","会话"],daily.slice().reverse().map(x=>[x.day,number(x.activeVisitors),`${number(x.returningVisitors)} · ${percent(x.returningVisitors,x.activeVisitors)}`,number(x.sessions)]));
+      $("dailyTable").innerHTML=table([
+        summary.bucketUnit==="hour"?"小时":"日期","活跃","回访","会话",
+        "NBA82 进入","NBA82 开始/完成","NBA5 进入","NBA5 开始/完成",
+        "在线进入","在线开赛","开包","选满五人","分享"
+      ],daily.slice().reverse().map(x=>[
+        x.day,
+        number(x.activeVisitors),
+        `${number(x.returningVisitors)} · ${percent(x.returningVisitors,x.activeVisitors)}`,
+        number(x.sessions),
+        number(x.nba82Entrants),
+        `${number(x.nba82Starters)} / ${number(x.nba82Completers)}`,
+        number(x.nba5Entrants),
+        `${number(x.nba5Starters)} / ${number(x.nba5Completers)}`,
+        number(x.onlineEntrants),
+        number(x.onlineStarters),
+        number(x.packOpeners),
+        number(x.lineupCompleters),
+        number(x.sharers)
+      ]));
       $("roomTable").innerHTML=table(["日期","创建","完成","完成率"],(summary.legacyRooms||[]).slice().reverse().map(x=>[x.day,number(x.roomsCreated),number(x.roomsComplete),percent(x.roomsComplete,x.roomsCreated)]));
       $("versionTable").innerHTML=table(["版本","访客","事件"],(summary.versions||[]).map(x=>[x.releaseVersion,number(x.visitors),number(x.events)]));
       const next=new Date(Date.now()+3*60*60*1000);$("statusText").textContent=`正式数据 · 更新于 ${new Date(summary.generatedAt).toLocaleString("zh-CN")} · 下次自动刷新 ${next.toLocaleTimeString("zh-CN",{hour:"2-digit",minute:"2-digit"})}`;

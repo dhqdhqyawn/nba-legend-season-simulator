@@ -2,7 +2,7 @@ import { positiveInteger } from "./config.mjs";
 import { ApiError } from "./errors.mjs";
 import { clientFingerprint, sha256Hex } from "./security.mjs";
 
-export const ANALYTICS_SCHEMA_VERSION = "product-analytics-1.1.0";
+export const ANALYTICS_SCHEMA_VERSION = "product-analytics-1.2.0";
 export const ANALYTICS_EVENT_NAMES = Object.freeze([
   "session_start",
   "mode_entered",
@@ -209,7 +209,7 @@ export async function getAnalyticsSummary(database, {
   const bucketExpression = bucketUnit === "hour"
     ? "strftime('%Y-%m-%d %H:00', received_at, 'unixepoch', '+8 hours')"
     : "date(received_at, 'unixepoch', '+8 hours')";
-  const [totalResult, dailyResult, eventResult, modeResult, transitionResult, versionResult, roomResult] = await Promise.all([
+  const [totalResult, dailyResult, bucketFunnelResult, eventResult, modeResult, transitionResult, versionResult, roomResult] = await Promise.all([
     database.prepare(
       `WITH window_visitors AS (
          SELECT visitor_hash
@@ -264,6 +264,46 @@ export async function getAnalyticsSummary(database, {
        LEFT JOIN bucket_sessions s ON s.day = d.day
        GROUP BY d.day
        ORDER BY d.day`,
+    ).bind(cutoff, environment).all(),
+    database.prepare(
+      `SELECT ${bucketExpression} AS day,
+              COUNT(DISTINCT CASE
+                WHEN event_name = 'mode_entered' AND mode = 'nba82' THEN visitor_hash
+              END) AS nba82Entrants,
+              COUNT(DISTINCT CASE
+                WHEN event_name = 'nba82_started' THEN visitor_hash
+              END) AS nba82Starters,
+              COUNT(DISTINCT CASE
+                WHEN event_name = 'nba82_completed' THEN visitor_hash
+              END) AS nba82Completers,
+              COUNT(DISTINCT CASE
+                WHEN event_name = 'mode_entered' AND mode = 'nba5' THEN visitor_hash
+              END) AS nba5Entrants,
+              COUNT(DISTINCT CASE
+                WHEN event_name = 'nba5_started' THEN visitor_hash
+              END) AS nba5Starters,
+              COUNT(DISTINCT CASE
+                WHEN event_name = 'nba5_completed' THEN visitor_hash
+              END) AS nba5Completers,
+              COUNT(DISTINCT CASE
+                WHEN event_name = 'mode_entered' AND mode = 'online' THEN visitor_hash
+              END) AS onlineEntrants,
+              COUNT(DISTINCT CASE
+                WHEN event_name = 'room_started' THEN visitor_hash
+              END) AS onlineStarters,
+              COUNT(DISTINCT CASE
+                WHEN event_name = 'pack_opened' THEN visitor_hash
+              END) AS packOpeners,
+              COUNT(DISTINCT CASE
+                WHEN event_name = 'lineup_completed' THEN visitor_hash
+              END) AS lineupCompleters,
+              COUNT(DISTINCT CASE
+                WHEN event_name = 'result_shared' THEN visitor_hash
+              END) AS sharers
+       FROM product_analytics_events
+       WHERE received_at >= ?1 AND environment = ?2
+       GROUP BY day
+       ORDER BY day`,
     ).bind(cutoff, environment).all(),
     database.prepare(
       `SELECT event_name AS eventName,
@@ -333,6 +373,17 @@ export async function getAnalyticsSummary(database, {
     ).bind(cutoff).all(),
   ]);
 
+  const bucketFunnelFields = [
+    "nba82Entrants", "nba82Starters", "nba82Completers",
+    "nba5Entrants", "nba5Starters", "nba5Completers",
+    "onlineEntrants", "onlineStarters",
+    "packOpeners", "lineupCompleters", "sharers",
+  ];
+  const bucketFunnelByDay = new Map(rowsFrom(bucketFunnelResult).map((row) => [
+    row.day,
+    numberFields(row, bucketFunnelFields),
+  ]));
+
   return {
     schemaVersion: ANALYTICS_SCHEMA_VERSION,
     generatedAt: new Date(nowSeconds * 1_000).toISOString(),
@@ -343,9 +394,10 @@ export async function getAnalyticsSummary(database, {
     totals: numberFields(rowsFrom(totalResult)[0] || {}, [
       "activeVisitors", "returningVisitors", "sessions", "crossModeVisitors",
     ]),
-    daily: rowsFrom(dailyResult).map((row) => numberFields(row, [
-      "activeVisitors", "returningVisitors", "sessions",
-    ])),
+    daily: rowsFrom(dailyResult).map((row) => ({
+      ...numberFields(row, ["activeVisitors", "returningVisitors", "sessions"]),
+      ...numberFields(bucketFunnelByDay.get(row.day), bucketFunnelFields),
+    })),
     events: rowsFrom(eventResult).map((row) => numberFields(row, ["events", "visitors"])),
     modes: rowsFrom(modeResult).map((row) => numberFields(row, [
       "visitors", "sessions", "starters", "completers",

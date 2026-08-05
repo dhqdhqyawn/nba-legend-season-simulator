@@ -172,6 +172,13 @@ test("normalizes summary query rows and keeps legacy rooms explicitly separate",
   const results = [
     [{ activeVisitors: "9", returningVisitors: "2", sessions: "11", crossModeVisitors: "3" }],
     [{ day: "2026-08-04", activeVisitors: "9", returningVisitors: "2", sessions: "11" }],
+    [{
+      day: "2026-08-04",
+      nba82Entrants: "7", nba82Starters: "6", nba82Completers: "5",
+      nba5Entrants: "4", nba5Starters: "3", nba5Completers: "2",
+      onlineEntrants: "2", onlineStarters: "1",
+      packOpeners: "8", lineupCompleters: "6", sharers: "3",
+    }],
     [{ eventName: "session_start", events: "12", visitors: "9" }],
     [{ mode: "nba82", visitors: "8", sessions: "10", starters: "7", completers: "6" }],
     [{ fromMode: "nba82", toMode: "nba5", transitions: "3", visitors: "2" }],
@@ -179,8 +186,10 @@ test("normalizes summary query rows and keeps legacy rooms explicitly separate",
     [{ day: "2026-08-04", roomsCreated: "4", roomsComplete: "3" }],
   ];
   let queryIndex = 0;
+  const queries = [];
   const database = {
-    prepare() {
+    prepare(sql) {
+      queries.push(sql);
       const current = queryIndex++;
       return {
         args: [],
@@ -196,12 +205,53 @@ test("normalizes summary query rows and keeps legacy rooms explicitly separate",
     nowSeconds: NOW,
   });
   assert.equal(summary.environment, "candidate");
+  assert.equal(summary.schemaVersion, "product-analytics-1.2.0");
   assert.equal(summary.totals.crossModeVisitors, 3);
   assert.equal(summary.daily[0].activeVisitors, 9);
+  assert.equal(summary.daily[0].nba82Entrants, 7);
+  assert.equal(summary.daily[0].nba82Starters, 6);
+  assert.equal(summary.daily[0].nba82Completers, 5);
+  assert.equal(summary.daily[0].nba5Entrants, 4);
+  assert.equal(summary.daily[0].onlineStarters, 1);
+  assert.equal(summary.daily[0].packOpeners, 8);
+  assert.equal(summary.daily[0].lineupCompleters, 6);
+  assert.equal(summary.daily[0].sharers, 3);
   assert.equal(summary.events[0].visitors, 9);
   assert.equal(summary.modes[0].completers, 6);
   assert.equal(summary.transitions[0].visitors, 2);
   assert.equal(summary.legacyRooms[0].roomsComplete, 3);
+  assert.match(queries[2], /COUNT\(DISTINCT CASE[\s\S]+nba82_started/);
+  assert.match(queries[2], /COUNT\(DISTINCT CASE[\s\S]+room_started/);
+});
+
+test("fills empty per-bucket gameplay metrics with zero", async () => {
+  const results = [
+    [{ activeVisitors: "1", returningVisitors: "0", sessions: "1", crossModeVisitors: "0" }],
+    [{ day: "2026-08-04 09:00", activeVisitors: "1", returningVisitors: "0", sessions: "1" }],
+    [], [], [], [], [], [],
+  ];
+  let queryIndex = 0;
+  const database = {
+    prepare() {
+      const current = queryIndex++;
+      return {
+        bind() { return this; },
+        async all() { return { results: results[current] }; },
+      };
+    },
+  };
+  const summary = await getAnalyticsSummary(database, {
+    windowKey: "12h",
+    windowHours: 12,
+    environment: "candidate",
+    nowSeconds: NOW,
+  });
+  assert.equal(summary.bucketUnit, "hour");
+  assert.equal(summary.daily[0].nba82Entrants, 0);
+  assert.equal(summary.daily[0].nba5Completers, 0);
+  assert.equal(summary.daily[0].onlineStarters, 0);
+  assert.equal(summary.daily[0].packOpeners, 0);
+  assert.equal(summary.daily[0].sharers, 0);
 });
 
 test("cleanup respects the retention boundary when explicitly selected", async () => {
