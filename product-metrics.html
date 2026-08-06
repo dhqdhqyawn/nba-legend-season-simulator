@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex,nofollow">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self'; img-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'self'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self'; img-src 'self'; style-src 'unsafe-inline'; script-src 'self' 'unsafe-inline'; base-uri 'none'; form-action 'self'">
   <title>NBA 巨星赛季模拟器 · 老板看板</title>
   <style>
     :root{color-scheme:light;--page:#f4f1e9;--card:#fffdf8;--ink:#211e19;--muted:#716a60;--line:#ddd5c8;--accent:#9e3f2d;--green:#26705a;--gold:#b98732;--shadow:0 18px 50px rgba(70,54,35,.10);font-family:Inter,"PingFang SC","Microsoft YaHei",system-ui,sans-serif}
@@ -19,9 +19,10 @@
     .mode-ring::after{content:"";position:absolute;inset:28px;border-radius:50%;background:var(--card)}
     .mode-ring>div{position:relative;z-index:1;text-align:center}.mode-ring strong{display:block;font-size:28px}.mode-ring span{color:var(--muted);font-size:11px}
     .mode-bars{display:grid;gap:13px}.mode-row{display:grid;grid-template-columns:90px minmax(0,1fr) 55px;gap:9px;align-items:center}.mode-name{font-weight:800}.mode-meta{grid-column:2/-1;color:var(--muted);font-size:11px;margin-top:-7px}.mode-swatch{height:24px;border-radius:7px}.mode-value{text-align:right;font-weight:800}.transitions{display:grid;gap:10px}.transition-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:12px;border:1px solid #e8e0d4;border-radius:10px}.transition-route{font-weight:850}.transition-route span{color:var(--accent);padding:0 8px}.transition-value{text-align:right}.transition-value small{display:block;color:var(--muted)}
-    .trend-chart{min-height:210px}.trend-chart svg{width:100%;height:185px;overflow:visible}.trend-area{fill:rgba(38,112,90,.12)}.trend-line{fill:none;stroke:var(--green);stroke-width:3;stroke-linejoin:round;stroke-linecap:round}.trend-dot{fill:var(--card);stroke:var(--green);stroke-width:2}.trend-axis{display:flex;justify-content:space-between;color:var(--muted);font-size:11px}.single-panel{margin-top:16px}
-    @media(max-width:820px){.toolbar{grid-template-columns:1fr 1fr}.toolbar .status{grid-column:1/-1}.mode-visual{grid-template-columns:150px minmax(0,1fr)}.mode-ring{width:145px}}
-    @media(max-width:480px){.toolbar{grid-template-columns:1fr}.mode-visual{grid-template-columns:1fr}.mode-ring{margin:0 auto}.mode-row{grid-template-columns:82px minmax(0,1fr) 48px}.transition-row{grid-template-columns:1fr}.transition-value{text-align:left}}
+    .date-panel{margin-bottom:16px;padding:17px 19px}.date-panel h2{margin:0;font-size:17px}.date-panel p{margin:2px 0 13px;color:var(--muted);font-size:12px}.date-controls{display:grid;grid-template-columns:minmax(140px,1fr) minmax(140px,1fr) auto auto auto;gap:10px;align-items:end}.date-controls label{display:grid;gap:5px;color:var(--muted);font-size:12px;font-weight:700}.date-feedback{min-height:20px;margin-top:8px;color:var(--muted);font-size:12px}.date-feedback.error{color:#a12626}.date-panel.active{border-color:#c58c58;box-shadow:0 0 0 2px rgba(158,63,45,.08),0 8px 24px rgba(70,54,35,.06)}
+    .trend-chart{min-height:210px}.trend-chart svg{width:100%;height:185px;overflow:visible}.trend-area{fill:rgba(38,112,90,.12)}.trend-line{fill:none;stroke:var(--green);stroke-width:3;stroke-linejoin:round;stroke-linecap:round}.trend-dot{fill:var(--card);stroke:var(--green);stroke-width:2}.chart-grid{stroke:#e9e2d8;stroke-width:1}.chart-line{fill:none;stroke-width:3;stroke-linejoin:round;stroke-linecap:round}.chart-dot{fill:var(--card);stroke-width:2}.trend-axis{display:flex;justify-content:space-between;color:var(--muted);font-size:11px}.chart-legend{display:flex;flex-wrap:wrap;gap:11px;margin-bottom:8px;color:var(--muted);font-size:11px}.legend-item{display:inline-flex;align-items:center;gap:5px}.legend-dot{width:9px;height:9px;border-radius:50%}.depth-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}.depth-card{padding:13px;border:1px solid #e8e0d4;border-radius:11px}.depth-card header{display:flex;justify-content:space-between;gap:8px;border:0;background:none}.depth-card span{color:var(--muted);font-size:12px}.depth-card strong{font-size:18px}.depth-track{height:8px;margin-top:10px;overflow:hidden;border-radius:999px;background:#eee9df}.depth-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--accent),var(--gold))}.depth-card small{display:block;margin-top:7px;color:var(--muted)}.single-panel{margin-top:16px}
+    @media(max-width:820px){.toolbar{grid-template-columns:1fr 1fr}.toolbar .status{grid-column:1/-1}.date-controls{grid-template-columns:1fr 1fr auto}.date-controls button:last-of-type{grid-column:auto}.mode-visual{grid-template-columns:150px minmax(0,1fr)}.mode-ring{width:145px}}
+    @media(max-width:480px){.toolbar{grid-template-columns:1fr}.date-controls{grid-template-columns:1fr 1fr}.date-controls button{width:100%}.date-controls #applyDates{grid-column:1/-1}.mode-visual{grid-template-columns:1fr}.mode-ring{margin:0 auto}.mode-row{grid-template-columns:82px minmax(0,1fr) 48px}.transition-row{grid-template-columns:1fr}.transition-value{text-align:left}.depth-grid{grid-template-columns:1fr}}
   </style>
 </head>
 <body>
@@ -41,6 +42,19 @@
         <button id="refresh" type="button">立即刷新</button>
       </div>
 
+      <section class="panel date-panel" id="datePanel">
+        <h2>自定义日期分析</h2>
+        <p>选择北京时间自然日，结束日期包含当天；最多查询 90 天。3 天以内按小时，其余按天。</p>
+        <div class="date-controls">
+          <label>开始日期<input id="dateFrom" type="date"></label>
+          <label>结束日期<input id="dateTo" type="date"></label>
+          <button class="primary" id="applyDates" type="button">查询日期</button>
+          <button id="clearDates" type="button">回到预设</button>
+          <button id="exportExcel" type="button" disabled>导出 Excel</button>
+        </div>
+        <div class="date-feedback" id="dateFeedback">当前使用上方的快捷观察窗口。</div>
+      </section>
+
       <div class="cards" id="metricCards"></div>
 
       <div class="section-grid">
@@ -54,6 +68,11 @@
       </div>
 
       <div class="section-grid">
+        <section class="panel"><div class="panel-head"><div><h2>玩法开赛趋势</h2><p>看真正开始游玩的规模；按当前日期或快捷窗口聚合</p></div></div><div class="chart-legend" id="startsLegend"></div><div class="trend-chart" id="startsTrend"></div></section>
+        <section class="panel"><div class="panel-head"><div><h2>参与深度</h2><p>当前窗口的参与比值，用于方向判断，不是 cohort 留存</p></div></div><div class="depth-grid" id="depthGrid"></div></section>
+      </div>
+
+      <div class="section-grid">
         <section class="panel"><div class="panel-head"><div><h2>时段玩法明细</h2><p>按匿名用户去重；12 小时至 3 天按小时，其余窗口按天。开始/完成是本时段分别计数，不是同批用户转化率。</p></div></div><div class="table-wrap" id="dailyTable"></div></section>
         <section class="panel"><div class="panel-head"><div><h2>在线房间历史参考</h2><p>沿用旧表，可能包含过去的验收流量</p></div></div><div class="warning">这组数字不是完整 DAU，只是在线房间创建与完成记录。</div><div class="table-wrap" id="roomTable"></div></section>
       </div>
@@ -62,24 +81,39 @@
       <p class="footer-note">看板只展示正式环境；每 3 小时自动刷新一次，也可手动刷新。访问统计、产品行为和在线房间是不同口径。</p>
     </section>
   </main>
+  <script src="/product-metrics-xlsx.js"></script>
   <script>
   (()=>{
     const labels={session_start:"进入游戏",pack_opened:"完成开包",lineup_completed:"选满五人",nba82_started:"开始 NBA82",nba82_completed:"完成 NBA82",nba5_started:"开始 NBA5",nba5_completed:"完成 NBA5",result_shared:"生成分享图"};
     const funnelOrder=["session_start","pack_opened","lineup_completed","nba82_started","nba82_completed","nba5_started","nba5_completed","result_shared"];
     const modeOrder=["nba82","nba5","online"],modeNames={nba82:"NBA82",nba5:"NBA5 离线",online:"在线房间"},modeColors={nba82:"#9e3f2d",nba5:"#26705a",online:"#b98732"};
     const windowNames={"12h":"12 小时","24h":"24 小时","3d":"3 天","7d":"7 天","14d":"14 天","30d":"30 天","90d":"90 天"};
-    let adminKey="";
-    let refreshTimer=null;
+    let adminKey="",refreshTimer=null,currentSummary=null,customRangeActive=false;
     const $=id=>document.getElementById(id);
     const number=value=>Number(value||0).toLocaleString("zh-CN");
     const percent=(part,total)=>total?`${(part*100/total).toFixed(1)}%`:"—";
-    function table(headers,rows){if(!rows.length)return '<div class="empty">暂无数据</div>';return `<table><thead><tr>${headers.map(x=>`<th>${x}</th>`).join("")}</tr></thead><tbody>${rows.map(row=>`<tr>${row.map(x=>`<td>${x}</td>`).join("")}</tr>`).join("")}</tbody></table>`}
+    const escape=value=>String(value??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+    function table(headers,rows){if(!rows.length)return '<div class="empty">暂无数据</div>';return `<table><thead><tr>${headers.map(x=>`<th>${escape(x)}</th>`).join("")}</tr></thead><tbody>${rows.map(row=>`<tr>${row.map(x=>`<td>${escape(x)}</td>`).join("")}</tr>`).join("")}</tbody></table>`}
+    function beijingToday(){return new Date(Date.now()+8*60*60*1000).toISOString().slice(0,10)}
+    function addDays(ymd,days){const value=new Date(`${ymd}T00:00:00Z`);value.setUTCDate(value.getUTCDate()+days);return value.toISOString().slice(0,10)}
+    function inclusiveDays(from,to){return Math.floor((Date.parse(`${to}T00:00:00Z`)-Date.parse(`${from}T00:00:00Z`))/86400000)+1}
+    function rangeLabel(summary){return summary.range?.from&&summary.range?.to?`${summary.range.from} 至 ${summary.range.to}`:`最近 ${windowNames[summary.windowKey]||summary.windowKey}`}
     function trend(daily){
       if(!daily.length)return '<div class="empty">暂无趋势数据</div>';
       const width=600,height=150,padding=12,max=Math.max(1,...daily.map(x=>x.activeVisitors||0));
       const points=daily.map((item,index)=>{const x=daily.length===1?padding:padding+index*(width-padding*2)/(daily.length-1);const y=height-padding-(item.activeVisitors||0)*(height-padding*2)/max;return {x,y,value:item.activeVisitors||0,label:item.day}});
       const line=points.map(x=>`${x.x.toFixed(1)},${x.y.toFixed(1)}`).join(" "),area=`${padding},${height-padding} ${line} ${width-padding},${height-padding}`;
-      return `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="活跃用户趋势"><polygon class="trend-area" points="${area}"></polygon><polyline class="trend-line" points="${line}"></polyline>${points.map((x,index)=>index===0||index===points.length-1||points.length<12?`<circle class="trend-dot" cx="${x.x}" cy="${x.y}" r="4"><title>${x.label}：${x.value}</title></circle>`:"").join("")}</svg><div class="trend-axis"><span>${daily[0].day}</span><span>峰值 ${number(max)}</span><span>${daily[daily.length-1].day}</span></div>`;
+      return `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="活跃用户趋势"><polygon class="trend-area" points="${area}"></polygon><polyline class="trend-line" points="${line}"></polyline>${points.map((x,index)=>index===0||index===points.length-1||points.length<12?`<circle class="trend-dot" cx="${x.x}" cy="${x.y}" r="4"><title>${escape(x.label)}：${x.value}</title></circle>`:"").join("")}</svg><div class="trend-axis"><span>${escape(daily[0].day)}</span><span>峰值 ${number(max)}</span><span>${escape(daily[daily.length-1].day)}</span></div>`;
+    }
+    function multiTrend(daily,series){
+      if(!daily.length)return '<div class="empty">暂无趋势数据</div>';
+      const width=600,height=150,padding=14,max=Math.max(1,...series.flatMap(item=>daily.map(row=>Number(row[item.key]||0))));
+      const grid=[.25,.5,.75,1].map(ratio=>{const y=height-padding-(height-padding*2)*ratio;return `<line class="chart-grid" x1="${padding}" x2="${width-padding}" y1="${y.toFixed(1)}" y2="${y.toFixed(1)}"/>`}).join("");
+      const paths=series.map(item=>{
+        const points=daily.map((row,index)=>{const x=daily.length===1?padding:padding+index*(width-padding*2)/(daily.length-1),value=Number(row[item.key]||0),y=height-padding-value*(height-padding*2)/max;return{x,y,value,label:row.day}});
+        return `<polyline class="chart-line" stroke="${item.color}" points="${points.map(point=>`${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(" ")}"></polyline>${points.map((point,index)=>index===0||index===points.length-1||points.length<12?`<circle class="chart-dot" stroke="${item.color}" cx="${point.x}" cy="${point.y}" r="3.5"><title>${escape(point.label)} · ${escape(item.label)}：${point.value}</title></circle>`:"").join("")}`;
+      }).join("");
+      return `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="玩法开赛趋势">${grid}${paths}</svg><div class="trend-axis"><span>${escape(daily[0].day)}</span><span>峰值 ${number(max)}</span><span>${escape(daily[daily.length-1].day)}</span></div>`;
     }
     function render(summary){
       const daily=summary.daily||[],totals=summary.totals||{};
@@ -87,7 +121,7 @@
       const modes=new Map((summary.modes||[]).map(item=>[item.mode,item])),modeRows=modeOrder.map(mode=>({mode,...(modes.get(mode)||{})}));
       const leader=modeRows.slice().sort((a,b)=>(b.visitors||0)-(a.visitors||0))[0];
       const cards=[
-        ["窗口活跃用户",number(totals.activeVisitors),`最近 ${windowNames[summary.windowKey]||summary.windowKey}`],
+        ["窗口活跃用户",number(totals.activeVisitors),rangeLabel(summary)],
         ["会话数",number(totals.sessions),`老访客 ${number(totals.returningVisitors)}`],
         ["最受欢迎模式",leader?.visitors?modeNames[leader.mode]:"—",leader?.visitors?`${number(leader.visitors)} 位用户`:"暂无数据"],
         ["跨模式用户",number(totals.crossModeVisitors),percent(totals.crossModeVisitors,totals.activeVisitors)],
@@ -101,6 +135,16 @@
       const max=Math.max(1,...funnelOrder.map(name=>events.get(name)?.visitors||0));
       $("funnel").innerHTML=funnelOrder.map(name=>{const value=events.get(name)?.visitors||0;return `<div class="funnel-row"><span class="funnel-label">${labels[name]}</span><div class="bar-track"><div class="bar" style="width:${Math.max(value?2:0,value*100/max)}%"></div></div><span class="funnel-value">${number(value)}</span></div>`}).join("");
       $("trend").innerHTML=trend(daily);$("trendCaption").textContent=summary.bucketUnit==="hour"?"按小时 · 北京时间":"按天 · 北京时间";
+      const startSeries=modeOrder.map(mode=>({key:`${mode}Starters`,label:modeNames[mode],color:modeColors[mode]}));
+      $("startsLegend").innerHTML=startSeries.map(item=>`<span class="legend-item"><i class="legend-dot" style="background:${item.color}"></i>${item.label}</span>`).join("");
+      $("startsTrend").innerHTML=multiTrend(daily,startSeries);
+      const depth=[
+        ["选满五人 / 活跃",events.get("lineup_completed")?.visitors||0,totals.activeVisitors||0],
+        ["NBA82 完成 / 开始",modes.get("nba82")?.completers||0,modes.get("nba82")?.starters||0],
+        ["在线开赛 / 进入",modes.get("online")?.starters||0,modes.get("online")?.visitors||0],
+        ["分享 / 活跃",events.get("result_shared")?.visitors||0,totals.activeVisitors||0],
+      ];
+      $("depthGrid").innerHTML=depth.map(([label,part,total])=>{const value=total?part*100/total:0;return `<article class="depth-card"><header><span>${label}</span><strong>${percent(part,total)}</strong></header><div class="depth-track"><div class="depth-fill" style="width:${Math.min(100,value)}%"></div></div><small>${number(part)} / ${number(total)} 位用户</small></article>`}).join("");
       $("dailyTable").innerHTML=table([
         summary.bucketUnit==="hour"?"小时":"日期","活跃","回访","会话",
         "NBA82 进入","NBA82 开始/完成","NBA5 进入","NBA5 开始/完成",
@@ -122,23 +166,35 @@
       ]));
       $("roomTable").innerHTML=table(["日期","创建","完成","完成率"],(summary.legacyRooms||[]).slice().reverse().map(x=>[x.day,number(x.roomsCreated),number(x.roomsComplete),percent(x.roomsComplete,x.roomsCreated)]));
       $("versionTable").innerHTML=table(["版本","访客","事件"],(summary.versions||[]).map(x=>[x.releaseVersion,number(x.visitors),number(x.events)]));
-      const next=new Date(Date.now()+3*60*60*1000);$("statusText").textContent=`正式数据 · 更新于 ${new Date(summary.generatedAt).toLocaleString("zh-CN")} · 下次自动刷新 ${next.toLocaleTimeString("zh-CN",{hour:"2-digit",minute:"2-digit"})}`;
+      currentSummary=summary;$("exportExcel").disabled=false;
+      $("datePanel").classList.toggle("active",Boolean(summary.range));
+      $("dateFeedback").className="date-feedback";
+      $("dateFeedback").textContent=summary.range?`当前显示 ${summary.range.from} 至 ${summary.range.to}，导出也使用这段日期。`:"当前使用上方的快捷观察窗口。";
+      const next=new Date(Date.now()+3*60*60*1000);$("statusText").textContent=`正式数据 · ${rangeLabel(summary)} · 更新于 ${new Date(summary.generatedAt).toLocaleString("zh-CN")} · 下次自动刷新 ${next.toLocaleTimeString("zh-CN",{hour:"2-digit",minute:"2-digit"})}`;
     }
     function scheduleRefresh(){if(refreshTimer)clearTimeout(refreshTimer);refreshTimer=setTimeout(()=>{if(adminKey)load()},3*60*60*1000)}
     async function load(){
-      const button=$("refresh");button.disabled=true;$("statusText").style.color="";$("statusText").textContent="正在读取…";
+      const button=$("refresh");button.disabled=true;$("applyDates").disabled=true;$("exportExcel").disabled=true;$("statusText").style.color="";$("statusText").textContent="正在读取…";
       try{
-        const params=new URLSearchParams({window:$("window").value});
+        const params=customRangeActive?new URLSearchParams({from:$("dateFrom").value,to:$("dateTo").value}):new URLSearchParams({window:$("window").value});
         const response=await fetch(`/api/analytics/summary?${params}`,{headers:{Authorization:`Bearer ${adminKey}`},cache:"no-store"});
         const data=await response.json().catch(()=>null);
         if(response.status===401){adminKey="";$("dashboard").hidden=true;$("authPanel").hidden=false;$("authMessage").textContent=data?.error?.message||"管理员密钥无效。";$("authMessage").className="message error";$("adminKey").focus();return}
         if(!response.ok||!data?.ok)throw new Error(data?.error?.message||`读取失败（${response.status}）`);
         render(data.summary);scheduleRefresh();
-      }catch(error){$("statusText").textContent=error.message;$("statusText").style.color="#a12626"}finally{button.disabled=false}
+      }catch(error){$("statusText").textContent=error.message;$("statusText").style.color="#a12626";$("dateFeedback").textContent=error.message;$("dateFeedback").className="date-feedback error"}finally{button.disabled=false;$("applyDates").disabled=false;$("exportExcel").disabled=!currentSummary}
     }
+    function applyDateRange(){
+      const from=$("dateFrom").value,to=$("dateTo").value,days=inclusiveDays(from,to);
+      if(!from||!to||!Number.isFinite(days)||days<1||days>90){$("dateFeedback").textContent=!from||!to?"请先选择开始和结束日期。":days<1?"结束日期不能早于开始日期。":"一次最多查询 90 天。";$("dateFeedback").className="date-feedback error";return}
+      customRangeActive=true;load();
+    }
+    function usePreset(){customRangeActive=false;$("datePanel").classList.remove("active");$("dateFeedback").className="date-feedback";$("dateFeedback").textContent="当前使用上方的快捷观察窗口。";load()}
     $("loadDashboard").addEventListener("click",async()=>{const value=$("adminKey").value.trim();if(!value){$("authMessage").textContent="请输入管理员密钥。";$("authMessage").className="message error";return}adminKey=value;$("adminKey").value="";$("authPanel").hidden=true;$("dashboard").hidden=false;await load()});
     $("adminKey").addEventListener("keydown",event=>{if(event.key==="Enter")$("loadDashboard").click()});
-    $("refresh").addEventListener("click",load);$("window").addEventListener("change",load);
+    $("refresh").addEventListener("click",load);$("window").addEventListener("change",usePreset);$("applyDates").addEventListener("click",applyDateRange);$("clearDates").addEventListener("click",usePreset);
+    $("exportExcel").addEventListener("click",()=>{if(!currentSummary)return;if(!window.ProductMetricsXlsx){$("dateFeedback").textContent="Excel 导出模块未加载，请刷新页面重试。";$("dateFeedback").className="date-feedback error";return}window.ProductMetricsXlsx.download(currentSummary)});
+    const today=beijingToday();$("dateTo").value=today;$("dateFrom").value=addDays(today,-6);
   })();
   </script>
 </body>

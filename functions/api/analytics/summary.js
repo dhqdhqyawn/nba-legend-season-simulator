@@ -18,6 +18,9 @@ const WINDOWS = Object.freeze({
   "30d": 720,
   "90d": 2160,
 });
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const BEIJING_OFFSET_MS = 8 * 60 * 60 * 1_000;
+const DAY_SECONDS = 86_400;
 
 function parseWindow(value, legacyDays) {
   if (value && WINDOWS[value]) return { windowKey: value, windowHours: WINDOWS[value] };
@@ -29,6 +32,55 @@ function parseWindow(value, legacyDays) {
     return { windowKey: `${days}d`, windowHours: days * 24 };
   }
   return { windowKey: "30d", windowHours: WINDOWS["30d"] };
+}
+
+function parseBeijingDateStart(value) {
+  if (!DATE_PATTERN.test(String(value || ""))) return null;
+  const [year, month, day] = value.split("-").map(Number);
+  const utcMs = Date.UTC(year, month - 1, day) - BEIJING_OFFSET_MS;
+  const check = new Date(utcMs + BEIJING_OFFSET_MS);
+  if (
+    check.getUTCFullYear() !== year ||
+    check.getUTCMonth() !== month - 1 ||
+    check.getUTCDate() !== day
+  ) return null;
+  return Math.floor(utcMs / 1_000);
+}
+
+export function parseAnalyticsRange(searchParams) {
+  const from = searchParams.get("from");
+  const to = searchParams.get("to");
+  const hasCustomRange = from !== null || to !== null;
+  if (!hasCustomRange) {
+    return parseWindow(searchParams.get("window"), searchParams.get("days"));
+  }
+  if (!from || !to) {
+    throw new ApiError(400, "invalid_date_range", "开始日期和结束日期必须同时填写。");
+  }
+  if (searchParams.has("window") || searchParams.has("days")) {
+    throw new ApiError(400, "ambiguous_date_range", "自定义日期不能与预设窗口同时使用。");
+  }
+  const rangeStart = parseBeijingDateStart(from);
+  const toStart = parseBeijingDateStart(to);
+  if (rangeStart === null || toStart === null) {
+    throw new ApiError(400, "invalid_date_range", "日期格式无效，请使用 YYYY-MM-DD。");
+  }
+  if (toStart < rangeStart) {
+    throw new ApiError(400, "invalid_date_range", "结束日期不能早于开始日期。");
+  }
+  const rangeEnd = toStart + DAY_SECONDS;
+  const rangeDays = (rangeEnd - rangeStart) / DAY_SECONDS;
+  if (rangeDays > 90) {
+    throw new ApiError(400, "date_range_too_large", "自定义日期范围最多为 90 天。");
+  }
+  return {
+    windowKey: "custom",
+    windowHours: rangeDays * 24,
+    rangeStart,
+    rangeEnd,
+    rangeFrom: from,
+    rangeTo: to,
+  };
 }
 
 function parseEnvironment(value) {
@@ -51,7 +103,7 @@ async function handleGet(context) {
   requireAnalyticsAdmin(request, env);
   const database = requireDatabase(env);
   const url = new URL(request.url);
-  const window = parseWindow(url.searchParams.get("window"), url.searchParams.get("days"));
+  const window = parseAnalyticsRange(url.searchParams);
   const environment = parseEnvironment(url.searchParams.get("environment"));
   const summary = await getAnalyticsSummary(database, {
     ...window,

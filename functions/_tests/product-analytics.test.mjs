@@ -12,6 +12,7 @@ import {
 import { onRequest as analyticsEventsRequest } from "../api/analytics/events.js";
 import {
   onRequest as analyticsSummaryRequest,
+  parseAnalyticsRange,
   requireAnalyticsAdmin,
 } from "../api/analytics/summary.js";
 
@@ -205,7 +206,7 @@ test("normalizes summary query rows and keeps legacy rooms explicitly separate",
     nowSeconds: NOW,
   });
   assert.equal(summary.environment, "candidate");
-  assert.equal(summary.schemaVersion, "product-analytics-1.2.0");
+  assert.equal(summary.schemaVersion, "product-analytics-1.3.0");
   assert.equal(summary.totals.crossModeVisitors, 3);
   assert.equal(summary.daily[0].activeVisitors, 9);
   assert.equal(summary.daily[0].nba82Entrants, 7);
@@ -222,6 +223,70 @@ test("normalizes summary query rows and keeps legacy rooms explicitly separate",
   assert.equal(summary.legacyRooms[0].roomsComplete, 3);
   assert.match(queries[2], /COUNT\(DISTINCT CASE[\s\S]+nba82_started/);
   assert.match(queries[2], /COUNT\(DISTINCT CASE[\s\S]+room_started/);
+  assert.match(queries[0], /received_at < \?3/);
+});
+
+test("parses inclusive Beijing calendar dates and rejects unsafe ranges", () => {
+  const parsed = parseAnalyticsRange(new URLSearchParams("from=2026-08-04&to=2026-08-06"));
+  assert.deepEqual(parsed, {
+    windowKey: "custom",
+    windowHours: 72,
+    rangeStart: Date.parse("2026-08-04T00:00:00+08:00") / 1_000,
+    rangeEnd: Date.parse("2026-08-07T00:00:00+08:00") / 1_000,
+    rangeFrom: "2026-08-04",
+    rangeTo: "2026-08-06",
+  });
+  assert.throws(
+    () => parseAnalyticsRange(new URLSearchParams("from=2026-08-06&to=2026-08-04")),
+    (error) => error.code === "invalid_date_range",
+  );
+  assert.throws(
+    () => parseAnalyticsRange(new URLSearchParams("from=2026-02-30&to=2026-03-01")),
+    (error) => error.code === "invalid_date_range",
+  );
+  assert.throws(
+    () => parseAnalyticsRange(new URLSearchParams("from=2026-01-01&to=2026-04-01")),
+    (error) => error.code === "date_range_too_large",
+  );
+  assert.throws(
+    () => parseAnalyticsRange(new URLSearchParams("window=7d&from=2026-08-04&to=2026-08-06")),
+    (error) => error.code === "ambiguous_date_range",
+  );
+});
+
+test("uses an exclusive upper bound for every custom-range aggregate", async () => {
+  const bindings = [];
+  const database = {
+    prepare() {
+      return {
+        bind(...args) { bindings.push(args); return this; },
+        async all() { return { results: [] }; },
+      };
+    },
+  };
+  const rangeStart = Date.parse("2026-08-04T00:00:00+08:00") / 1_000;
+  const rangeEnd = Date.parse("2026-08-07T00:00:00+08:00") / 1_000;
+  const summary = await getAnalyticsSummary(database, {
+    windowKey: "custom",
+    environment: "production",
+    nowSeconds: NOW,
+    rangeStart,
+    rangeEnd,
+    rangeFrom: "2026-08-04",
+    rangeTo: "2026-08-06",
+  });
+  assert.equal(summary.bucketUnit, "hour");
+  assert.deepEqual(summary.range, {
+    from: "2026-08-04",
+    to: "2026-08-06",
+    startAt: new Date(rangeStart * 1_000).toISOString(),
+    endAtExclusive: new Date(rangeEnd * 1_000).toISOString(),
+  });
+  assert.equal(bindings.length, 8);
+  bindings.slice(0, 7).forEach((args) => assert.deepEqual(args, [
+    rangeStart, "production", rangeEnd,
+  ]));
+  assert.deepEqual(bindings[7], [rangeStart, rangeEnd]);
 });
 
 test("fills empty per-bucket gameplay metrics with zero", async () => {

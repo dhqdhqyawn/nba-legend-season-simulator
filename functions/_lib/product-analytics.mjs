@@ -2,7 +2,7 @@ import { positiveInteger } from "./config.mjs";
 import { ApiError } from "./errors.mjs";
 import { clientFingerprint, sha256Hex } from "./security.mjs";
 
-export const ANALYTICS_SCHEMA_VERSION = "product-analytics-1.2.0";
+export const ANALYTICS_SCHEMA_VERSION = "product-analytics-1.3.0";
 export const ANALYTICS_EVENT_NAMES = Object.freeze([
   "session_start",
   "mode_entered",
@@ -202,9 +202,17 @@ export async function getAnalyticsSummary(database, {
   windowKey,
   environment,
   nowSeconds,
+  rangeStart,
+  rangeEnd,
+  rangeFrom = null,
+  rangeTo = null,
 }) {
-  const windowHours = requestedWindowHours || days * 24;
-  const cutoff = nowSeconds - windowHours * 3_600;
+  const hasCustomRange = Number.isFinite(rangeStart) && Number.isFinite(rangeEnd);
+  const cutoff = hasCustomRange ? rangeStart : nowSeconds - (requestedWindowHours || days * 24) * 3_600;
+  const endExclusive = hasCustomRange ? rangeEnd : nowSeconds + 1;
+  const windowHours = hasCustomRange
+    ? Math.ceil((endExclusive - cutoff) / 3_600)
+    : requestedWindowHours || days * 24;
   const bucketUnit = windowHours <= 72 ? "hour" : "day";
   const bucketExpression = bucketUnit === "hour"
     ? "strftime('%Y-%m-%d %H:00', received_at, 'unixepoch', '+8 hours')"
@@ -214,7 +222,7 @@ export async function getAnalyticsSummary(database, {
       `WITH window_visitors AS (
          SELECT visitor_hash
          FROM product_analytics_events
-         WHERE received_at >= ?1 AND environment = ?2
+         WHERE received_at >= ?1 AND received_at < ?3 AND environment = ?2
          GROUP BY visitor_hash
        ), first_seen AS (
          SELECT visitor_hash, MIN(received_at) AS first_received_at
@@ -226,23 +234,23 @@ export async function getAnalyticsSummary(database, {
               SUM(CASE WHEN f.first_received_at < ?1 THEN 1 ELSE 0 END) AS returningVisitors,
               (SELECT COUNT(DISTINCT session_hash)
                FROM product_analytics_events
-               WHERE received_at >= ?1 AND environment = ?2) AS sessions,
+               WHERE received_at >= ?1 AND received_at < ?3 AND environment = ?2) AS sessions,
               (SELECT COUNT(*) FROM (
                  SELECT visitor_hash
                  FROM product_analytics_events
-                 WHERE received_at >= ?1 AND environment = ?2
+                 WHERE received_at >= ?1 AND received_at < ?3 AND environment = ?2
                    AND mode IN ('nba82', 'nba5', 'online')
                  GROUP BY visitor_hash
                  HAVING COUNT(DISTINCT mode) > 1
                )) AS crossModeVisitors
        FROM window_visitors w
        JOIN first_seen f ON f.visitor_hash = w.visitor_hash`,
-    ).bind(cutoff, environment).all(),
+    ).bind(cutoff, environment, endExclusive).all(),
     database.prepare(
       `WITH bucket_visitors AS (
          SELECT ${bucketExpression} AS day, visitor_hash
          FROM product_analytics_events
-         WHERE received_at >= ?1 AND environment = ?2
+         WHERE received_at >= ?1 AND received_at < ?3 AND environment = ?2
          GROUP BY day, visitor_hash
        ), first_seen AS (
          SELECT visitor_hash, ${bucketExpression.replaceAll("received_at", "MIN(received_at)")} AS first_day
@@ -253,7 +261,7 @@ export async function getAnalyticsSummary(database, {
          SELECT ${bucketExpression} AS day,
                 COUNT(DISTINCT session_hash) AS sessions
          FROM product_analytics_events
-         WHERE received_at >= ?1 AND environment = ?2
+         WHERE received_at >= ?1 AND received_at < ?3 AND environment = ?2
          GROUP BY day
        )
        SELECT d.day, COUNT(*) AS activeVisitors,
@@ -264,7 +272,7 @@ export async function getAnalyticsSummary(database, {
        LEFT JOIN bucket_sessions s ON s.day = d.day
        GROUP BY d.day
        ORDER BY d.day`,
-    ).bind(cutoff, environment).all(),
+    ).bind(cutoff, environment, endExclusive).all(),
     database.prepare(
       `SELECT ${bucketExpression} AS day,
               COUNT(DISTINCT CASE
@@ -301,19 +309,19 @@ export async function getAnalyticsSummary(database, {
                 WHEN event_name = 'result_shared' THEN visitor_hash
               END) AS sharers
        FROM product_analytics_events
-       WHERE received_at >= ?1 AND environment = ?2
+       WHERE received_at >= ?1 AND received_at < ?3 AND environment = ?2
        GROUP BY day
        ORDER BY day`,
-    ).bind(cutoff, environment).all(),
+    ).bind(cutoff, environment, endExclusive).all(),
     database.prepare(
       `SELECT event_name AS eventName,
               COUNT(*) AS events,
               COUNT(DISTINCT visitor_hash) AS visitors
        FROM product_analytics_events
-       WHERE received_at >= ?1 AND environment = ?2
+       WHERE received_at >= ?1 AND received_at < ?3 AND environment = ?2
        GROUP BY event_name
        ORDER BY event_name`,
-    ).bind(cutoff, environment).all(),
+    ).bind(cutoff, environment, endExclusive).all(),
     database.prepare(
       `SELECT mode,
               COUNT(DISTINCT visitor_hash) AS visitors,
@@ -325,11 +333,11 @@ export async function getAnalyticsSummary(database, {
                 WHEN event_name IN ('nba82_completed', 'nba5_completed') THEN visitor_hash
               END) AS completers
        FROM product_analytics_events
-       WHERE received_at >= ?1 AND environment = ?2
+       WHERE received_at >= ?1 AND received_at < ?3 AND environment = ?2
          AND mode IN ('nba82', 'nba5', 'online')
        GROUP BY mode
        ORDER BY visitors DESC, mode`,
-    ).bind(cutoff, environment).all(),
+    ).bind(cutoff, environment, endExclusive).all(),
     database.prepare(
       `WITH entered AS (
          SELECT visitor_hash,
@@ -339,7 +347,7 @@ export async function getAnalyticsSummary(database, {
                   ORDER BY occurred_at, received_at, event_id
                 ) AS to_mode
          FROM product_analytics_events
-         WHERE received_at >= ?1 AND environment = ?2
+         WHERE received_at >= ?1 AND received_at < ?3 AND environment = ?2
            AND event_name = 'mode_entered'
            AND mode IN ('nba82', 'nba5', 'online')
        )
@@ -351,26 +359,26 @@ export async function getAnalyticsSummary(database, {
        WHERE to_mode IS NOT NULL AND from_mode <> to_mode
        GROUP BY from_mode, to_mode
        ORDER BY visitors DESC, transitions DESC, from_mode, to_mode`,
-    ).bind(cutoff, environment).all(),
+    ).bind(cutoff, environment, endExclusive).all(),
     database.prepare(
       `SELECT release_version AS releaseVersion,
               COUNT(DISTINCT visitor_hash) AS visitors,
               COUNT(*) AS events
        FROM product_analytics_events
-       WHERE received_at >= ?1 AND environment = ?2
+       WHERE received_at >= ?1 AND received_at < ?3 AND environment = ?2
        GROUP BY release_version
        ORDER BY visitors DESC, release_version
        LIMIT 12`,
-    ).bind(cutoff, environment).all(),
+    ).bind(cutoff, environment, endExclusive).all(),
     database.prepare(
       `SELECT date(created_at, 'unixepoch', '+8 hours') AS day,
               COUNT(*) AS roomsCreated,
               SUM(CASE WHEN status = 'complete' THEN 1 ELSE 0 END) AS roomsComplete
        FROM battle_rooms_v3
-       WHERE created_at >= ?1
+       WHERE created_at >= ?1 AND created_at < ?2
        GROUP BY day
        ORDER BY day`,
-    ).bind(cutoff).all(),
+    ).bind(cutoff, endExclusive).all(),
   ]);
 
   const bucketFunnelFields = [
@@ -391,6 +399,12 @@ export async function getAnalyticsSummary(database, {
     windowHours,
     bucketUnit,
     environment,
+    range: hasCustomRange ? {
+      from: rangeFrom,
+      to: rangeTo,
+      startAt: new Date(cutoff * 1_000).toISOString(),
+      endAtExclusive: new Date(endExclusive * 1_000).toISOString(),
+    } : null,
     totals: numberFields(rowsFrom(totalResult)[0] || {}, [
       "activeVisitors", "returningVisitors", "sessions", "crossModeVisitors",
     ]),
