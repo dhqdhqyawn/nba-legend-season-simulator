@@ -2,7 +2,7 @@ import { positiveInteger } from "./config.mjs";
 import { ApiError } from "./errors.mjs";
 import { clientFingerprint, sha256Hex } from "./security.mjs";
 
-export const ANALYTICS_SCHEMA_VERSION = "product-analytics-1.3.0";
+export const ANALYTICS_SCHEMA_VERSION = "product-analytics-1.4.0";
 export const ANALYTICS_EVENT_NAMES = Object.freeze([
   "session_start",
   "mode_entered",
@@ -206,6 +206,7 @@ export async function getAnalyticsSummary(database, {
   rangeEnd,
   rangeFrom = null,
   rangeTo = null,
+  requestedBucketUnit = "auto",
 }) {
   const hasCustomRange = Number.isFinite(rangeStart) && Number.isFinite(rangeEnd);
   const cutoff = hasCustomRange ? rangeStart : nowSeconds - (requestedWindowHours || days * 24) * 3_600;
@@ -213,7 +214,9 @@ export async function getAnalyticsSummary(database, {
   const windowHours = hasCustomRange
     ? Math.ceil((endExclusive - cutoff) / 3_600)
     : requestedWindowHours || days * 24;
-  const bucketUnit = windowHours <= 72 ? "hour" : "day";
+  const bucketUnit = requestedBucketUnit === "hour" || requestedBucketUnit === "day"
+    ? requestedBucketUnit
+    : windowHours <= 72 ? "hour" : "day";
   const bucketExpression = bucketUnit === "hour"
     ? "strftime('%Y-%m-%d %H:00', received_at, 'unixepoch', '+8 hours')"
     : "date(received_at, 'unixepoch', '+8 hours')";

@@ -34,6 +34,14 @@ function parseWindow(value, legacyDays) {
   return { windowKey: "30d", windowHours: WINDOWS["30d"] };
 }
 
+function parseBucket(value) {
+  const bucketUnit = value || "auto";
+  if (!["auto", "hour", "day"].includes(bucketUnit)) {
+    throw new ApiError(400, "invalid_bucket", "bucket 应为 auto、hour 或 day。");
+  }
+  return bucketUnit;
+}
+
 function parseBeijingDateStart(value) {
   if (!DATE_PATTERN.test(String(value || ""))) return null;
   const [year, month, day] = value.split("-").map(Number);
@@ -48,11 +56,15 @@ function parseBeijingDateStart(value) {
 }
 
 export function parseAnalyticsRange(searchParams) {
+  const requestedBucketUnit = parseBucket(searchParams.get("bucket"));
   const from = searchParams.get("from");
   const to = searchParams.get("to");
   const hasCustomRange = from !== null || to !== null;
   if (!hasCustomRange) {
-    return parseWindow(searchParams.get("window"), searchParams.get("days"));
+    return {
+      ...parseWindow(searchParams.get("window"), searchParams.get("days")),
+      requestedBucketUnit,
+    };
   }
   if (!from || !to) {
     throw new ApiError(400, "invalid_date_range", "开始日期和结束日期必须同时填写。");
@@ -80,6 +92,7 @@ export function parseAnalyticsRange(searchParams) {
     rangeEnd,
     rangeFrom: from,
     rangeTo: to,
+    requestedBucketUnit,
   };
 }
 

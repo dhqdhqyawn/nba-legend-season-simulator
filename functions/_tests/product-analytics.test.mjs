@@ -206,7 +206,7 @@ test("normalizes summary query rows and keeps legacy rooms explicitly separate",
     nowSeconds: NOW,
   });
   assert.equal(summary.environment, "candidate");
-  assert.equal(summary.schemaVersion, "product-analytics-1.3.0");
+  assert.equal(summary.schemaVersion, "product-analytics-1.4.0");
   assert.equal(summary.totals.crossModeVisitors, 3);
   assert.equal(summary.daily[0].activeVisitors, 9);
   assert.equal(summary.daily[0].nba82Entrants, 7);
@@ -235,6 +235,7 @@ test("parses inclusive Beijing calendar dates and rejects unsafe ranges", () => 
     rangeEnd: Date.parse("2026-08-07T00:00:00+08:00") / 1_000,
     rangeFrom: "2026-08-04",
     rangeTo: "2026-08-06",
+    requestedBucketUnit: "auto",
   });
   assert.throws(
     () => parseAnalyticsRange(new URLSearchParams("from=2026-08-06&to=2026-08-04")),
@@ -252,6 +253,39 @@ test("parses inclusive Beijing calendar dates and rejects unsafe ranges", () => 
     () => parseAnalyticsRange(new URLSearchParams("window=7d&from=2026-08-04&to=2026-08-06")),
     (error) => error.code === "ambiguous_date_range",
   );
+});
+
+test("accepts explicit chart bucket units and rejects unknown values", () => {
+  const hourly = parseAnalyticsRange(new URLSearchParams("window=30d&bucket=hour"));
+  assert.equal(hourly.requestedBucketUnit, "hour");
+  const daily = parseAnalyticsRange(new URLSearchParams("from=2026-08-04&to=2026-08-06&bucket=day"));
+  assert.equal(daily.requestedBucketUnit, "day");
+  assert.throws(
+    () => parseAnalyticsRange(new URLSearchParams("window=7d&bucket=week")),
+    (error) => error.code === "invalid_bucket",
+  );
+});
+
+test("honors an explicit bucket unit independently from the window", async () => {
+  const queries = [];
+  const database = {
+    prepare(sql) {
+      queries.push(sql);
+      return {
+        bind() { return this; },
+        async all() { return { results: [] }; },
+      };
+    },
+  };
+  const summary = await getAnalyticsSummary(database, {
+    windowKey: "30d",
+    windowHours: 720,
+    requestedBucketUnit: "hour",
+    environment: "production",
+    nowSeconds: NOW,
+  });
+  assert.equal(summary.bucketUnit, "hour");
+  assert.match(queries[1], /%Y-%m-%d %H:00/);
 });
 
 test("uses an exclusive upper bound for every custom-range aggregate", async () => {

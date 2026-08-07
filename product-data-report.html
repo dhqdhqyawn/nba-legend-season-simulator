@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>NBA 巨星赛季模拟器 · 产品数据报告</title>
+  <style>
+    :root{color-scheme:light;--page:#f2eee5;--card:#fffdf8;--ink:#201d18;--muted:#716a60;--line:#ddd4c6;--red:#9e3f2d;--green:#26705a;--gold:#b98732;--purple:#6b4ba1;--shadow:0 14px 40px rgba(70,54,35,.09);font-family:Inter,"PingFang SC","Microsoft YaHei",system-ui,sans-serif}
+    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:radial-gradient(circle at 90% 0,#e9dcc4 0,transparent 32%),var(--page);color:var(--ink);font-size:15px;line-height:1.65}button{font:inherit}a{color:var(--red)}.wrap{width:min(1120px,calc(100% - 32px));margin:auto}.hero{padding:58px 0 34px}.eyebrow{color:var(--red);font-size:12px;font-weight:900;letter-spacing:.16em}.hero h1{max-width:820px;margin:9px 0 12px;font-size:clamp(32px,5vw,60px);line-height:1.08;letter-spacing:-.04em}.hero p{max-width:760px;margin:0;color:var(--muted);font-size:16px}.meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:22px}.pill{padding:6px 10px;border:1px solid #d9c39e;border-radius:999px;background:#fff8eb;color:#795521;font-size:12px;font-weight:800}.actions{display:flex;gap:10px;margin-top:22px}.actions button{padding:9px 14px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);cursor:pointer;font-weight:800}.actions button:first-child{border-color:var(--red);background:var(--red);color:#fff}.summary{margin-bottom:18px;padding:22px;border:1px solid #d5b990;border-radius:16px;background:linear-gradient(135deg,#fff8e9,#fffdf8);box-shadow:var(--shadow)}.summary strong{color:var(--red)}.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.metric,.panel{border:1px solid var(--line);background:var(--card);box-shadow:var(--shadow)}.metric{padding:17px;border-radius:14px}.metric span{display:block;color:var(--muted);font-size:12px}.metric strong{display:block;margin:4px 0;font-size:30px;line-height:1.1}.metric small{color:var(--muted)}main{padding-bottom:60px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}.panel{min-width:0;padding:22px;border-radius:16px}.wide{grid-column:1/-1}.panel h2{margin:0;font-size:20px}.panel h3{margin:20px 0 7px;font-size:15px}.sub{margin:2px 0 18px;color:var(--muted);font-size:12px}.chart{height:238px}.chart svg{width:100%;height:100%;overflow:visible}.gridline{stroke:#e9e2d8;stroke-width:1}.axis{fill:var(--muted);font-size:10px}.line{fill:none;stroke:var(--green);stroke-width:4;stroke-linecap:round;stroke-linejoin:round}.area{fill:rgba(38,112,90,.12)}.dot{fill:var(--card);stroke:var(--green);stroke-width:3}.bar-list{display:grid;gap:13px}.bar-row{display:grid;grid-template-columns:120px minmax(0,1fr) 72px;gap:10px;align-items:center}.bar-label{font-weight:800}.track{height:24px;border-radius:7px;background:#eee8de;overflow:hidden}.fill{height:100%;border-radius:7px;background:linear-gradient(90deg,var(--red),#ca8050)}.bar-value{text-align:right;font-weight:850;font-variant-numeric:tabular-nums}.retention{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px}.retention-card{padding:14px;border:1px solid #e6ded2;border-radius:12px}.retention-card span{display:block;color:var(--muted);font-size:11px}.retention-card strong{font-size:26px}.retention-card small{display:block;color:var(--muted)}.heat{display:grid;grid-template-columns:repeat(12,1fr);gap:5px;align-items:end;height:150px}.heat div{position:relative;min-height:5px;border-radius:5px 5px 2px 2px;background:linear-gradient(180deg,var(--purple),#a58bc9)}.heat div::after{content:attr(data-time);position:absolute;top:100%;left:50%;margin-top:7px;transform:translateX(-50%);color:var(--muted);font-size:9px;white-space:nowrap}.callout{margin-top:15px;padding:14px 16px;border-left:4px solid var(--gold);border-radius:8px;background:#fff6e6;color:#65491f}.callout.danger{border-color:var(--red);background:#fff1ed;color:#722e23}.table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}th,td{padding:10px 9px;border-bottom:1px solid #eee7dc;text-align:right;white-space:nowrap}th:first-child,td:first-child{text-align:left}th{color:var(--muted);font-size:11px}.priority{counter-reset:item;display:grid;gap:10px;margin:0;padding:0;list-style:none}.priority li{position:relative;padding:13px 13px 13px 52px;border:1px solid #e7dfd3;border-radius:11px}.priority li::before{counter-increment:item;content:counter(item);position:absolute;left:14px;top:12px;width:26px;height:26px;display:grid;place-items:center;border-radius:50%;background:var(--ink);color:#fff;font-size:12px;font-weight:900}.foot{margin-top:16px;padding:18px 0 34px;color:var(--muted);font-size:11px}.foot p{margin:4px 0}
+    @media(max-width:760px){.hero{padding-top:36px}.metrics{grid-template-columns:1fr 1fr}.grid{grid-template-columns:1fr}.wide{grid-column:auto}.panel{padding:17px}.bar-row{grid-template-columns:90px minmax(0,1fr) 58px}.retention{grid-template-columns:1fr}.heat div:nth-child(even)::after{display:none}}
+    @media(max-width:420px){.wrap{width:min(100% - 20px,1120px)}.metric{padding:14px}.metric strong{font-size:25px}.actions{flex-direction:column}.actions button{width:100%}}
+    @media print{body{background:#fff}.actions{display:none}.wrap{width:100%}.hero{padding-top:20px}.metric,.panel,.summary{box-shadow:none;break-inside:avoid}.grid{gap:10px}.foot{padding-bottom:0}}
+  </style>
+</head>
+<body>
+  <header class="hero wrap">
+    <div class="eyebrow">PRODUCT SIGNAL REPORT · 01</div>
+    <h1>已经不是“有没有人玩”，而是该研究他们为什么回来。</h1>
+    <p>NBA 巨星赛季模拟器首份正式产品数据报告。用匿名产品事件观察活跃、早期留存、玩法闭环与跨模式探索。</p>
+    <div class="meta"><span class="pill">截至 2026-08-07 19:26</span><span class="pill">北京时间</span><span class="pill">正式环境</span><span class="pill">约 3.5 天数据</span></div>
+    <div class="actions"><button type="button" onclick="window.print()">打印 / 另存 PDF</button><button type="button" onclick="location.hash='conclusion'">直接看结论</button></div>
+  </header>
+
+  <main class="wrap">
+    <section class="summary"><strong>一句话结论：</strong>这不是没人玩的冷启动数据。8 月 7 日尚未结束，活跃用户已经追平前一天全天；NBA82 的开始与完成闭环很强，跨模式探索明显。留存有正向信号，但数据只有四个自然日，尚不能判断 D7 或长期留存。</section>
+
+    <section class="metrics" aria-label="核心指标">
+      <article class="metric"><span>去重访客</span><strong>872</strong><small>正式环境累计</small></article>
+      <article class="metric"><span>会话</span><strong>2,241</strong><small>人均约 2.57 次</small></article>
+      <article class="metric"><span>产品事件</span><strong>30,852</strong><small>匿名聚合</small></article>
+      <article class="metric"><span>8 月 7 日 DAU</span><strong>346</strong><small>截至 19:26，已追平前日</small></article>
+    </section>
+
+    <div class="grid">
+      <section class="panel wide">
+        <h2>DAU 没有降温，8 月 6 日发生了明显跃升</h2>
+        <p class="sub">8 月 4 日只从 12:55 开始记录；8 月 7 日只统计到 19:26，二者都不是完整自然日。</p>
+        <div class="chart" role="img" aria-label="8月4日至8月7日活跃用户趋势">
+          <svg viewBox="0 0 760 238">
+            <line class="gridline" x1="45" x2="745" y1="190" y2="190"/><line class="gridline" x1="45" x2="745" y1="130" y2="130"/><line class="gridline" x1="45" x2="745" y1="70" y2="70"/>
+            <text class="axis" x="38" y="194" text-anchor="end">0</text><text class="axis" x="38" y="134" text-anchor="end">175</text><text class="axis" x="38" y="74" text-anchor="end">350</text>
+            <polygon class="area" points="65,107 285,111 505,71 725,71 725,190 65,190"/>
+            <polyline class="line" points="65,107 285,111 505,71 725,71"/>
+            <g><circle class="dot" cx="65" cy="107" r="6"/><circle class="dot" cx="285" cy="111" r="6"/><circle class="dot" cx="505" cy="71" r="6"/><circle class="dot" cx="725" cy="71" r="6"/></g>
+            <g class="axis" text-anchor="middle"><text x="65" y="218">8/4 · 168</text><text x="285" y="218">8/5 · 161</text><text x="505" y="218">8/6 · 346</text><text x="725" y="218">8/7 · 346*</text></g>
+          </svg>
+        </div>
+        <div class="callout">8 月 5 日到 8 月 6 日活跃增长 <strong>114.9%</strong>。8 月 7 日在尚未结束时已达到 346，更接近继续增长，而不是逐日降温。</div>
+      </section>
+
+      <section class="panel">
+        <h2>早期留存</h2>
+        <p class="sub">以首次观察到 session_start 的日期建立 cohort。</p>
+        <div class="retention">
+          <article class="retention-card"><span>8 月 4 日 cohort</span><strong>25.6%</strong><small>D1 · 43 / 168</small></article>
+          <article class="retention-card"><span>8 月 5 日 cohort</span><strong>18.6%</strong><small>D1 · 22 / 118</small></article>
+          <article class="retention-card"><span>8 月 4 日 cohort</span><strong>8.3%</strong><small>D3 · 14 / 168</small></article>
+        </div>
+        <div class="callout">D1 已经证明“有人第二天回来”。但 8 月 4 日是半天起表，8 月 6 日的 D1 又尚未走完，当前不能宣称留存已经稳定。</div>
+      </section>
+
+      <section class="panel">
+        <h2>核心玩法闭环</h2>
+        <p class="sub">全数据窗口内，按匿名用户去重。</p>
+        <div class="bar-list">
+          <div class="bar-row"><span class="bar-label">NBA82 进入</span><div class="track"><div class="fill" style="width:100%"></div></div><span class="bar-value">564</span></div>
+          <div class="bar-row"><span class="bar-label">NBA82 开始</span><div class="track"><div class="fill" style="width:84.4%"></div></div><span class="bar-value">476</span></div>
+          <div class="bar-row"><span class="bar-label">NBA82 完成</span><div class="track"><div class="fill" style="width:80.9%"></div></div><span class="bar-value">456</span></div>
+          <div class="bar-row"><span class="bar-label">NBA5 进入</span><div class="track"><div class="fill" style="width:56.4%"></div></div><span class="bar-value">318</span></div>
+          <div class="bar-row"><span class="bar-label">在线进入</span><div class="track"><div class="fill" style="width:32.1%"></div></div><span class="bar-value">181</span></div>
+        </div>
+        <div class="callout"><strong>NBA82 进入→开始 84.4%，开始→完成 95.8%。</strong> 这是目前最可靠、也最强的产品信号。</div>
+      </section>
+
+      <section class="panel wide">
+        <h2>深夜流量是真的，而且不只发生在深夜</h2>
+        <p class="sub">代表性小时活跃用户。主峰集中在 20:00–01:00，中午至下午还有第二波。</p>
+        <div class="heat" aria-label="代表性小时活跃柱状图">
+          <div style="height:77%" data-time="20:00" title="8月6日20:00：57"></div><div style="height:70%" data-time="21:00" title="8月6日21:00：52"></div><div style="height:81%" data-time="22:00" title="8月6日22:00：57"></div><div style="height:100%" data-time="23:00" title="8月6日23:00：70"></div><div style="height:77%" data-time="00:00" title="8月7日00:00：54"></div><div style="height:71%" data-time="01:00" title="8月7日01:00：50"></div><div style="height:43%" data-time="02:00" title="8月7日02:00：30"></div><div style="height:23%" data-time="03:00" title="8月7日03:00：16"></div><div style="height:67%" data-time="11:00" title="8月7日11:00：47"></div><div style="height:57%" data-time="14:00" title="8月7日14:00：40"></div><div style="height:57%" data-time="15:00" title="8月7日15:00：40"></div><div style="height:53%" data-time="16:00" title="8月7日16:00：37"></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>跨模式探索</h2>
+        <p class="sub">662 位用户至少进入过一个玩法。</p>
+        <div class="retention">
+          <article class="retention-card"><span>跨模式用户</span><strong>307</strong><small>占玩法用户 46.4%</small></article>
+          <article class="retention-card"><span>三模式都进入</span><strong>94</strong><small>占玩法用户 14.2%</small></article>
+          <article class="retention-card"><span>在线开赛</span><strong>69</strong><small>进入→开赛 38.1%</small></article>
+        </div>
+        <p>用户并没有被单个入口锁死，接近一半的玩法用户愿意继续探索其他模式。在线房的进入兴趣存在，但等待对手、理解房间规则或组阵容可能造成开赛前摩擦。</p>
+      </section>
+
+      <section class="panel">
+        <h2>先别误判 NBA5</h2>
+        <p class="sub">目前最重要的数据质量问题。</p>
+        <div class="callout danger"><strong>8 月 7 日：33 位 NBA5 开始用户，完成事件为 0。</strong><br>8 月 6 日也只有 14 位开始、4 位完成。分模式重构后，完成事件很可能没有在新结果路径触发。</div>
+        <p>修复前，不得把 NBA5 的 0 完成解释成所有玩家都中途退出。开包和选满五人的跨版本变化也需要先统一入口口径。</p>
+      </section>
+
+      <section class="panel wide" id="conclusion">
+        <h2>产品判断与下一步</h2>
+        <p class="sub">当前最合理的判断：核心玩法已经出现真实势能，值得继续做；但四天数据还不足以证明长期留存或商业化规模。</p>
+        <ol class="priority">
+          <li><strong>修复 NBA5 完成事件。</strong>这是当前唯一会直接误导产品判断的监控缺口。</li>
+          <li><strong>等到 8 月 14 日以后再正式比较 D1、D3、D7。</strong>同时记录传播渠道和版本发布时间。</li>
+          <li><strong>保持 NBA82 主闭环稳定。</strong>把 NBA5 进入后不开始、在线房进入后不开赛作为两个重点漏斗。</li>
+          <li><strong>广告先按真实完成量估算。</strong>优先测试自然节点的奖励广告，不打断已经非常顺畅的 NBA82 完成链路。</li>
+        </ol>
+      </section>
+
+      <section class="panel wide">
+        <h2>数据口径</h2>
+        <div class="table-wrap"><table><thead><tr><th>项目</th><th>口径或限制</th></tr></thead><tbody><tr><td>活跃用户</td><td>正式环境匿名访客去重，不等于实名账户</td></tr><tr><td>小时活跃</td><td>同一用户可出现在多个小时，不能相加成日活</td></tr><tr><td>回访</td><td>早于当前时间桶出现过；不等同于 cohort D1/D7</td></tr><tr><td>不完整日期</td><td>8 月 4 日从 12:55 开始，8 月 7 日截至 19:26</td></tr><tr><td>隐私</td><td>不读取昵称、阵容、反馈正文或直接身份信息</td></tr></tbody></table></div>
+      </section>
+    </div>
+    <footer class="foot"><p>数据源：Cloudflare 正式 D1 匿名产品事件聚合。</p><p>报告版本：2026-08-07 · 这是数据快照，不会随老板看板实时更新。</p></footer>
+  </main>
+</body>
+</html>
