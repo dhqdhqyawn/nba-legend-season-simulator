@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#111713">
+  <title>传奇实验室</title>
+  <script>document.documentElement.dataset.legendMode=new URL(location.href).searchParams.get("mode")||"";</script>
+  <link rel="stylesheet" href="./styles.css?v=20260813-2">
+  <style>
+    .start{display:grid!important;gap:6px;padding:16px 20px!important;font:inherit!important;text-align:center}
+    .start b{font-size:16px}.start span{font-size:11px;opacity:.72}
+    .start.theater-start{min-height:102px;background:var(--green);color:#fff;text-align:left}
+    .start.theater-start b{font-size:20px}.start.theater-start span{font-size:12px;color:rgba(255,255,255,.72)}
+    html:not([data-legend-mode="theater"]) #teamBRow{display:none!important}
+  </style>
+</head>
+<body>
+  <header class="topbar"><a href="../">← 玩法大厅</a><span>LEGENDS LAB</span><b id="pageTitle">传奇实验室</b></header>
+  <main>
+    <section class="lab-home" id="labHome">
+      <div class="hero"><small>LEGENDS LAB</small><h1>传奇实验室</h1></div>
+      <div class="lab-grid">
+        <a class="lab-card theater" href="?mode=theater"><small>01 · THEATER</small><h2>传奇剧场</h2><p>选择两支经典球队，进行跨时代系列赛。</p><b>进入剧场模式 →</b></a>
+        <a class="lab-card offline" href="?mode=offline&v=20260813-2"><small>02 · OFFLINE</small><h2>离线传奇对战</h2><p>只选择自己的经典队，对手随机且开赛后揭晓。</p><b>进入离线对战 →</b></a>
+        <a class="lab-card online" href="?mode=online"><small>03 · ONLINE</small><h2>在线传奇对战</h2><p>选择自己的经典球队，再进入 NBA5 在线房间。</p><b>进入在线对战 →</b></a>
+      </div>
+    </section>
+
+    <section class="setup" id="setup" hidden>
+      <a class="back-lab" href="./">← 传奇实验室</a>
+      <div class="setup-title"><small id="setupKicker"></small><h1 id="setupTitle"></h1></div>
+      <div class="team-form">
+        <label><span id="teamALabel">经典球队 A</span><select id="teamA"></select></label>
+        <label id="teamBRow"><span id="teamBLabel">经典球队 B</span><select id="teamB"></select></label>
+      </div>
+      <section class="format-panel" id="formatPanel">
+        <button class="active" type="button" data-format="quick"><b>快速模拟</b><span>一次完成七场四胜</span></button>
+        <button type="button" data-format="coach"><b>逐场策略</b><span>逐场调整进攻、防守与对位</span></button>
+      </section>
+      <button class="start" id="startButton" type="button"><b>进入 NBA5</b></button>
+    </section>
+  </main>
+  <script src="./classic-data.js?v=20260813-2"></script>
+  <script src="./app.js?v=20260813-3"></script>
+</body>
+</html>

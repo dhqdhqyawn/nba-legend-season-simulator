@@ -18,6 +18,8 @@
   let sending = false;
   let nba82Started = false;
   let nba5Started = false;
+  let nba5StartedMode = "nba5";
+  let nba5StartResultSignature = "";
   let lastPackSignature = "";
   let lastObservedMode = "home";
 
@@ -167,14 +169,41 @@
     }
   }
 
-  function markNba5Complete() {
+  function nba5ResultSignature() {
+    const result = document.getElementById("battleResult")?.textContent || "";
+    const modalResult = document.getElementById("battleResultModalContent")?.textContent || "";
+    return `${result.trim()}|${modalResult.trim()}`;
+  }
+
+  function markNba5Started(mode = currentMode() === "online" ? "online" : "nba5") {
+    if (nba5Started) return false;
+    nba5Started = true;
+    nba5StartedMode = mode;
+    nba5StartResultSignature = nba5ResultSignature();
+    emit("nba5_started", mode);
+    return true;
+  }
+
+  function markNba5Complete(mode = nba5StartedMode) {
     if (!nba5Started) return;
     const section = document.getElementById("battleResultsSection");
-    const result = document.getElementById("battleResult")?.textContent || "";
-    if (section && !section.hidden && result.trim().length > 20) {
+    const modal = document.getElementById("battleResultModal");
+    const signature = nba5ResultSignature();
+    const resultVisible = (section && !section.hidden) || (modal && !modal.hidden);
+    if (resultVisible && signature.length > 20 && signature !== nba5StartResultSignature) {
       nba5Started = false;
-      emit("nba5_completed", currentMode() === "online" ? "online" : "nba5");
+      nba5StartResultSignature = signature;
+      emit("nba5_completed", mode);
     }
+  }
+
+  function completedCoachSeries(payload) {
+    const candidates = [payload, payload?.snapshot, payload?.state, payload?.room];
+    return candidates.some((candidate) => (
+      candidate?.phase === "series_complete"
+      || candidate?.status === "series_complete"
+      || candidate?.series?.status === "complete"
+    ));
   }
 
   function markShareComplete() {
@@ -199,6 +228,8 @@
     observeElement("seasonModal", markNba82Complete, { attributes: true, attributeFilter: ["class"] });
     observeElement("battleResultsSection", markNba5Complete);
     observeElement("battleResult", markNba5Complete);
+    observeElement("battleResultModal", markNba5Complete, { attributes: true, attributeFilter: ["hidden"] });
+    observeElement("battleResultModalContent", markNba5Complete);
     observeElement("sharePanel", markShareComplete);
     observeElement("shareImage", markShareComplete, { attributes: true, attributeFilter: ["src"] });
     new MutationObserver(() => queueMicrotask(markModeEntered)).observe(document.body, {
@@ -216,9 +247,8 @@
           emit("nba82_started", "nba82");
           queueMicrotask(markNba82Complete);
         }
-      } else if (button.id === "battleStartSeries" && !nba5Started) {
-        nba5Started = true;
-        emit("nba5_started", currentMode() === "online" ? "online" : "nba5");
+      } else if (["battleStartSeries", "battleQuickSeries", "battleCoachSeries"].includes(button.id)) {
+        markNba5Started("nba5");
         queueMicrotask(markNba5Complete);
       } else if (button.id === "generateShareBtn") {
         globalThis.setTimeout(markShareComplete, 50);
@@ -238,7 +268,29 @@
         if (response.ok && method === "POST" && url.origin === location.origin) {
           if (url.pathname === "/api/battle/rooms") emit("room_created", "online");
           else if (/^\/api\/battle\/rooms\/[^/]+\/join$/.test(url.pathname)) emit("room_joined", "online");
-          else if (/^\/api\/battle\/rooms\/[^/]+\/start$/.test(url.pathname)) emit("room_started", "online");
+          else if (/^\/api\/battle\/rooms\/[^/]+\/start$/.test(url.pathname)) {
+            emit("room_started", "online");
+            markNba5Started("online");
+            const payload = await response.clone().json().catch(() => null);
+            if (payload?.room?.status === "complete") {
+              nba5Started = false;
+              emit("nba5_completed", "online");
+            }
+          } else if (/^\/api\/battle\/rooms\/[^/]+\/series\/start-ready$/.test(url.pathname)) {
+            markNba5Started("online");
+          }
+        }
+        if (response.ok && url.origin === location.origin
+          && /^\/api\/battle\/rooms\/[^/]+(?:\/series(?:\/start-ready)?|\/games\/[^/]+\/(?:strategy|reveal|next-ready))$/.test(url.pathname)) {
+          const payload = await response.clone().json().catch(() => null);
+          if (completedCoachSeries(payload)) {
+            if (!nba5Started) markNba5Started("online");
+            markNba5Complete("online");
+            if (nba5Started) {
+              nba5Started = false;
+              emit("nba5_completed", "online");
+            }
+          }
         }
       } catch {
         // The original response is returned unchanged even if observation fails.
@@ -263,7 +315,7 @@
   });
 
   const publicApi = Object.freeze({
-    schemaVersion: "product-analytics-client-1.1.0",
+    schemaVersion: "product-analytics-client-1.2.0",
     configuration,
     emit,
     flush,

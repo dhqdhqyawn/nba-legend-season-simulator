@@ -13,7 +13,7 @@
     @media(max-width:480px){.header-inner,main{width:min(100% - 20px,1180px)}.cards{gap:8px}.metric{padding:14px}.metric strong{font-size:25px}.toolbar{grid-template-columns:1fr}.auth{padding:18px}.auth-grid{grid-template-columns:1fr}.panel{padding:15px}.funnel-row{grid-template-columns:88px minmax(0,1fr) 42px}}
   </style>
   <style>
-    .toolbar{grid-template-columns:minmax(0,1fr) 180px auto}
+    .toolbar{grid-template-columns:minmax(0,1fr) 150px 180px auto}
     .mode-visual{display:grid;grid-template-columns:180px minmax(0,1fr);gap:22px;align-items:center}
     .mode-ring{width:170px;aspect-ratio:1;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--accent) 0 33.3%,var(--green) 33.3% 66.6%,var(--gold) 66.6%);position:relative}
     .mode-ring::after{content:"";position:absolute;inset:28px;border-radius:50%;background:var(--card)}
@@ -38,6 +38,7 @@
     <section class="dashboard" id="dashboard" hidden>
       <div class="toolbar">
         <div class="status" id="statusText">尚未加载</div>
+        <label>数据平台<select id="platform"><option value="web">网页版</option><option value="wechat">微信小程序</option></select></label>
         <label>观察窗口<select id="window"><option value="12h">最近 12 小时</option><option value="24h">最近 24 小时</option><option value="3d">最近 3 天</option><option value="7d" selected>最近 7 天</option><option value="14d">最近 14 天</option><option value="30d">最近 30 天</option><option value="90d">最近 90 天</option></select></label>
         <button id="refresh" type="button">立即刷新</button>
       </div>
@@ -79,17 +80,22 @@
       </div>
 
       <section class="panel single-panel"><div class="panel-head"><div><h2>正式版本分布</h2><p>用于确认发布后新旧版本没有混写</p></div></div><div class="table-wrap" id="versionTable"></div></section>
+      <section class="panel single-panel" id="officialPanel" hidden><div class="panel-head"><div><h2>微信官方日趋势（T+1）</h2><p>来自微信数据分析接口，只到昨日；与上方自有实时埋点并排核对，不相加。</p></div></div><div class="table-wrap" id="officialTable"></div></section>
       <p class="footer-note">看板只展示正式环境；每 3 小时自动刷新一次，也可手动刷新。访问统计、产品行为和在线房间是不同口径。</p>
     </section>
   </main>
   <script src="/product-metrics-xlsx.js"></script>
   <script>
   (()=>{
-    const labels={session_start:"进入游戏",pack_opened:"完成开包",lineup_completed:"选满五人",nba82_started:"开始 NBA82",nba82_completed:"完成 NBA82",nba5_started:"开始 NBA5",nba5_completed:"完成 NBA5",result_shared:"生成分享图"};
-    const funnelOrder=["session_start","pack_opened","lineup_completed","nba82_started","nba82_completed","nba5_started","nba5_completed","result_shared"];
-    const modeOrder=["nba82","nba5","online"],modeNames={nba82:"NBA82",nba5:"NBA5 离线",online:"在线房间"},modeColors={nba82:"#9e3f2d",nba5:"#26705a",online:"#b98732"};
+    const labels={session_start:"进入游戏",pack_opened:"完成开包",lineup_completed:"选满五人",nba82_started:"开始 NBA82",nba82_completed:"完成 NBA82",nba5_started:"开始 NBA5",nba5_completed:"完成 NBA5",room_started:"在线房开赛",result_shared:"结果分享"};
+    const webFunnel=["session_start","pack_opened","lineup_completed","nba82_started","nba82_completed","nba5_started","nba5_completed","result_shared"],wechatFunnel=["session_start","pack_opened","lineup_completed","nba5_started","nba5_completed","room_started","result_shared"];
+    const webModes=["nba82","nba5","online"],wechatModes=["friend","friend_free","free","offline","coach_friend","coach_free","coach_offline"];
+    const modeNames={nba82:"NBA82",nba5:"NBA5 离线",online:"在线房间",friend:"好友三包",friend_free:"好友自由",free:"自由阵容",offline:"离线三轮",coach_friend:"好友逐场",coach_free:"自由逐场",coach_offline:"离线逐场",unknown:"其他"};
+    const modeColors={nba82:"#9e3f2d",nba5:"#26705a",online:"#b98732",friend:"#9e3f2d",friend_free:"#26705a",free:"#3974a8",offline:"#b98732",coach_friend:"#7c4d9c",coach_free:"#2b8b84",coach_offline:"#8a6d3b",unknown:"#777"};
     const windowNames={"12h":"12 小时","24h":"24 小时","3d":"3 天","7d":"7 天","14d":"14 天","30d":"30 天","90d":"90 天"};
     let adminKey="",refreshTimer=null,currentSummary=null,customRangeActive=false;
+    const isWechat=()=>$("platform").value==="wechat";
+    const summaryEndpoint=()=>isWechat()?"/api/analytics/wechat-summary":"/api/analytics/summary";
     const $=id=>document.getElementById(id);
     const number=value=>Number(value||0).toLocaleString("zh-CN");
     const percent=(part,total)=>total?`${(part*100/total).toFixed(1)}%`:"—";
@@ -128,30 +134,44 @@
     function render(summary){
       const daily=summary.daily||[],totals=summary.totals||{};
       const events=new Map((summary.events||[]).map(item=>[item.eventName,item]));
-      const modes=new Map((summary.modes||[]).map(item=>[item.mode,item])),modeRows=modeOrder.map(mode=>({mode,...(modes.get(mode)||{})}));
+      const activeModes=isWechat()?wechatModes:webModes;
+      const funnelOrder=isWechat()?wechatFunnel:webFunnel;
+      const modes=new Map((summary.modes||[]).map(item=>[item.mode,item])),modeRows=activeModes.filter(mode=>modes.has(mode)).map(mode=>({mode,...(modes.get(mode)||{})}));
       const leader=modeRows.slice().sort((a,b)=>(b.visitors||0)-(a.visitors||0))[0];
       const cards=[
         ["窗口活跃用户",number(totals.activeVisitors),rangeLabel(summary)],
-        ["会话数",number(totals.sessions),`老访客 ${number(totals.returningVisitors)}`],
+        ["会话数",number(totals.sessions),isWechat()?"自有匿名会话口径":`老访客 ${number(totals.returningVisitors)}`],
         ["最受欢迎模式",leader?.visitors?modeNames[leader.mode]:"—",leader?.visitors?`${number(leader.visitors)} 位用户`:"暂无数据"],
-        ["跨模式用户",number(totals.crossModeVisitors),percent(totals.crossModeVisitors,totals.activeVisitors)],
+        [isWechat()?"微信官方昨日 DAU":"跨模式用户",isWechat()?number((summary.official||[]).at(-1)?.visitUv):number(totals.crossModeVisitors),isWechat()?"T+1 平台口径":percent(totals.crossModeVisitors,totals.activeVisitors)],
       ];
       $("metricCards").innerHTML=cards.map(x=>`<article class="metric"><span>${x[0]}</span><strong>${x[1]}</strong><small>${x[2]}</small></article>`).join("");
       const modeTotal=modeRows.reduce((sum,x)=>sum+Number(x.visitors||0),0),modeMax=Math.max(1,...modeRows.map(x=>x.visitors||0));let cursor=0;
       const stops=modeRows.map(x=>{const start=cursor;cursor+=modeTotal?(x.visitors||0)*100/modeTotal:0;return `${modeColors[x.mode]} ${start}% ${cursor}%`});
       $("modeRing").style.background=modeTotal?`conic-gradient(${stops.join(",")})`:`#e9e3d9`;$("modeRingTotal").textContent=number(totals.activeVisitors);
       $("modeBars").innerHTML=modeRows.map(x=>`<div class="mode-row"><span class="mode-name">${modeNames[x.mode]}</span><div class="bar-track"><div class="mode-swatch" style="width:${Math.max(x.visitors?3:0,(x.visitors||0)*100/modeMax)}%;background:${modeColors[x.mode]}"></div></div><span class="mode-value">${number(x.visitors)}</span><span class="mode-meta">${number(x.sessions)} 次会话 · 完成率 ${percent(x.completers,x.starters)}</span></div>`).join("");
-      $("transitions").innerHTML=(summary.transitions||[]).length?(summary.transitions||[]).map(x=>`<div class="transition-row"><div class="transition-route">${modeNames[x.fromMode]}<span>→</span>${modeNames[x.toMode]}</div><div class="transition-value"><b>${number(x.visitors)} 人</b><small>${number(x.transitions)} 次切换 · ${percent(x.visitors,modes.get(x.fromMode)?.visitors)}</small></div></div>`).join(""):'<div class="empty">当前窗口暂无跨模式流动</div>';
+      $("transitions").innerHTML=(summary.transitions||[]).length?(summary.transitions||[]).map(x=>`<div class="transition-row"><div class="transition-route">${modeNames[x.fromMode]||x.fromMode}<span>→</span>${modeNames[x.toMode]||x.toMode}</div><div class="transition-value"><b>${number(x.visitors)} 人</b><small>${number(x.transitions)} 次切换 · ${percent(x.visitors,modes.get(x.fromMode)?.visitors)}</small></div></div>`).join(""):'<div class="empty">当前窗口暂无跨模式流动</div>';
       const max=Math.max(1,...funnelOrder.map(name=>events.get(name)?.visitors||0));
       $("funnel").innerHTML=funnelOrder.map(name=>{const value=events.get(name)?.visitors||0;return `<div class="funnel-row"><span class="funnel-label">${labels[name]}</span><div class="bar-track"><div class="bar" style="width:${Math.max(value?2:0,value*100/max)}%"></div></div><span class="funnel-value">${number(value)}</span></div>`}).join("");
-      const depth=[
+      const depth=isWechat()?[
+        ["选满五人 / 活跃",events.get("lineup_completed")?.visitors||0,totals.activeVisitors||0],
+        ["NBA5 完成 / 开始",events.get("nba5_completed")?.visitors||0,events.get("nba5_started")?.visitors||0],
+        ["在线开赛 / 活跃",events.get("room_started")?.visitors||0,totals.activeVisitors||0],
+        ["结果分享 / 活跃",events.get("result_shared")?.visitors||0,totals.activeVisitors||0],
+      ]:[
         ["选满五人 / 活跃",events.get("lineup_completed")?.visitors||0,totals.activeVisitors||0],
         ["NBA82 完成 / 开始",modes.get("nba82")?.completers||0,modes.get("nba82")?.starters||0],
         ["在线开赛 / 进入",modes.get("online")?.starters||0,modes.get("online")?.visitors||0],
         ["分享 / 活跃",events.get("result_shared")?.visitors||0,totals.activeVisitors||0],
       ];
       $("depthGrid").innerHTML=depth.map(([label,part,total])=>{const value=total?part*100/total:0;return `<article class="depth-card"><header><span>${label}</span><strong>${percent(part,total)}</strong></header><div class="depth-track"><div class="depth-fill" style="width:${Math.min(100,value)}%"></div></div><small>${number(part)} / ${number(total)} 位用户</small></article>`}).join("");
-      $("dailyTable").innerHTML=table([
+      const officialByDay=new Map((summary.official||[]).map(row=>[row.day,row]));
+      $("dailyTable").innerHTML=isWechat()?table([
+        summary.bucketUnit==="hour"?"小时":"日期","自有活跃","会话","NBA5 开始/完成","在线开赛","开包","选满五人","分享","官方 DAU（T+1）"
+      ],daily.slice().reverse().map(x=>[
+        x.day,number(x.activeVisitors),number(x.sessions),`${number(x.nba5Starters)} / ${number(x.nba5Completers)}`,
+        number(x.onlineStarters),number(x.packOpeners),number(x.lineupCompleters),number(x.sharers),
+        summary.bucketUnit==="day"?number(officialByDay.get(x.day)?.visitUv):"按天提供"
+      ])):table([
         summary.bucketUnit==="hour"?"小时":"日期","活跃","回访","会话",
         "NBA82 进入","NBA82 开始/完成","NBA5 进入","NBA5 开始/完成",
         "在线进入","在线开赛","开包","选满五人","分享"
@@ -172,6 +192,8 @@
       ]));
       $("roomTable").innerHTML=table(["日期","创建","完成","完成率"],(summary.legacyRooms||[]).slice().reverse().map(x=>[x.day,number(x.roomsCreated),number(x.roomsComplete),percent(x.roomsComplete,x.roomsCreated)]));
       $("versionTable").innerHTML=table(["版本","访客","事件"],(summary.versions||[]).map(x=>[x.releaseVersion,number(x.visitors),number(x.events)]));
+      $("officialPanel").hidden=!isWechat();
+      $("officialTable").innerHTML=table(["日期","官方 DAU","新用户","打开次数","访问次数","人均停留","访问深度"],(summary.official||[]).slice().reverse().map(x=>[x.day,number(x.visitUv),number(x.newUv),number(x.sessions),number(x.visitPv),`${Number(x.stayTimeUv||0).toFixed(1)} 秒`,Number(x.visitDepth||0).toFixed(2)]));
       currentSummary=summary;$("exportExcel").disabled=false;
       $("datePanel").classList.toggle("active",Boolean(summary.range));
       $("dateFeedback").className="date-feedback";
@@ -185,7 +207,7 @@
       $("activeChartReadout").textContent="点击图上的数据点查看时间与数值。";
     }
     function renderStartsChart(summary){
-      const series=modeOrder.map(mode=>({key:`${mode}Starters`,label:modeNames[mode],color:modeColors[mode]}));
+      const series=(isWechat()?["nba5","online"]:webModes).map(mode=>({key:`${mode}Starters`,label:modeNames[mode],color:modeColors[mode]}));
       $("startsLegend").innerHTML=series.map(item=>`<span class="legend-item"><i class="legend-dot" style="background:${item.color}"></i>${item.label}</span>`).join("");
       $("startsTrend").innerHTML=timeChart(summary.daily||[],series,{ariaLabel:"玩法开赛时间趋势"});
       $("startsCaption").textContent=`最近 ${windowNames[summary.windowKey]||summary.windowKey} · ${summary.bucketUnit==="hour"?"按小时":"按天"} · 北京时间轴`;
@@ -197,7 +219,7 @@
       const button=$(buttonId);button.disabled=true;$(chartId).innerHTML='<div class="empty">正在读取图表…</div>';
       try{
         const params=new URLSearchParams({window:$(windowId).value,bucket:$(bucketId).value});
-        const response=await fetch(`/api/analytics/summary?${params}`,{headers:{Authorization:`Bearer ${adminKey}`},cache:"no-store"});
+        const response=await fetch(`${summaryEndpoint()}?${params}`,{headers:{Authorization:`Bearer ${adminKey}`},cache:"no-store"});
         const data=await response.json().catch(()=>null);
         if(response.status===401){showAuthError(data?.error?.message);return}
         if(!response.ok||!data?.ok)throw new Error(data?.error?.message||`读取失败（${response.status}）`);
@@ -209,7 +231,7 @@
       const button=$("refresh");button.disabled=true;$("applyDates").disabled=true;$("exportExcel").disabled=true;$("statusText").style.color="";$("statusText").textContent="正在读取…";
       try{
         const params=customRangeActive?new URLSearchParams({from:$("dateFrom").value,to:$("dateTo").value}):new URLSearchParams({window:$("window").value});
-        const response=await fetch(`/api/analytics/summary?${params}`,{headers:{Authorization:`Bearer ${adminKey}`},cache:"no-store"});
+        const response=await fetch(`${summaryEndpoint()}?${params}`,{headers:{Authorization:`Bearer ${adminKey}`},cache:"no-store"});
         const data=await response.json().catch(()=>null);
         if(response.status===401){showAuthError(data?.error?.message);return}
         if(!response.ok||!data?.ok)throw new Error(data?.error?.message||`读取失败（${response.status}）`);
@@ -234,7 +256,7 @@
     }
     $("loadDashboard").addEventListener("click",async()=>{const value=$("adminKey").value.trim();if(!value){$("authMessage").textContent="请输入管理员密钥。";$("authMessage").className="message error";return}adminKey=value;$("adminKey").value="";$("authPanel").hidden=true;$("dashboard").hidden=false;await refreshAll()});
     $("adminKey").addEventListener("keydown",event=>{if(event.key==="Enter")$("loadDashboard").click()});
-    $("refresh").addEventListener("click",refreshAll);$("window").addEventListener("change",usePreset);$("applyDates").addEventListener("click",applyDateRange);$("clearDates").addEventListener("click",usePreset);$("activeChartApply").addEventListener("click",()=>loadChart("active"));$("startsChartApply").addEventListener("click",()=>loadChart("starts"));bindChart("trend","activeChartReadout");bindChart("startsTrend","startsChartReadout");
+    $("refresh").addEventListener("click",refreshAll);$("platform").addEventListener("change",()=>{customRangeActive=false;refreshAll()});$("window").addEventListener("change",usePreset);$("applyDates").addEventListener("click",applyDateRange);$("clearDates").addEventListener("click",usePreset);$("activeChartApply").addEventListener("click",()=>loadChart("active"));$("startsChartApply").addEventListener("click",()=>loadChart("starts"));bindChart("trend","activeChartReadout");bindChart("startsTrend","startsChartReadout");
     $("exportExcel").addEventListener("click",()=>{if(!currentSummary)return;if(!window.ProductMetricsXlsx){$("dateFeedback").textContent="Excel 导出模块未加载，请刷新页面重试。";$("dateFeedback").className="date-feedback error";return}window.ProductMetricsXlsx.download(currentSummary)});
     const today=beijingToday();$("dateTo").value=today;$("dateFrom").value=addDays(today,-6);
   })();
