@@ -111,6 +111,20 @@ test("rejects malformed lineup payloads and honeypot submissions", () => {
   );
 });
 
+test("keeps the feedback lineup field restricted to NBA82 codes", () => {
+  const nba82 = lineupCode();
+  const nba5 = `NBA5-${nba82.slice("NBA82-".length)}`;
+
+  assert.match(normalizeFeedbackFields({ lineupCode: nba82 }).lineupCode, /^NBA82-/);
+  assert.throws(
+    () => normalizeFeedbackFields({ lineupCode: nba5 }),
+    (error) =>
+      error instanceof ApiError &&
+      error.code === "invalid_lineup_code" &&
+      /NBA82-/.test(error.message),
+  );
+});
+
 test("enforces text length limits", () => {
   assert.throws(
     () =>

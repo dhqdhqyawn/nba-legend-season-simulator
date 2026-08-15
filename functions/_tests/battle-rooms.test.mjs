@@ -56,6 +56,7 @@ test("accepts a current short NBA5 and normalizes room input", () => {
   }, "host"), {
     name: "小丁",
     roomType: "fair_pack",
+    cardPoolKey: "all",
     protocolVersion: BATTLE_ROOM_PROTOCOL,
   });
   assert.deepEqual(normalizeRoomLineupSubmission({
@@ -71,11 +72,27 @@ test("accepts a current short NBA5 and normalizes room input", () => {
 
 test("normalizes room rules, pack requests and rematch choices", () => {
   const sessionToken = "23456789234567892345678923456789";
-  assert.equal(normalizeRoomSubmission({
+  const openRoom = normalizeRoomSubmission({
     name: "自由房",
     roomType: "open_lineup",
+    cardPoolKey: "modern_2015_2026",
     protocolVersion: BATTLE_ROOM_PROTOCOL,
-  }, "host").roomType, "open_lineup");
+  }, "host");
+  assert.equal(openRoom.roomType, "open_lineup");
+  assert.equal(openRoom.cardPoolKey, "modern_2015_2026");
+  const fairRoom = normalizeRoomSubmission({
+    name: "历史房",
+    roomType: "fair_pack",
+    cardPoolKey: "historic_pre_2015",
+    protocolVersion: BATTLE_ROOM_PROTOCOL,
+  }, "host");
+  assert.equal(fairRoom.cardPoolKey, "historic_pre_2015");
+  assert.throws(() => normalizeRoomSubmission({
+    name: "错误卡池",
+    roomType: "fair_pack",
+    cardPoolKey: "guards",
+    protocolVersion: BATTLE_ROOM_PROTOCOL,
+  }, "host"), error => error instanceof ApiError && error.code === "invalid_card_pool");
   assert.deepEqual(normalizeRoomPackSubmission({
     sessionToken,
     protocolVersion: BATTLE_ROOM_PROTOCOL,
@@ -169,6 +186,7 @@ function roomRow(overrides = {}) {
     room_code: "ABCD2345",
     status: "complete",
     room_type: "fair_pack",
+    card_pool_key: "historic_pre_2015",
     round_number: 1,
     host_score: 0,
     guest_score: 0,
@@ -225,6 +243,7 @@ test("complete rooms expose one locked seed and both exact lineups", () => {
   const room = publicRoom(row, 160);
   assert.equal(room.status, "complete");
   assert.equal(room.roomType, "fair_pack");
+  assert.equal(room.cardPoolKey, "historic_pre_2015");
   assert.equal(room.round, 1);
   assert.equal(room.host.packsOpened, 2);
   assert.equal(room.guest.packsOpened, 3);
@@ -266,7 +285,10 @@ test("opening a completed result renews the room for thirty minutes", async () =
     },
   };
 
-  const room = await startBattleRoom(database, row.room_code, { sessionToken }, nowSeconds);
+  const room = await startBattleRoom(database, row.room_code, {
+    sessionToken,
+    protocolVersion: BATTLE_ROOM_PROTOCOL,
+  }, nowSeconds);
   assert.equal(row.expires_at, nowSeconds + BATTLE_ROOM_TTL_SECONDS);
   assert.equal(room.expiresAt, new Date((nowSeconds + BATTLE_ROOM_TTL_SECONDS) * 1000).toISOString());
 });
